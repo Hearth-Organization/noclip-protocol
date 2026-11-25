@@ -14,6 +14,7 @@
 #include <AzCore/std/chrono/chrono.h>
 #include <AzFramework/Components/NonUniformScaleComponent.h>
 #include <AzFramework/Components/TransformComponent.h>
+#include <AzFramework/Entity/EntityDebugDisplayBus.h>
 
 #include <cstdlib>
 
@@ -206,6 +207,11 @@ namespace NoclipProtocol
             DespawnChunk(chunk);
         }
         m_chunks.clear();
+        m_statsShown.clear();
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Set("/Hearth/Viewport/Stats", AZStd::string_view{});
+        }
         for (auto& asset : m_pieceAssets)
         {
             asset.Release();
@@ -317,6 +323,64 @@ namespace NoclipProtocol
                 }
             }
         }
+
+        PublishStats();
+        DrawChunkBorders();
+    }
+
+    // Hearth Engine viewport (approved mockup "Editor"): "9 chunks · 412 pieces" in the status line, and the
+    // Chunks button there turns on chunk borders. Both go through the settings registry so the engine needs no game code.
+    void EndlessLevelComponent::PublishStats()
+    {
+        int pieces = 0;
+        for (const auto& entry : m_chunks)
+        {
+            pieces += entry.second.m_pieces;
+        }
+        const AZStd::string text = AZStd::string::format("%d chunks · %d pieces", static_cast<int>(m_chunks.size()), pieces);
+        if (text != m_statsShown)
+        {
+            m_statsShown = text;
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Set("/Hearth/Viewport/Stats", text);
+            }
+        }
+    }
+
+    void EndlessLevelComponent::DrawChunkBorders() const
+    {
+        bool show = false;
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Get(show, "/Hearth/Viewport/ShowChunks");
+        }
+        if (!show)
+        {
+            return;
+        }
+        AzFramework::DebugDisplayRequestBus::BusPtr debugBus;
+        AzFramework::DebugDisplayRequestBus::Bind(debugBus, AzFramework::g_defaultSceneEntityDebugDisplayId);
+        AzFramework::DebugDisplayRequests* debug = AzFramework::DebugDisplayRequestBus::FindFirstHandler(debugBus);
+        if (!debug)
+        {
+            return;
+        }
+        const float size = m_settings.m_cellSize * static_cast<float>(m_settings.m_chunkCells);
+        const float top = m_settings.m_ceilingHeight;
+        debug->SetColor(AZ::Color(0.91f, 0.45f, 0.23f, 1.0f)); // ember
+        for (const auto& entry : m_chunks)
+        {
+            const float x0 = static_cast<float>(entry.second.m_x) * size;
+            const float y0 = static_cast<float>(entry.second.m_y) * size;
+            const AZ::Vector3 corners[4] = { AZ::Vector3(x0, y0, 0.05f), AZ::Vector3(x0 + size, y0, 0.05f),
+                                             AZ::Vector3(x0 + size, y0 + size, 0.05f), AZ::Vector3(x0, y0 + size, 0.05f) };
+            for (int i = 0; i < 4; ++i)
+            {
+                debug->DrawLine(corners[i], corners[(i + 1) % 4]);
+                debug->DrawLine(corners[i], corners[i] + AZ::Vector3(0.0f, 0.0f, top));
+            }
+        }
     }
 
     void EndlessLevelComponent::SpawnChunk(int chunkX, int chunkY)
@@ -327,6 +391,7 @@ namespace NoclipProtocol
         chunk.m_x = chunkX;
         chunk.m_y = chunkY;
         chunk.m_tickets.reserve(PieceCount);
+        const int piecesBefore = m_spawnedPieces;
         for (int i = 0; i < PieceCount; ++i)
         {
             chunk.m_tickets.emplace_back(m_pieceAssets[i]);
@@ -388,11 +453,13 @@ namespace NoclipProtocol
             }
         }
 
+        chunk.m_pieces = m_spawnedPieces - piecesBefore;
         m_chunks.emplace(Key(chunkX, chunkY), AZStd::move(chunk));
     }
 
     void EndlessLevelComponent::SpawnBox(AzFramework::EntitySpawnTicket& ticket, const Level0::Box& box, bool stretch, float yawRadians)
     {
+        ++m_spawnedPieces;
         const AZ::Vector3 translation(box.m_cx, box.m_cy, box.m_cz);
         const AZ::Vector3 scale(box.m_sx, box.m_sy, box.m_sz);
 

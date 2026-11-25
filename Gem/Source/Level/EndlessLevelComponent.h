@@ -62,6 +62,7 @@ namespace NoclipProtocol
             int m_x = 0;
             int m_y = 0;
             AZStd::vector<AzFramework::EntitySpawnTicket> m_tickets;
+            int m_pieces = 0; // walls, pillars, lights, stains... spawned for this chunk
         };
 
         static AZ::u64 Key(int x, int y);
@@ -114,5 +115,9 @@ namespace NoclipProtocol
         AZStd::unordered_map<AZ::u64, Chunk> m_chunks;
         bool m_assetsMissing = false;
         bool m_announced = false;
+        int m_spawnedPieces = 0;      // counts SpawnBox calls, for the editor's "9 chunks · 412 pieces"
+        AZStd::string m_statsShown;   // what was last written to /Hearth/Viewport/Stats
+        void PublishStats();
+        void DrawChunkBorders() const;
     };
 } // namespace NoclipProtocol
