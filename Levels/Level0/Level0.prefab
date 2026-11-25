@@ -171,6 +171,371 @@
                 }
             }
         },
+        "Entity_[15429039280115]": {
+            "Id": "Entity_[15429039280115]",
+            "Name": "Footsteps",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 8750090672815389399
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 11201622963860152473
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 14512946332031392151,
+                    "Child Entity Order": [
+                        "Entity_[15433334247411]",
+                        "Entity_[15437629214707]",
+                        "Entity_[15441924182003]",
+                        "Entity_[15446219149299]",
+                        "Entity_[15450514116595]"
+                    ]
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 8885084324470944542
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 6577544569121639016
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 4065260078925572981
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 1544513419322940467
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 15866994430786436163
+                },
+                "FootstepsComponent": {
+                    "$type": "GenericComponentWrapper",
+                    "Id": 9951525114979462621,
+                    "m_template": {
+                        "$type": "FootstepsComponent",
+                        "Follow": "Entity_[915853021226]",
+                        "StepSounds": [
+                            "Entity_[15433334247411]",
+                            "Entity_[15437629214707]",
+                            "Entity_[15441924182003]",
+                            "Entity_[15446219149299]"
+                        ],
+                        "LandSound": "Entity_[15450514116595]"
+                    }
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 4953587271521490915,
+                    "Parent Entity": "Entity_[915853021226]"
+                }
+            }
+        },
+        "Entity_[15433334247411]": {
+            "Id": "Entity_[15433334247411]",
+            "Name": "Step1",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 6602724699566713579
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 17000862059764345489
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 11292093348726149539
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 13006541376432266163
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 16311945854739969257
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 15234824976639026352,
+                    "Controller": {
+                        "Config": {
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{62A7B761-556C-5DCD-B594-0631E8645DD4}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/level0/step_carpet_1.wav.miniaudio"
+                            },
+                            "Volume": 55.0,
+                            "Auto-follow": true
+                        }
+                    }
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 10188190235706849533
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 8254697908180813911
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 12618630350116894492
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 1832197295254473519,
+                    "Parent Entity": "Entity_[15429039280115]"
+                }
+            }
+        },
+        "Entity_[15437629214707]": {
+            "Id": "Entity_[15437629214707]",
+            "Name": "Step2",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 12780438346910136065
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 5590466175579172226
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 3987771213814969644
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 6055147975254345472
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 8532503846445354107
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 6705959293493454461,
+                    "Controller": {
+                        "Config": {
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{C9A98293-D7A4-5431-B7CB-42CB7021C1B5}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/level0/step_carpet_2.wav.miniaudio"
+                            },
+                            "Volume": 55.0,
+                            "Auto-follow": true
+                        }
+                    }
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 8492473619454173854
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 18114092996375121567
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 8341789924394295483
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 9346306347450712317,
+                    "Parent Entity": "Entity_[15429039280115]"
+                }
+            }
+        },
+        "Entity_[15441924182003]": {
+            "Id": "Entity_[15441924182003]",
+            "Name": "Step3",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 12983515116940764080
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 10967987451845408412
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 10900698471799086993
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 15608624476236126373
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 2907090410900614972
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 6279652782044971326,
+                    "Controller": {
+                        "Config": {
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{A48F6755-1122-5C9E-91A5-D06C0BF0ED10}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/level0/step_carpet_3.wav.miniaudio"
+                            },
+                            "Volume": 55.0,
+                            "Auto-follow": true
+                        }
+                    }
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 8982342805968658428
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 12758363330323432557
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 9889477739934129114
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 15843155116362716019,
+                    "Parent Entity": "Entity_[15429039280115]"
+                }
+            }
+        },
+        "Entity_[15446219149299]": {
+            "Id": "Entity_[15446219149299]",
+            "Name": "Step4",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 6887643669859310085
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 6209610981492273818
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 2724626815841320561
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 12549630297829188426
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 8731606020819645294
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 2215841707136290668,
+                    "Controller": {
+                        "Config": {
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{D15D83CA-4A51-57E3-AF98-DA16CB6F048E}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/level0/step_carpet_4.wav.miniaudio"
+                            },
+                            "Volume": 55.0,
+                            "Auto-follow": true
+                        }
+                    }
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 13977190875698755783
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 13466126548335748988
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 10491976729731182555
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 15210136067954417499,
+                    "Parent Entity": "Entity_[15429039280115]"
+                }
+            }
+        },
+        "Entity_[15450514116595]": {
+            "Id": "Entity_[15450514116595]",
+            "Name": "StepLand",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 8141588044967171172
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 12562583565113147056
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 10834595599490838611
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 4859154693426637706
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 9337094670493864543
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 17035926422898571206,
+                    "Controller": {
+                        "Config": {
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{62AC545D-C25D-531E-9170-3882F93BC0A5}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/level0/step_carpet_land.wav.miniaudio"
+                            },
+                            "Volume": 55.0,
+                            "Auto-follow": true
+                        }
+                    }
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 4366073527426155394
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 8126112630776613867
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 9332866222253868584
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 16569390164957766783,
+                    "Parent Entity": "Entity_[15429039280115]"
+                }
+            }
+        },
         "Entity_[911558053930]": {
             "Id": "Entity_[911558053930]",
             "Name": "GroundCollider",
@@ -285,7 +650,8 @@
                     "$type": "EditorEntitySortComponent",
                     "Id": 15762405793376488372,
                     "Child Entity Order": [
-                        "Entity_[920147988522]"
+                        "Entity_[920147988522]",
+                        "Entity_[15429039280115]"
                     ]
                 },
                 "EditorInspectorComponent": {
