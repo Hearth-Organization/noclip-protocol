@@ -43,7 +43,7 @@ LOG_DIR = PROJECT / "user" / "log"
 LAUNCHER = PROJECT / "build" / "linux" / "bin" / "profile" / "NoclipProtocol.GameLauncher"
 BUILD_TARGETS = ["NoclipProtocol.GameLauncher", "NoclipProtocol.HeadlessServerLauncher",
                  "NoclipProtocol.ServerLauncher", "NoclipProtocol.UnifiedLauncher", "Editor"]
-VERSION = "1.4"
+VERSION = "1.5"
 ENGINE_DIR = Path.home() / "O3DE" / "Engines" / "hearth-engine"
 ENGINE_REPO = "https://github.com/Dragongamer9/hearth-engine"
 ENGINE_BRANCH = "hearth/main"
@@ -648,6 +648,18 @@ def op_engine(args):
         return {"state": dict(_engine_state), "progress": progress, "engine_dir": str(ENGINE_DIR),
                 "downloaded": (ENGINE_DIR / "engine.json").exists(), "git_lfs": git_lfs,
                 "disk_free_gb": round(disk.free / 2**30, 1), "log_tail": "\n".join(text.splitlines()[-12:])}
+    if action == "stop":
+        stopped = []
+        for name in ("ninja", "cmake"):
+            for pid, cmd in find_processes(name):
+                if str(ENGINE_DIR) in " ".join(cmd) or os.path.realpath(f"/proc/{pid}/cwd").startswith(str(ENGINE_DIR)):
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                        stopped.append(pid)
+                    except OSError:
+                        pass
+        log(f"engine build stopped: {stopped}")
+        return {"ok": True, "stopped": stopped}
     if not _engine_lock.acquire(blocking=False):
         return {"ok": False, "error": "engine work already running", "state": dict(_engine_state)}
     env = dict(os.environ)
@@ -665,18 +677,18 @@ def op_engine(args):
         steps.append(("update", ["git", "pull", "--ff-only"], str(ENGINE_DIR), env))
         steps.append(("lfs files", ["git", "lfs", "pull"], str(ENGINE_DIR), env))
     elif action == "build":
-        if editor_processes() and args.get("stop_editor"):
+        if editor_processes() and args.get("stop_editor", True):
             op_editor_stop({"save": True})
         build_env = dict(env)
-        build_env["HEARTH_JOBS"] = str(int(args.get("jobs", 3)))
+        build_env["HEARTH_JOBS"] = str(int(args.get("jobs", 5)))
         steps.append(("build", ["bash", str(ENGINE_DIR / "scripts" / "hearth" / "build-laptop.sh"), str(PROJECT)],
                       str(ENGINE_DIR), build_env))
     else:
         _engine_lock.release()
-        return {"ok": False, "error": "action must be status, setup, update or build"}
+        return {"ok": False, "error": "action must be status, setup, update, build or stop"}
     if args.get("then_build") and action in ("setup", "update"):
         build_env = dict(env)
-        build_env["HEARTH_JOBS"] = str(int(args.get("jobs", 3)))
+        build_env["HEARTH_JOBS"] = str(int(args.get("jobs", 5)))
         steps.append(("build", ["bash", str(ENGINE_DIR / "scripts" / "hearth" / "build-laptop.sh"), str(PROJECT)],
                       str(ENGINE_DIR), build_env))
     _engine_state.update(running=True, step=None, started=time.time(), finished=None, exit_code=None)

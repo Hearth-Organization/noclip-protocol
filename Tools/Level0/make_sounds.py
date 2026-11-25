@@ -6,6 +6,7 @@
 level0_hum.wav       fluorescent buzz for each working ceiling light (4 s loop)
 level0_roomtone.wav  faint low air/building rumble heard everywhere (8 s loop)
 level0_zap.wav       short electrical crackle for flickering lights (one-shot)
+step_carpet_1..4.wav footsteps on carpet (four variations); step_carpet_land.wav landing from a jump
 
 Every looped part is built from whole cycles over the loop length, so the
 start and end join without a click.
@@ -84,12 +85,35 @@ def zap():
     return (buzz * 0.8 + crackle * 0.6) * env * stutter + snap
 
 
+def footstep(seed, heavy=False):
+    """A footstep on thin office carpet: a soft low thud plus a short fabric scuff."""
+    seconds = 0.45 if heavy else 0.32
+    t = np.arange(int(RATE * seconds)) / RATE
+    rng = np.random.default_rng(100 + seed)
+    pitch = rng.uniform(0.9, 1.12)
+    thud = np.sin(2 * np.pi * (70 * pitch) * t * (1 - 0.35 * t)) * np.exp(-t * (18 if heavy else 26))
+    thud += 0.5 * np.sin(2 * np.pi * (140 * pitch) * t) * np.exp(-t * 40)
+    noise = rng.standard_normal(t.size)
+    spec = np.fft.rfft(noise)
+    freqs = np.fft.rfftfreq(t.size, 1 / RATE)
+    spec *= np.exp(-((np.log(freqs + 1) - np.log(900 * pitch)) ** 2) / 0.9)   # soft band around ~900 Hz
+    scuff = np.fft.irfft(spec, t.size)
+    scuff /= np.abs(scuff).max() + 1e-9
+    onset = rng.uniform(0.006, 0.02)
+    scuff_env = np.clip((t - onset) / 0.01, 0, 1) * np.exp(-np.clip(t - onset, 0, None) * (22 if heavy else 30))
+    attack = np.clip(t / 0.003, 0, 1)
+    return (thud * (1.3 if heavy else 1.0) + 0.55 * scuff * scuff_env) * attack
+
+
 def main():
     out = Path(sys.argv[1] if len(sys.argv) > 1 else ".")
     out.mkdir(parents=True, exist_ok=True)
     write_wav(out / "level0_hum.wav", hum(), 0.7)
     write_wav(out / "level0_roomtone.wav", roomtone(), 0.6)
     write_wav(out / "level0_zap.wav", zap(), 0.95)
+    for i in range(1, 5):
+        write_wav(out / f"step_carpet_{i}.wav", footstep(i), 0.8)
+    write_wav(out / "step_carpet_land.wav", footstep(9, heavy=True), 0.9)
 
 
 if __name__ == "__main__":

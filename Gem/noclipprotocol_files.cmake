@@ -8,8 +8,12 @@ set(FILES
     Source/Player/FirstPersonControllerComponent.h
     Source/Player/FlashlightComponent.cpp
     Source/Player/FlashlightComponent.h
+    Source/Player/FootstepsComponent.cpp
+    Source/Player/FootstepsComponent.h
     Source/Level/Level0Layout.cpp
     Source/Level/Level0Layout.h
+    Source/Level/Level0Scripting.cpp
+    Source/Level/Level0Scripting.h
     Source/Level/EndlessLevelComponent.cpp
     Source/Level/EndlessLevelComponent.h
     Source/Level/FlickerLightComponent.cpp

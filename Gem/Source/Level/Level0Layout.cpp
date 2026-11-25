@@ -219,11 +219,38 @@ namespace NoclipProtocol::Level0
             }
         }
 
-        // 3b. The spawn room: a big open room centered on the spawn cell (it spans the four chunks around the
-        //     origin). Every wall between two of its cells goes; its outer walls keep the maze's doorways.
-        //     Both chunks sharing a border apply the same rule, so they agree.
+        // 3b. The spawn room (the players' first base): a big open room centered on the spawn cell, spanning the
+        //     four chunks around the origin. Walled all round, with two doorways side by side in the north
+        //     wall, so the back of the room is the safe end to build in. A hallway loops around the outside of it, so every part of the
+        //     maze that used to connect through the room still connects. Both chunks sharing a border apply
+        //     the same rule, so they agree.
         const int r = settings.m_spawnRoomRadius;
         auto inRoom = [r](int gx, int gy) { return gx >= -r && gx <= r && gy >= -r && gy <= r; };
+        auto inRing = [r, &inRoom](int gx, int gy)
+        { return !inRoom(gx, gy) && gx >= -r - 1 && gx <= r + 1 && gy >= -r - 1 && gy <= r + 1; };
+        // The edge between two side-by-side cells: true = wall, false = open, -1 = leave as the maze made it.
+        auto spawnRule = [&](int ax, int ay, int bx, int by) -> int
+        {
+            const bool a = inRoom(ax, ay);
+            const bool b = inRoom(bx, by);
+            if (a && b)
+            {
+                return 0;
+            }
+            if (a != b)
+            {
+                // Both doorways in the north wall, one cell in from each side (solid wall between them).
+                const int doorX = std::max(1, r - 1);
+                const bool northEdge = (ay == r && by == r + 1) || (ay == r + 1 && by == r);
+                const bool door = ax == bx && (ax == doorX || ax == -doorX) && northEdge;
+                return door ? 0 : 1;
+            }
+            if (inRing(ax, ay) && inRing(bx, by))
+            {
+                return 0;
+            }
+            return -1;
+        };
         if (r > 0)
         {
             for (int x = 0; x < n; ++x)
@@ -231,7 +258,8 @@ namespace NoclipProtocol::Level0
                 for (int y = 0; y <= n; ++y)
                 {
                     // h[x][y] separates cells (x, y - 1) and (x, y)
-                    if (inRoom(baseX + x, baseY + y - 1) && inRoom(baseX + x, baseY + y)) { h[x][y] = false; }
+                    const int rule = spawnRule(baseX + x, baseY + y - 1, baseX + x, baseY + y);
+                    if (rule >= 0) { h[x][y] = rule == 1; }
                 }
             }
             for (int x = 0; x <= n; ++x)
@@ -239,7 +267,8 @@ namespace NoclipProtocol::Level0
                 for (int y = 0; y < n; ++y)
                 {
                     // v[x][y] separates cells (x - 1, y) and (x, y)
-                    if (inRoom(baseX + x - 1, baseY + y) && inRoom(baseX + x, baseY + y)) { v[x][y] = false; }
+                    const int rule = spawnRule(baseX + x - 1, baseY + y, baseX + x, baseY + y);
+                    if (rule >= 0) { v[x][y] = rule == 1; }
                 }
             }
         }

@@ -5,6 +5,7 @@
 #include "NoclipProtocolSystemComponent.h"
 #include "Player/FirstPersonControllerComponent.h"
 #include "Player/FlashlightComponent.h"
+#include "Player/FootstepsComponent.h"
 #include "Level/EndlessLevelComponent.h"
 #include "Level/FlickerLightComponent.h"
 
@@ -27,6 +28,7 @@ namespace NoclipProtocol
                 NoclipProtocolSystemComponent::CreateDescriptor(),
                 FirstPersonControllerComponent::CreateDescriptor(),
                 FlashlightComponent::CreateDescriptor(),
+                FootstepsComponent::CreateDescriptor(),
                 EndlessLevelComponent::CreateDescriptor(),
                 FlickerLightComponent::CreateDescriptor(),
             });

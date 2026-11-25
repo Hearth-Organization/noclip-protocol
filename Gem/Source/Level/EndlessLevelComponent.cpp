@@ -1,4 +1,5 @@
 #include "EndlessLevelComponent.h"
+#include "Level0Scripting.h"
 
 #include <AzCore/Asset/AssetManager.h>
 #include <AzCore/Asset/AssetManagerBus.h>
@@ -18,6 +19,8 @@ namespace NoclipProtocol
 {
     void EndlessLevelComponent::Reflect(AZ::ReflectContext* context)
     {
+        Level0::ReflectScripting(context);
+
         if (auto serialize = azrtti_cast<AZ::SerializeContext*>(context))
         {
             serialize->Class<EndlessLevelComponent, AZ::Component>()
