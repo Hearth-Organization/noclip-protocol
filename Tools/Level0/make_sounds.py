@@ -68,14 +68,20 @@ def roomtone():
 
 
 def zap():
-    seconds = 0.35
+    """Fluorescent tube sputtering on: a sharp snap, then a harsh clipped buzz with crackle that dies away."""
+    seconds = 0.6
     t = np.arange(int(RATE * seconds)) / RATE
     rng = np.random.default_rng(4)
-    crackle = rng.standard_normal(t.size) * (rng.random(t.size) < 0.08)
-    buzz = np.sign(np.sin(2 * np.pi * 120 * t)) * 0.5
-    env = np.exp(-t * 14)
-    env[: int(0.004 * RATE)] *= np.linspace(0, 1, int(0.004 * RATE))
-    return (crackle + buzz) * env
+    buzz = np.zeros_like(t)
+    for k, amp in [(1, 1.0), (2, 0.7), (3, 0.6), (5, 0.4), (7, 0.25)]:
+        buzz += amp * np.sin(2 * np.pi * 120 * k * t)
+    buzz = np.tanh(buzz * 3.0)                                   # harsh, nearly square
+    crackle = rng.standard_normal(t.size) * (rng.random(t.size) < 0.25)
+    crackle = np.convolve(crackle, np.ones(6) / 6, mode="same") * 2.5
+    snap = rng.standard_normal(t.size) * np.exp(-t * 120) * 0.9   # the initial pop
+    env = np.clip(t / 0.003, 0, 1) * np.where(t < 0.18, 1.0, np.exp(-(t - 0.18) * 9))
+    stutter = 0.6 + 0.4 * (np.sin(2 * np.pi * 23 * t) > -0.3)     # uneven, sputtering
+    return (buzz * 0.8 + crackle * 0.6) * env * stutter + snap
 
 
 def main():
@@ -83,7 +89,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     write_wav(out / "level0_hum.wav", hum(), 0.7)
     write_wav(out / "level0_roomtone.wav", roomtone(), 0.6)
-    write_wav(out / "level0_zap.wav", zap(), 0.9)
+    write_wav(out / "level0_zap.wav", zap(), 0.95)
 
 
 if __name__ == "__main__":
