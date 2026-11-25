@@ -282,7 +282,9 @@ def op_editor_start(args):
     engine_editor = project_engine_editor()
     if launch and engine_editor and launch.get("args") and os.path.realpath(launch["args"][0]) != os.path.realpath(engine_editor):
         log(f"the project uses {engine_editor}; not reusing the remembered {launch['args'][0]}")
-        launch = dict(launch, args=[engine_editor] + list(launch["args"][1:]))
+        # Its environment too: a library path from the other engine would load that engine's libraries.
+        env = {k: v for k, v in (launch.get("env") or {}).items() if k != "LD_LIBRARY_PATH"}
+        launch = dict(launch, args=[engine_editor] + list(launch["args"][1:]), env=env)
     other = args.get("project_path")
     if other and launch:
         other_path = Path(other).resolve()
@@ -1722,6 +1724,9 @@ def session_env(extra):
     """Environment for starting graphical programs: what the editor last ran with, else sane defaults."""
     env = dict(os.environ)
     env.update(extra or {})
+    # Engine programs find their own libraries next to them; a library path left from another engine
+    # (an older O3DE) would make them load that engine's libraries instead.
+    env.pop("LD_LIBRARY_PATH", None)
     uid = os.getuid()
     env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{uid}")
     if "WAYLAND_DISPLAY" not in env:
