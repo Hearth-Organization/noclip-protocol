@@ -367,7 +367,7 @@ def op_build(args):
         steps = [l for l in text.splitlines() if l.startswith("[") and "/" in l.split("]")[0]]
         result["steps"] = steps[-1].split("]")[0].strip("[") if steps else None
         if code == 0 and args.get("reconfigure"):
-            save_stats(pending_rebuild=False)
+            save_stats(pending_rebuild=False, built_gems=json.loads(PROJECT_JSON.read_text()).get("gem_names", []))
         save_stats(last_build={"ok": code == 0, "finished": _build_state["finished"], "steps": result["steps"],
                                "seconds": result["seconds"], "errors": (result.get("errors") or [])[:5],
                                "log": str(BUILD_LOG)})
@@ -962,6 +962,191 @@ def op_engine(args):
     return {"ok": True, "started": [name for name, *_ in steps], "log": str(ENGINE_LOG)}
 
 
+# ---------- Project settings: engine parts ----------
+# The parts the Project settings window shows first (the rest of the engine's gems are under "All parts").
+PROJECT_PARTS = [
+    {"name": "Renderer (Atom)", "about": "Always on", "gems": ["Atom"], "locked": True},
+    {"name": "Physics (PhysX)", "about": "Collisions, player body", "gems": ["PhysX5"]},
+    {"name": "Sound (MiniAudio)", "about": "Every sound", "gems": ["MiniAudio", "AudioSystem"]},
+    {"name": "Voice Studio", "about": "Lines from your Hearth server", "gems": [], "setting": "voiceStudio"},
+    {"name": "Python scripting", "about": "Claude and your scripts", "gems": ["EditorPythonBindings", "QtForPython"], "locked": True},
+    {"name": "Save games", "about": "Bases and progress", "gems": ["SaveData"]},
+    {"name": "Debug overlay", "about": "FPS and memory in game", "gems": ["ImGui", "DebugDraw"]},
+    {"name": "Animation", "about": "Monsters and hands", "gems": ["EMotionFX"]},
+    {"name": "Script Canvas", "about": "Visual scripting", "gems": ["ScriptCanvas"]},
+    {"name": "Cinematics", "about": "Cutscenes", "gems": ["Maestro"]},
+    {"name": "Terrain", "about": "Outdoor ground", "gems": ["Terrain"]},
+    {"name": "Multiplayer", "about": "Co-op over the network", "gems": ["Multiplayer"]},
+]
+PROJECT_SETTINGS_FILE = PROJECT / "Registry" / "hearth_project.setreg"
+
+
+def project_settings():
+    try:
+        return json.loads(PROJECT_SETTINGS_FILE.read_text()).get("Hearth", {}).get("Project", {})
+    except (OSError, ValueError):
+        return {}
+
+
+def engine_gems():
+    """Every gem the engine and the project offer: {name: summary}."""
+    roots = []
+    info_root = engine_info().get("engine_root")
+    for root in (info_root, "/opt/hearth-engine", str(ENGINE_DIR)):
+        if root and Path(root).is_dir() and root not in roots:
+            roots.append(root)
+    found = {}
+    for root in roots[:1] + [str(PROJECT)]:
+        for gem_json in glob.glob(str(Path(root) / "Gems" / "**" / "gem.json"), recursive=True) + \
+                        glob.glob(str(Path(root) / "Gem" / "gem.json")):
+            try:
+                data = json.loads(Path(gem_json).read_text())
+            except (OSError, ValueError):
+                continue
+            name = data.get("gem_name")
+            if name and name not in found:
+                found[name] = data.get("summary") or data.get("display_name") or ""
+    return found
+
+
+def op_project_parts(args):
+    data = json.loads(PROJECT_JSON.read_text())
+    gems = set(data.get("gem_names", []))
+    stats = load_stats()
+    built = set(stats.get("built_gems") or [])
+    if not stats.get("built_gems") and not stats.get("pending_rebuild"):
+        save_stats(built_gems=sorted(gems))   # nothing changed yet: what's on now is what was built
+        built = set(gems)
+    settings = project_settings()
+    parts = []
+    for part in PROJECT_PARTS:
+        if part.get("setting"):
+            on = bool(settings.get(part["setting"], True))
+            changed = False
+        else:
+            on = all(g in gems for g in part["gems"])
+            changed = on != all(g in built for g in part["gems"])
+        parts.append({"name": part["name"], "about": part["about"], "on": on, "locked": bool(part.get("locked")), "changed": changed})
+    available = engine_gems()
+    curated = {g for part in PROJECT_PARTS for g in part["gems"]}
+    everything = [{"gem": name, "about": about, "on": name in gems, "changed": (name in gems) != (name in built)}
+                  for name, about in sorted(available.items(), key=lambda kv: kv[0].lower())]
+    return {"parts": parts, "all": everything, "on": len(gems), "total": max(len(available), len(gems)),
+            "changed": sum(p["changed"] for p in parts) + sum(1 for g in everything if g["changed"] and g["gem"] not in curated),
+            "pending_rebuild": stats.get("pending_rebuild", False)}
+
+
+def op_set_project_part(args):
+    """Project settings switch: a part from PROJECT_PARTS by name, or any gem by gem name."""
+    on = bool(args.get("on"))
+    part = next((p for p in PROJECT_PARTS if p["name"] == args.get("name")), None)
+    if part and part.get("locked"):
+        return {"ok": False, "error": f"{part['name']} can't be turned off: the project needs it"}
+    if part and part.get("setting"):
+        try:
+            data = json.loads(PROJECT_SETTINGS_FILE.read_text())
+        except (OSError, ValueError):
+            data = {}
+        data.setdefault("Hearth", {}).setdefault("Project", {})[part["setting"]] = on
+        PROJECT_SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        PROJECT_SETTINGS_FILE.write_text(json.dumps(data, indent=4) + "\n")
+        return {"ok": True}
+    gems = part["gems"] if part else [str(args.get("gem", ""))]
+    if not gems or not gems[0]:
+        return {"ok": False, "error": "unknown part"}
+    result = op_set_parts({"enable" if on else "disable": gems})
+    if result.get("ok"):
+        save_stats(pending_rebuild=True)
+    return result
+
+
+# ---------- Rebuild on GitHub ----------
+CLOUD_WORKFLOW = "hearth-build.yml"
+_cloud_state = {"running": False, "step": None, "run_id": None, "error": None, "finished": None}
+
+
+def git(*command, timeout=60):
+    return subprocess.run(["git", *command], cwd=str(PROJECT), capture_output=True, text=True, timeout=timeout)
+
+
+def op_cloud_build(args):
+    """Build the game on GitHub (hearth-32) and bring the result back into build/linux. args: commit (bool)
+    lets it commit and push project.json and Registry first (the owner pressed the button and agreed)."""
+    if _cloud_state["running"]:
+        return {"ok": True, "state": dict(_cloud_state)}
+    if not shutil.which("gh"):
+        return {"ok": False, "error": "the GitHub app (gh) isn't installed on this computer"}
+    if subprocess.run(["gh", "auth", "status"], capture_output=True, text=True).returncode != 0:
+        return {"ok": False, "error": "gh isn't signed in: run gh auth login once"}
+    if not (PROJECT / ".github" / "workflows" / CLOUD_WORKFLOW).exists():
+        return {"ok": False, "error": f"this project has no .github/workflows/{CLOUD_WORKFLOW}"}
+    changed = git("status", "--porcelain", "--", "project.json", "Registry").stdout.strip()
+    if changed and not args.get("commit"):
+        return {"ok": False, "needs_commit": True, "files": changed.splitlines(),
+                "error": "GitHub builds what's pushed: the parts change has to be committed and pushed first"}
+    branch = git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip() or "main"
+    if changed:
+        git("add", "--", "project.json", "Registry")
+        commit = git("commit", "-m", "Engine parts changed in Project settings")
+        if commit.returncode != 0:
+            return {"ok": False, "error": "couldn't commit: " + (commit.stderr or commit.stdout)[-400:]}
+    push = git("push", "origin", branch, timeout=300)
+    if push.returncode != 0:
+        return {"ok": False, "error": "couldn't push: " + push.stderr[-400:]}
+
+    def run():
+        _cloud_state.update(running=True, step="starting on GitHub", run_id=None, error=None, finished=None)
+        try:
+            start = subprocess.run(["gh", "workflow", "run", CLOUD_WORKFLOW, "--ref", branch], cwd=str(PROJECT),
+                                   capture_output=True, text=True, timeout=120)
+            if start.returncode != 0:
+                raise RuntimeError(start.stderr[-400:])
+            time.sleep(8)
+            listed = subprocess.run(["gh", "run", "list", "--workflow", CLOUD_WORKFLOW, "--branch", branch, "-L", "1",
+                                     "--json", "databaseId"], cwd=str(PROJECT), capture_output=True, text=True, timeout=60)
+            run_id = json.loads(listed.stdout or "[]")[0]["databaseId"]
+            _cloud_state.update(run_id=run_id, step="building on GitHub")
+            while True:
+                view = subprocess.run(["gh", "run", "view", str(run_id), "--json", "status,conclusion"], cwd=str(PROJECT),
+                                      capture_output=True, text=True, timeout=60)
+                info = json.loads(view.stdout or "{}")
+                if info.get("status") == "completed":
+                    if info.get("conclusion") != "success":
+                        raise RuntimeError(f"the GitHub build ended: {info.get('conclusion')}")
+                    break
+                time.sleep(20)
+            _cloud_state["step"] = "bringing the build home"
+            target = HOME / "cloud-build"
+            shutil.rmtree(target, ignore_errors=True)
+            got = subprocess.run(["gh", "run", "download", str(run_id), "-n", "game-build", "-D", str(target)], cwd=str(PROJECT),
+                                 capture_output=True, text=True, timeout=1800)
+            if got.returncode != 0:
+                raise RuntimeError(got.stderr[-400:])
+            out = PROJECT / "build" / "linux"
+            out.mkdir(parents=True, exist_ok=True)
+            unpack = subprocess.run(["tar", "--zstd", "-xf", str(target / "game-build.tar.zst"), "-C", str(out)],
+                                    capture_output=True, text=True, timeout=600)
+            if unpack.returncode != 0:
+                raise RuntimeError(unpack.stderr[-400:])
+            save_stats(pending_rebuild=False, built_gems=json.loads(PROJECT_JSON.read_text()).get("gem_names", []),
+                       last_build={"ok": True, "finished": time.time(), "steps": "GitHub", "seconds": None, "errors": [],
+                                   "log": f"GitHub run {run_id}"})
+            _cloud_state.update(step="done")
+            log(f"cloud build {run_id} brought home")
+        except Exception as error:  # report, never die
+            _cloud_state.update(error=str(error))
+            log(f"cloud build failed: {error}")
+        finally:
+            _cloud_state.update(running=False, finished=time.time())
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"ok": True, "started": True}
+
+
+def op_cloud_status(args):
+    return dict(_cloud_state)
+
+
 # ---------- Level Generator (Hearth Engine Hub) ----------
 
 def _levelgen_clean(values):
@@ -1136,7 +1321,8 @@ def op_levelgen_play(args):
                           "width": args.get("width", 1600), "height": args.get("height", 900), "extra": extra})
 
 
-OPS = {"engine": op_engine, "new_project": op_new_project, "hub_info": op_hub_info, "set_part": op_set_part, "list_projects": op_list_projects, "switch_project": op_switch_project, "dismiss_crash": op_dismiss_crash, "coop_start": op_coop_start, "coop_status": op_coop_status, "coop_stop": op_coop_stop,
+OPS = {"project_parts": op_project_parts, "set_project_part": op_set_project_part, "cloud_build": op_cloud_build, "cloud_status": op_cloud_status,
+       "engine": op_engine, "new_project": op_new_project, "hub_info": op_hub_info, "set_part": op_set_part, "list_projects": op_list_projects, "switch_project": op_switch_project, "dismiss_crash": op_dismiss_crash, "coop_start": op_coop_start, "coop_status": op_coop_status, "coop_stop": op_coop_stop,
        "probe": op_probe, "parts": op_parts, "set_parts": op_set_parts, "status": op_status, "editor_start": op_editor_start, "editor_stop": op_editor_stop,
        "build": op_build, "game_start": op_game_start, "game_stop": op_game_stop,
        "crash_report": op_crash_report, "logs": op_logs,
@@ -1376,9 +1562,9 @@ def handle(path, token):
 # Hearth Settings › Claude switches, applied to requests from Claude (the file inbox its hearth_engine tool uses).
 CLAUDE_GATES = {
     "readLogs": ("logs", "crash_report"),
-    "buildAndPlay": ("build", "game_start", "game_stop", "editor_start", "editor_stop", "coop_start", "coop_stop",
+    "buildAndPlay": ("build", "cloud_build", "game_start", "game_stop", "editor_start", "editor_stop", "coop_start", "coop_stop",
                      "levelgen_play", "engine"),
-    "editLevels": ("levelgen_apply", "levelgen_area"),
+    "editLevels": ("levelgen_apply", "levelgen_area", "set_project_part", "set_part", "set_parts"),
 }
 CLAUDE_GATE_NAMES = {"readLogs": "Can read logs", "buildAndPlay": "Can build and play", "editLevels": "Can edit levels"}
 
@@ -1389,7 +1575,8 @@ def claude_refusal(op, args):
     for key, ops in CLAUDE_GATES.items():
         if op in ops and not hearth_setting("claude", key, True, bool):
             return {"ok": False, "error": f"Hearth Settings › Claude: '{CLAUDE_GATE_NAMES[key]}' is off"}
-    big = (op == "engine" and args.get("action") in ("build", "update", "setup")) or (op == "build" and args.get("reconfigure"))
+    big = (op == "engine" and args.get("action") in ("build", "update", "setup")) or (op == "build" and args.get("reconfigure")) \
+        or op == "cloud_build"
     if big and hearth_setting("claude", "askBigBuilds", True, bool) and not args.get("owner_ok"):
         return {"ok": False, "needs_owner": True,
                 "error": "Hearth Settings › Claude: 'Ask before big builds' is on. Ask the owner in chat, then send "

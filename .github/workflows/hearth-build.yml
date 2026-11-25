@@ -1,0 +1,71 @@
+# Noclip Protocol: build the game's code on GitHub (hearth-32) against the latest Hearth Engine release.
+# Started by Hearth Engine's Project settings "Rebuild on GitHub" (the Hearth Engine agent runs it with gh and
+# brings the result back into the laptop's build/linux). Can also be run by hand from the Actions tab.
+#
+# If the hearth-engine repo is private, add a repository secret HEARTH_ENGINE_TOKEN that can read its releases.
+
+name: Hearth game build
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: hearth-game-build
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: hearth-32
+    timeout-minutes: 60
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install Hearth Engine (latest release)
+        env:
+          GH_TOKEN: ${{ secrets.HEARTH_ENGINE_TOKEN || github.token }}
+        run: |
+          tag="$(gh release list --repo Hearth-Organization/hearth-engine --limit 30 --json tagName,isPrerelease \
+                 --jq '[.[] | select(.tagName | startswith("hearth-sdk-linux-"))][0].tagName')"
+          echo "Using $tag"
+          gh release download "$tag" --repo Hearth-Organization/hearth-engine --pattern '*.deb' --dir /tmp/hearth
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build clang /tmp/hearth/*.deb
+          /opt/hearth-engine/scripts/o3de.sh register --this-engine
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/linux -G "Ninja Multi-Config" \
+            -DLY_3RDPARTY_PATH="$HOME/.o3de/3rdParty" -DLY_UNITY_BUILD=ON -DLY_STRIP_DEBUG_SYMBOLS=ON \
+            -DCMAKE_CXX_SCAN_FOR_MODULES=OFF
+
+      - name: Build the game's code
+        run: |
+          project="$(python3 -c "import json;print(json.load(open('project.json'))['project_name'])")"
+          targets="$(cmake --build build/linux --config profile --target help 2>/dev/null \
+                     | grep -oE "^${project}[A-Za-z0-9_.]*" | grep -viE 'test' | sort -u | tr '\n' ' ')"
+          echo "Targets: $targets"
+          cmake --build build/linux --config profile -j "$(nproc)" --target $targets
+
+      - name: Package
+        run: |
+          project="$(python3 -c "import json;print(json.load(open('project.json'))['project_name'])")"
+          cd build/linux
+          files="$(ls -d bin/profile/*"${project}"* bin/profile/Registry 2>/dev/null)"
+          tar --zstd -cf "$GITHUB_WORKSPACE/game-build.tar.zst" $files
+          ls -lh "$GITHUB_WORKSPACE/game-build.tar.zst"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: game-build
+          path: game-build.tar.zst
+          retention-days: 7
