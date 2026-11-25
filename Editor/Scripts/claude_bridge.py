@@ -257,6 +257,38 @@ class _Bridge:
     # ------------------------------------------------------------------ ops
 
     def _dispatch(self, request):
+        response = self._dispatch_op(request)
+        self._note_activity(request, response)
+        return response
+
+    def _note_activity(self, request, response):
+        """Keep a short list of what Claude did through the bridge, for the editor's Claude panel."""
+        op = request.get("op")
+        if op == "ping":
+            return
+        what = ""
+        if op == "python":
+            lines = [l.strip() for l in str(request.get("code", "")).splitlines()]
+            lines = [l for l in lines if l and not l.startswith(("import ", "from ", "#"))]
+            what = lines[0][:120] if lines else "python"
+        elif op == "console":
+            what = str(request.get("command", ""))[:120]
+        elif op == "screenshot":
+            what = "screenshot"
+        entry = {"time": time.time(), "op": op, "what": what, "ok": bool(response.get("ok"))}
+        path = os.path.join(self.folder, "activity.jsonl")
+        try:
+            with open(path, "a", encoding="utf-8") as handle:
+                handle.write(json.dumps(entry) + "\n")
+            if os.path.getsize(path) > 256 * 1024:
+                with open(path, "r", encoding="utf-8") as handle:
+                    keep = handle.readlines()[-200:]
+                with open(path, "w", encoding="utf-8") as handle:
+                    handle.writelines(keep)
+        except OSError:
+            pass
+
+    def _dispatch_op(self, request):
         op = request.get("op")
         if op == "ping":
             return {"ok": True, "output": "pong"}
