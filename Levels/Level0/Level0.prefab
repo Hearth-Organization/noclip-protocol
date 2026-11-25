@@ -296,6 +296,24 @@
                     "$type": "EditorLockComponent",
                     "Id": 9866811137412032224
                 },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 12651921424106598637,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": true,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{FC09F75E-4B13-522D-AB81-F2E4AEBC2E77}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/level0/level0_roomtone.wav.miniaudio"
+                            },
+                            "Volume": 0.3499999940395355,
+                            "Loop": true
+                        }
+                    }
+                },
                 "EditorOnlyEntityComponent": {
                     "$type": "EditorOnlyEntityComponent",
                     "Id": 10308747447561903619
@@ -368,6 +386,16 @@
                 "EditorLockComponent": {
                     "$type": "EditorLockComponent",
                     "Id": 8049165811335440252
+                },
+                "EditorMiniAudioListenerComponent": {
+                    "$type": "EditorMiniAudioListenerComponent",
+                    "Id": 1180184851950188100,
+                    "Controller": {
+                        "Config": {
+                            "Follow Entity": "Entity_[920147988522]",
+                            "Global Volume": 1.0
+                        }
+                    }
                 },
                 "EditorOnlyEntityComponent": {
                     "$type": "EditorOnlyEntityComponent",
