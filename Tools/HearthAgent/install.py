@@ -29,6 +29,7 @@ After=default.target
 ExecStart={PYTHON} {AGENT}
 Restart=always
 RestartSec=3
+KillMode=process
 
 [Install]
 WantedBy=default.target

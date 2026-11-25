@@ -43,7 +43,10 @@ LOG_DIR = PROJECT / "user" / "log"
 LAUNCHER = PROJECT / "build" / "linux" / "bin" / "profile" / "NoclipProtocol.GameLauncher"
 BUILD_TARGETS = ["NoclipProtocol.GameLauncher", "NoclipProtocol.HeadlessServerLauncher",
                  "NoclipProtocol.ServerLauncher", "NoclipProtocol.UnifiedLauncher", "Editor"]
-VERSION = "1.0"
+VERSION = "1.2"
+PROJECT_JSON = PROJECT / "project.json"
+HTTP_PORT = 47830
+HUB_DIR = PROJECT / "Tools" / "HearthEngine" / "hub"
 
 _build_lock = threading.Lock()
 _build_state = {"running": False, "started": None, "finished": None, "exit_code": None}
@@ -201,7 +204,7 @@ def op_editor_start(args):
         return {"ok": False, "error": "don't know where the editor is yet: open it once from the Project Manager"}
     env = session_env(launch.get("env", {}))
     out = open(HOME / "editor_stdout.log", "ab")
-    proc = subprocess.Popen(launch["args"], cwd=launch.get("cwd") or str(PROJECT), env=env,
+    proc = subprocess.Popen(own_scope(launch["args"]), cwd=launch.get("cwd") or str(PROJECT), env=env,
                             stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
     log(f"editor started, pid {proc.pid}")
     wait = float(args.get("wait_seconds", 0))
@@ -278,9 +281,17 @@ def op_build(args):
         jobs = str(args.get("jobs") or max(1, (os.cpu_count() or 2) - 1))
         cmd = [cmake, "--build", "build/linux", "--target", *BUILD_TARGETS, "--config", "profile", "-j", jobs]
         _build_state.update(running=True, started=time.time(), finished=None, exit_code=None)
-        log("build started: " + " ".join(cmd))
         with open(BUILD_LOG, "wb") as out:
-            code = subprocess.call(cmd, cwd=str(PROJECT), stdout=out, stderr=subprocess.STDOUT)
+            code = 0
+            if args.get("reconfigure"):
+                configure = [cmake, "-S", ".", "-B", "build/linux"]
+                log("configure: " + " ".join(configure))
+                out.write(b"== configure ==\n"); out.flush()
+                code = subprocess.call(configure, cwd=str(PROJECT), stdout=out, stderr=subprocess.STDOUT)
+            if code == 0:
+                log("build started: " + " ".join(cmd))
+                out.write(b"== build ==\n"); out.flush()
+                code = subprocess.call(cmd, cwd=str(PROJECT), stdout=out, stderr=subprocess.STDOUT)
         _build_state.update(running=False, finished=time.time(), exit_code=code)
         log(f"build finished with code {code}")
         text = tail(BUILD_LOG, 400)
@@ -317,7 +328,7 @@ def op_game_start(args):
             launch = {}
     env = session_env(launch.get("env", {}))
     out = open(HOME / "game_stdout.log", "ab")
-    _game_proc = subprocess.Popen(cmd, cwd=str(PROJECT), env=env, stdout=out, stderr=subprocess.STDOUT,
+    _game_proc = subprocess.Popen(own_scope(cmd), cwd=str(PROJECT), env=env, stdout=out, stderr=subprocess.STDOUT,
                                   stdin=subprocess.DEVNULL, start_new_session=True)
     log(f"game started, pid {_game_proc.pid}")
     time.sleep(float(args.get("wait_seconds", 3)))
@@ -376,12 +387,80 @@ def op_logs(args):
     return {"file": str(files[which]), "tail": tail(files[which], int(args.get("lines", 80)))}
 
 
-OPS = {"status": op_status, "editor_start": op_editor_start, "editor_stop": op_editor_stop,
+def op_probe(args):
+    """What this machine has: CPU, memory, disk, Python and Qt, browsers."""
+    disk = shutil.disk_usage(str(PROJECT))
+    found = {name: shutil.which(name) for name in
+             ("firefox", "chromium", "google-chrome", "brave-browser", "microsoft-edge", "xdg-open",
+              "cmake", "ninja", "ccache", "clang", "gcc", "coredumpctl", "nvidia-smi")}
+    qt = subprocess.run([sys.executable, "-c", "import PySide6; print(PySide6.__version__)"],
+                        capture_output=True, text=True)
+    try:
+        model = [l.split(":", 1)[1].strip() for l in open("/proc/cpuinfo") if l.startswith("model name")][0]
+    except (OSError, IndexError):
+        model = None
+    gpu = subprocess.run(["lspci"], capture_output=True, text=True).stdout if shutil.which("lspci") else ""
+    return {"cpu": model, "cpu_count": os.cpu_count(), "disk_free_gb": round(disk.free / 2**30, 1),
+            "python": sys.version.split()[0], "system_pyside6": qt.stdout.strip() or None, "tools": found,
+            "gpu": [l for l in gpu.splitlines() if "VGA" in l or "3D" in l],
+            "swap": [l for l in open("/proc/meminfo") if l.startswith(("SwapTotal", "SwapFree"))]}
+
+
+def op_parts(args):
+    """Engine parts (gems) the project turns on."""
+    data = json.loads(PROJECT_JSON.read_text())
+    return {"enabled": data.get("gem_names", [])}
+
+
+def op_set_parts(args):
+    """Turn engine parts on or off: args enable [...] and disable [...]. Keeps a backup of project.json."""
+    data = json.loads(PROJECT_JSON.read_text())
+    gems = list(data.get("gem_names", []))
+    protected = {"NoclipProtocol", "Atom", "EditorPythonBindings", "PrefabBuilder", "PrimitiveAssets"}
+    for name in args.get("disable", []):
+        if name in protected:
+            return {"ok": False, "error": f"{name} can't be turned off: the project needs it"}
+        if name in gems:
+            gems.remove(name)
+    for name in args.get("enable", []):
+        if name not in gems:
+            gems.append(name)
+    backup = HOME / f"project.json.{time.strftime('%Y%m%d-%H%M%S')}.bak"
+    shutil.copy2(PROJECT_JSON, backup)
+    data["gem_names"] = sorted(gems, key=str.lower)
+    PROJECT_JSON.write_text(json.dumps(data, indent=4) + "\n")
+    log(f"parts changed: +{args.get('enable', [])} -{args.get('disable', [])}")
+    return {"ok": True, "enabled": data["gem_names"], "backup": str(backup),
+            "next": "run build with reconfigure true"}
+
+
+OPS = {"probe": op_probe, "parts": op_parts, "set_parts": op_set_parts, "status": op_status, "editor_start": op_editor_start, "editor_stop": op_editor_stop,
        "build": op_build, "game_start": op_game_start, "game_stop": op_game_stop,
        "crash_report": op_crash_report, "logs": op_logs}
 
 
 # ---------- request loop ----------
+
+def own_scope(cmd):
+    """Run a program in its own systemd scope, so restarting the agent never takes it down."""
+    if shutil.which("systemd-run") and os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"):
+        return ["systemd-run", "--user", "--scope", "--quiet", "--collect", "--"] + list(cmd)
+    return list(cmd)
+
+
+def fix_service_unit():
+    """Make sure stopping or restarting the agent's service only stops the agent itself."""
+    unit = Path.home() / ".config" / "systemd" / "user" / "hearth-engine-agent.service"
+    try:
+        text = unit.read_text()
+    except OSError:
+        return
+    if "KillMode=process" in text:
+        return
+    unit.write_text(text.replace("RestartSec=3\n", "RestartSec=3\nKillMode=process\n"))
+    subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+    log("service unit: KillMode=process (the editor and game survive agent restarts)")
+
 
 def session_env(extra):
     """Environment for starting graphical programs: what the editor last ran with, else sane defaults."""
@@ -424,6 +503,72 @@ def handle(path, token):
     tmp.rename(OUTBOX / (request_id + ".json"))
 
 
+class _Api:
+    token = ""
+
+
+def start_http(token):
+    """Localhost-only API for the Hearth Engine Hub. Every call needs the token; Host must be local."""
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    _Api.token = token
+    allowed_hosts = {f"127.0.0.1:{HTTP_PORT}", f"localhost:{HTTP_PORT}"}
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def _send(self, code, body, kind="application/json"):
+            data = body if isinstance(body, bytes) else json.dumps(body, default=str).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", kind)
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def do_GET(self):
+            if self.headers.get("Host") not in allowed_hosts:
+                return self._send(403, {"error": "bad host"})
+            path = self.path.split("?")[0]
+            if path in ("/", "/index.html"):
+                path = "/index.html"
+            target = (HUB_DIR / path.lstrip("/")).resolve()
+            if not str(target).startswith(str(HUB_DIR.resolve())) or not target.is_file():
+                return self._send(404, {"error": "not found"})
+            body = target.read_bytes()
+            if target.name == "index.html":
+                body = body.replace(b"__HEARTH_TOKEN__", _Api.token.encode())
+            kinds = {".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css",
+                     ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".woff2": "font/woff2"}
+            self._send(200, body, kinds.get(target.suffix, "application/octet-stream"))
+
+        def do_POST(self):
+            if self.headers.get("Host") not in allowed_hosts or not secrets.compare_digest(
+                    self.headers.get("X-Hearth-Token", ""), _Api.token):
+                return self._send(403, {"error": "forbidden"})
+            op = self.path.strip("/").split("/")[-1]
+            if op not in OPS:
+                return self._send(404, {"error": "unknown op"})
+            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                args = json.loads(self.rfile.read(length) or b"{}")
+            except ValueError:
+                args = {}
+            try:
+                result = OPS[op](args)
+            except Exception:
+                result = {"ok": False, "error": traceback.format_exc()}
+            self._send(200, result)
+
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", HTTP_PORT), Handler)
+    except OSError as error:
+        log(f"hub API not started: {error}")
+        return
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    log(f"hub API on http://127.0.0.1:{HTTP_PORT}/")
+
+
 def main():
     for folder in (HOME, INBOX, OUTBOX):
         folder.mkdir(parents=True, exist_ok=True)
@@ -438,6 +583,10 @@ def main():
     os.chmod(TOKEN_FILE, 0o600)
     token = TOKEN_FILE.read_text().strip()
     log(f"agent {VERSION} started, pid {os.getpid()}, project {PROJECT}")
+    start_http(token)
+    fix_service_unit()
+    me = Path(__file__).resolve()
+    my_mtime = me.stat().st_mtime
     last_seen = 0.0
     while True:
         now = time.time()
@@ -445,6 +594,21 @@ def main():
             last_seen = now
             remember_editor_launch()
             HEARTBEAT.write_text(json.dumps({"time": now, "pid": os.getpid(), "version": VERSION}))
+            try:
+                changed = me.stat().st_mtime != my_mtime
+            except OSError:
+                changed = False
+            if changed and not _build_state["running"]:
+                time.sleep(1.0)  # let the new file finish landing
+                try:
+                    compile(me.read_text(), str(me), "exec")
+                except SyntaxError as error:
+                    log(f"new agent file doesn't compile, staying on {VERSION}: {error}")
+                    my_mtime = me.stat().st_mtime
+                else:
+                    log("agent file changed, restarting into the new version")
+                    lock.close()
+                    os.execv(sys.executable, [sys.executable, str(me)])
         for path in sorted(INBOX.glob("*.json")):
             claimed = path.with_suffix(".working")
             try:
