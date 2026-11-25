@@ -6,6 +6,7 @@
 #include <AzCore/std/algorithm.h>
 #include <cmath>
 #include <MiniAudio/MiniAudioPlaybackBus.h>
+#include <MiniAudio/SoundAsset.h>
 
 namespace NoclipProtocol
 {
@@ -61,6 +62,7 @@ namespace NoclipProtocol
         m_debugTimer = 0.0f;
         m_debugTotal = 0.0f;
         m_stepsPlayed = 0;
+        m_selfTestDone = false;
         AZ_TracePrintf("Footsteps", "Footsteps active: %zu step sounds, landing %s, follow %s\n", m_stepSounds.size(),
             m_landSound.IsValid() ? "yes" : "no", m_follow.IsValid() ? m_follow.ToString().c_str() : "self");
         AZ::TickBus::Handler::BusConnect();
@@ -77,6 +79,16 @@ namespace NoclipProtocol
         const AZ::EntityId who = m_follow.IsValid() ? m_follow : GetEntityId();
         AZ::TransformBus::EventResult(position, who, &AZ::TransformBus::Events::GetWorldTranslation);
         return position;
+    }
+
+    void FootstepsComponent::DiagnoseSound(AZ::EntityId entity, const char* label) const
+    {
+        const bool listening = MiniAudio::MiniAudioPlaybackRequestBus::FindFirstHandler(entity) != nullptr;
+        AZ::Data::Asset<MiniAudio::SoundAsset> asset;
+        MiniAudio::MiniAudioPlaybackRequestBus::EventResult(asset, entity, &MiniAudio::MiniAudioPlaybackRequests::GetSoundAsset);
+        AZ_TracePrintf("Footsteps", "check %s: entity %s listening %d asset %s status %d ready %d bytes %zu\n", label,
+            entity.ToString().c_str(), listening ? 1 : 0, asset.GetId().ToFixedString().c_str(), static_cast<int>(asset.GetStatus()),
+            asset.IsReady() ? 1 : 0, asset.IsReady() ? asset->m_data.size() : size_t(0));
     }
 
     void FootstepsComponent::PlaySound(AZ::EntityId entity, float volumePercent)
@@ -135,6 +147,22 @@ namespace NoclipProtocol
         // The character capsule bobs a few millimetres every frame; only a sustained vertical speed means a jump or fall.
         m_verticalSmooth += (verticalSpeed - m_verticalSmooth) * AZStd::min(1.0f, deltaTime * 8.0f);
         const bool airborneNow = std::fabs(m_verticalSmooth) > 1.5f;
+
+        // Two seconds in: check every sound once and play one step (a self-test we can read in the log).
+        if (!m_selfTestDone && m_debugTotal > 2.0f)
+        {
+            m_selfTestDone = true;
+            for (size_t i = 0; i < m_stepSounds.size(); ++i)
+            {
+                DiagnoseSound(m_stepSounds[i], "step");
+            }
+            DiagnoseSound(m_landSound, "land");
+            if (!m_stepSounds.empty())
+            {
+                PlaySound(m_stepSounds[0], m_sprintVolume);
+                AZ_TracePrintf("Footsteps", "self-test: played step 1\n");
+            }
+        }
 
         // For the first minute of play, log twice a second while moving (to tune steps without guessing).
         m_debugTotal += deltaTime;

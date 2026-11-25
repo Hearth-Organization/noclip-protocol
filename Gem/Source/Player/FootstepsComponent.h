@@ -56,6 +56,8 @@ namespace NoclipProtocol
         float m_debugTimer = 0.0f;     // short log so we can see what the steps do
         float m_debugTotal = 0.0f;
         int m_stepsPlayed = 0;
+        bool m_selfTestDone = false;
+        void DiagnoseSound(AZ::EntityId entity, const char* label) const;
         size_t m_next = 0;
     };
 } // namespace NoclipProtocol
