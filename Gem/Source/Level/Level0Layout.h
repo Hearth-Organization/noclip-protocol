@@ -53,6 +53,7 @@ namespace NoclipProtocol::Level0
         Working = 0,
         Flickering,
         Dead,
+        Dying, // looks working; goes out for good when the player walks under it
     };
 
     struct Light

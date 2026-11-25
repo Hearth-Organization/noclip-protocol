@@ -53,6 +53,7 @@ namespace NoclipProtocol
             PieceDecalWet,
             PieceDecalMold,
             PieceDecalWorn,
+            PieceLightDying,
             PieceCount
         };
 
@@ -87,12 +88,14 @@ namespace NoclipProtocol
         AZStd::string m_decalWetPrefab = "prefabs/level0/l0_decalwet.spawnable";
         AZStd::string m_decalMoldPrefab = "prefabs/level0/l0_decalmold.spawnable";
         AZStd::string m_decalWornPrefab = "prefabs/level0/l0_decalworn.spawnable";
+        AZStd::string m_lightDyingPrefab = "prefabs/level0/l0_lightdying.spawnable";
         // Feature switches (for finding problems and for performance)
         bool m_enablePillars = true;
         bool m_enableLightBulbs = true;     // real point lights (off = glowing panels only)
         bool m_enableFlicker = true;        // off = flickering lights become working lights
         bool m_enableDeadLights = true;     // off = dead lights become missing
         bool m_enableStains = true;
+        bool m_enableDyingLights = true;   // off = dying lights become working lights
         float m_darkZoneShareField = 0.4f;
         float m_decalChanceField = 0.3f;
         int m_chunkCellsField = 6;

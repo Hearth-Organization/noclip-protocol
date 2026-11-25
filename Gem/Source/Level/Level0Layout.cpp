@@ -294,7 +294,8 @@ namespace NoclipProtocol::Level0
                 }
                 else
                 {
-                    if (roll < 0.70f) { layout.m_lights.push_back(Light{ at, LightState::Working }); }
+                    if (roll < 0.66f) { layout.m_lights.push_back(Light{ at, LightState::Working }); }
+                    else if (roll < 0.70f) { layout.m_lights.push_back(Light{ at, LightState::Dying }); }
                     else if (roll < 0.82f) { layout.m_lights.push_back(Light{ at, LightState::Flickering }); }
                     else if (roll < 0.94f) { layout.m_lights.push_back(Light{ at, LightState::Dead }); }
                 }

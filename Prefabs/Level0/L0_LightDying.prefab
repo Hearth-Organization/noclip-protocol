@@ -1,0 +1,312 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "L0_LightDying",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 6116667325658705817,
+                "Child Entity Order": [
+                    "Entity_[23691688266654]"
+                ]
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 2627761592780924311
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 1624454357499002797
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 4214621020159519162
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 5071737784439482491
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 5656326836650047479
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 6994908391394571715
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 7766690042192828913
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 2312397131546884197
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 6883808186432478471,
+                "Parent Entity": ""
+            }
+        }
+    },
+    "Entities": {
+        "Entity_[23691688266654]": {
+            "Id": "Entity_[23691688266654]",
+            "Name": "L0_LightDyingRoot",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 6430741863862446356
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 3649696057961819140
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 2077334621170073869,
+                    "Child Entity Order": [
+                        "Entity_[82856217149560]",
+                        "Entity_[57178693453373]"
+                    ]
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 4084687462835814752
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 9043293652031502584
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 7315260748368207451
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 5097264495581275110
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 8956881960122305028
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 6541234890729190145,
+                    "Parent Entity": "ContainerEntity"
+                },
+                "FlickerLightComponent": {
+                    "$type": "GenericComponentWrapper",
+                    "Id": 300130519090943648,
+                    "m_template": {
+                        "$type": "FlickerLightComponent",
+                        "LightEntity": "Entity_[57178693453373]",
+                        "PanelEntity": "Entity_[82856217149560]",
+                        "DiesWhenNear": true,
+                        "TriggerRadius": 2.2
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 9214233586950864529,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{CF7D2A05-AEED-5775-94B6-A99DC3579CC2}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/level0/level0_zap.wav.miniaudio"
+                            },
+                            "Volume": 45.0,
+                            "Loop": false,
+                            "Spatialization": true,
+                            "Min Distance": 1.0,
+                            "Max Distance": 12.0
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[82856217149560]": {
+            "Id": "Entity_[82856217149560]",
+            "Name": "L0_DyingPanel",
+            "Components": {
+                "AZ::Render::EditorMeshComponent": {
+                    "$type": "AZ::Render::EditorMeshComponent",
+                    "Id": 2133088033606603829,
+                    "Controller": {
+                        "Configuration": {
+                            "ModelAsset": {
+                                "assetId": {
+                                    "guid": "{C15CD465-9589-56ED-945F-8416FA4798A3}",
+                                    "subId": 284301017
+                                },
+                                "assetHint": "objects/_primitives/_box_1x1.fbx.azmodel"
+                            }
+                        }
+                    }
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 2352485670699585000
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 7407304556038805172
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 2482534705712839481
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 7542016210766591045
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 5147917162421458941
+                },
+                "EditorMaterialComponent": {
+                    "$type": "EditorMaterialComponent",
+                    "Id": 2543771707377113670,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": {
+                                "{}": {
+                                    "MaterialAsset": {
+                                        "assetId": {
+                                            "guid": "{4DD0B096-4BD7-57A8-85C9-8B86EB4E69AE}"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "EditorNonUniformScaleComponent": {
+                    "$type": "EditorNonUniformScaleComponent",
+                    "Id": 6929553118326231222,
+                    "NonUniformScale": [
+                        0.6000000238418579,
+                        0.6000000238418579,
+                        0.03999999910593033
+                    ]
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 3208453228419293199
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 4421403954355056244
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 3563754713339495217
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 7697132996094766049,
+                    "Parent Entity": "Entity_[23691688266654]",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            -0.019999999552965164
+                        ]
+                    }
+                }
+            }
+        },
+        "Entity_[57178693453373]": {
+            "Id": "Entity_[57178693453373]",
+            "Name": "L0_DyingBulb",
+            "Components": {
+                "AZ::Render::EditorAreaLightComponent": {
+                    "$type": "AZ::Render::EditorAreaLightComponent",
+                    "Id": 6283910958497615825,
+                    "Controller": {
+                        "Configuration": {
+                            "LightType": 6,
+                            "Color": [
+                                1.0,
+                                0.9599999785423279,
+                                0.8500000238418579
+                            ],
+                            "Intensity": 180.0,
+                            "AttenuationRadiusMode": 0,
+                            "AttenuationRadius": 7.0
+                        }
+                    }
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 731606879724029212
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 5962858224550005435
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 5030262114431471357
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 6625337590022896469
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 647708044195885612
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 8205930842216741769
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 9025712282511933378
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 5678480419089631551
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 1151153417707419288,
+                    "Parent Entity": "Entity_[23691688266654]",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            -0.3499999940395355
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 7009761198724622143,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": true,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{28F5FEAC-4AB6-5C01-A47D-95F9B46111AB}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/level0/level0_hum.wav.miniaudio"
+                            },
+                            "Volume": 35.0,
+                            "Loop": true,
+                            "Spatialization": true,
+                            "Min Distance": 0.800000011920929,
+                            "Max Distance": 7.0
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -47,7 +47,9 @@ namespace NoclipProtocol
                 ->Field("LightDeadPrefab", &EndlessLevelComponent::m_lightDeadPrefab)
                 ->Field("DecalWetPrefab", &EndlessLevelComponent::m_decalWetPrefab)
                 ->Field("DecalMoldPrefab", &EndlessLevelComponent::m_decalMoldPrefab)
-                ->Field("DecalWornPrefab", &EndlessLevelComponent::m_decalWornPrefab);
+                ->Field("DecalWornPrefab", &EndlessLevelComponent::m_decalWornPrefab)
+                ->Field("LightDyingPrefab", &EndlessLevelComponent::m_lightDyingPrefab)
+                ->Field("EnableDyingLights", &EndlessLevelComponent::m_enableDyingLights);
 
             if (auto edit = serialize->GetEditContext())
             {
@@ -94,6 +96,7 @@ namespace NoclipProtocol
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_enableFlicker, "Flickering lights", "")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_enableDeadLights, "Dead lights", "")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_enableStains, "Stains", "")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_enableDyingLights, "Dying lights", "Lights that go out when you walk under them")
                     ->ClassElement(AZ::Edit::ClassElements::Group, "Tile pieces")
                         ->Attribute(AZ::Edit::Attributes::AutoExpand, false)
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_wallPrefab, "Wall", "Spawnable product path")
@@ -105,7 +108,8 @@ namespace NoclipProtocol
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_lightDeadPrefab, "Dead light", "Spawnable product path")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_decalWetPrefab, "Wet spot", "Spawnable product path")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_decalMoldPrefab, "Mold", "Spawnable product path")
-                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_decalWornPrefab, "Worn patch", "Spawnable product path");
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_decalWornPrefab, "Worn patch", "Spawnable product path")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_lightDyingPrefab, "Dying light", "Spawnable product path");
             }
         }
     }
@@ -158,7 +162,7 @@ namespace NoclipProtocol
     {
         const AZStd::string* paths[PieceCount] = { &m_wallPrefab, &m_pillarPrefab, &m_floorPrefab, &m_ceilingPrefab, &m_lightPrefab,
                                                    &m_lightFlickerPrefab, &m_lightDeadPrefab, &m_decalWetPrefab, &m_decalMoldPrefab,
-                                                   &m_decalWornPrefab };
+                                                   &m_decalWornPrefab, &m_lightDyingPrefab };
         bool allFound = true;
         for (int i = 0; i < PieceCount; ++i)
         {
@@ -282,6 +286,10 @@ namespace NoclipProtocol
             {
                 state = Level0::LightState::Working;
             }
+            if (state == Level0::LightState::Dying && !m_enableDyingLights)
+            {
+                state = Level0::LightState::Working;
+            }
             if (state == Level0::LightState::Dead && !m_enableDeadLights)
             {
                 continue;
@@ -294,6 +302,10 @@ namespace NoclipProtocol
             else if (state == Level0::LightState::Flickering)
             {
                 piece = PieceLightFlicker;
+            }
+            else if (state == Level0::LightState::Dying)
+            {
+                piece = m_enableLightBulbs ? PieceLightDying : PieceLightDead;
             }
             SpawnBox(chunk.m_tickets[piece],
                 Level0::Box{ light.m_position.m_x, light.m_position.m_y, light.m_position.m_z, 1.0f, 1.0f, 1.0f }, false);
