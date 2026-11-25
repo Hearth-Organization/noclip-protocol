@@ -116,7 +116,7 @@ namespace NoclipProtocol
                     const bool done = effect.left <= 0.0f;
                     if (effect.kind == "flicker" && (effect.next <= 0.0f || done))
                     {
-                        effect.next = 0.04f + 0.18f * (static_cast<float>(std::rand()) / RAND_MAX);
+                        effect.next = 0.04f + 0.18f * (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX));
                         for (const AZ::EntityId& id : effect.lights)
                         {
                             AZ::Entity* entity = nullptr;

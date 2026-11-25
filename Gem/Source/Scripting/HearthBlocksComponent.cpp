@@ -1,5 +1,5 @@
 #include "HearthBlocksComponent.h"
-#include "Player/FirstPersonControllerComponent.h"
+#include "../Player/FirstPersonControllerComponent.h"
 
 #include <AzCore/Component/ComponentApplicationBus.h>
 #include <AzCore/Component/Entity.h>

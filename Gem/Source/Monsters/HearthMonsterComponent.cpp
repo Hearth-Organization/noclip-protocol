@@ -1,7 +1,7 @@
 #include "HearthMonsterComponent.h"
-#include "Level/EndlessLevelComponent.h"
-#include "Level/Level0Layout.h"
-#include "Player/FirstPersonControllerComponent.h"
+#include "../Level/EndlessLevelComponent.h"
+#include "../Level/Level0Layout.h"
+#include "../Player/FirstPersonControllerComponent.h"
 
 #include <AzCore/Component/ComponentApplicationBus.h>
 #include <AzCore/Component/Entity.h>
