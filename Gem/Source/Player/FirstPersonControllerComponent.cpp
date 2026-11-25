@@ -64,10 +64,9 @@ namespace NoclipProtocol
 
     void FirstPersonControllerComponent::Activate()
     {
-        // Start from whatever way the player entity faces in the level.
-        AZ::Quaternion rotation = AZ::Quaternion::CreateIdentity();
-        AZ::TransformBus::EventResult(rotation, GetEntityId(), &AZ::TransformBus::Events::GetWorldRotationQuaternion);
-        m_yaw = rotation.GetEulerRadiansXYZ().GetZ();
+        // The facing is read on the first frame (see OnTick), after other components such as the
+        // level generator have had the chance to turn the player.
+        m_facingRead = false;
         m_pitch = 0.0f;
 
         AzFramework::InputChannelEventListener::Connect();
@@ -139,6 +138,17 @@ namespace NoclipProtocol
         {
             return;
         }
+        {
+            // Pick up the facing on the first frame, and whenever something else turns the player
+            // (the level generator at the start of a run, a teleport...).
+            AZ::Quaternion rotation = AZ::Quaternion::CreateIdentity();
+            AZ::TransformBus::EventResult(rotation, GetEntityId(), &AZ::TransformBus::Events::GetWorldRotationQuaternion);
+            if (!m_facingRead || !rotation.IsClose(m_lastWrittenRotation, 0.0005f))
+            {
+                m_yaw = rotation.GetEulerRadiansXYZ().GetZ();
+                m_facingRead = true;
+            }
+        }
 
         // --- Look ---
         if (m_cursorCaptured)
@@ -151,8 +161,8 @@ namespace NoclipProtocol
         m_mouseDeltaX = 0.0f;
         m_mouseDeltaY = 0.0f;
 
-        AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion,
-            AZ::Quaternion::CreateRotationZ(m_yaw));
+        m_lastWrittenRotation = AZ::Quaternion::CreateRotationZ(m_yaw);
+        AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion, m_lastWrittenRotation);
         if (m_cameraEntity.IsValid())
         {
             AZ::TransformBus::Event(m_cameraEntity, &AZ::TransformBus::Events::SetLocalRotationQuaternion,

@@ -31,6 +31,7 @@ namespace NoclipProtocol::Level0
         float m_lightFraction = 0.35f; // kept for compatibility; lighting now comes from zones (below)
         float m_pillarChance = 0.6f;   // chance of a pillar on an open interior corner
         float m_pillarSize = 0.8f;     // chunky square pillars, meters
+        int m_spawnRoomRadius = 2;      // cells each way from the spawn cell: a big open, lit room to start in
         float m_darkZoneShare = 0.4f;  // share of the world inside dark zones (dead / missing lights)
         float m_darkZoneScale = 3.5f;  // dark zones are about this many cells across
         float m_decalChance = 0.3f;    // chance a cell gets a floor stain
@@ -102,6 +103,10 @@ namespace NoclipProtocol::Level0
     //! vertical == true: the line x = lineIndex (in cells), segment from cell y = cell to cell + 1.
     //! vertical == false: the line y = lineIndex, segment from cell x = cell to cell + 1.
     bool IsBorderOpen(const Settings& settings, bool vertical, int lineIndex, int cell);
+
+    //! The way to face from (x, y) for the longest, widest clear view (yaw in radians, 0 = facing +Y,
+    //! positive turns toward -X), so the player never spawns staring at a wall.
+    float OpenestYaw(const Settings& settings, float x, float y);
 
     //! 0..1 "darkness" of the area around a world cell; above (1 - darkZoneShare) the lights are dead or gone.
     float DarkZoneValue(const Settings& settings, int cellX, int cellY);

@@ -95,6 +95,7 @@ namespace NoclipProtocol
         bool m_enableFlicker = true;        // off = flickering lights become working lights
         bool m_enableDeadLights = true;     // off = dead lights become missing
         bool m_enableStains = true;
+        bool m_facedPlayer = false;
         bool m_enableDyingLights = true;   // off = dying lights become working lights
         float m_darkZoneShareField = 0.4f;
         float m_decalChanceField = 0.3f;

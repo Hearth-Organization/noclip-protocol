@@ -141,6 +141,7 @@ namespace NoclipProtocol
 
         m_assetsMissing = !LoadPieceAssets();
         m_announced = false;
+        m_facedPlayer = false;
         AZ::TickBus::Handler::BusConnect();
     }
 
@@ -195,6 +196,18 @@ namespace NoclipProtocol
 
     void EndlessLevelComponent::OnTick([[maybe_unused]] float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
+        // First frame (every entity is active by now): turn the player toward the most open view,
+        // so a run never starts staring at a wall.
+        if (!m_facedPlayer && m_followEntity.IsValid())
+        {
+            m_facedPlayer = true;
+            AZ::Vector3 start = AZ::Vector3::CreateZero();
+            AZ::TransformBus::EventResult(start, m_followEntity, &AZ::TransformBus::Events::GetWorldTranslation);
+            const float yaw = Level0::OpenestYaw(m_settings, start.GetX(), start.GetY());
+            AZ::TransformBus::Event(m_followEntity, &AZ::TransformBus::Events::SetWorldRotationQuaternion,
+                AZ::Quaternion::CreateRotationZ(yaw));
+        }
+
         if (m_assetsMissing || !PieceAssetsReady())
         {
             return;

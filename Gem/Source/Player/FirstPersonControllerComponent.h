@@ -3,6 +3,7 @@
 #include <AzCore/Component/Component.h>
 #include <AzCore/Component/EntityId.h>
 #include <AzCore/Component/TickBus.h>
+#include <AzCore/Math/Quaternion.h>
 #include <AzCore/Math/Vector3.h>
 #include <AzFramework/Input/Events/InputChannelEventListener.h>
 
@@ -60,5 +61,7 @@ namespace NoclipProtocol
         bool m_sprint = false;
         bool m_jumpRequested = false;
         bool m_cursorCaptured = false;
+        bool m_facingRead = false;
+        AZ::Quaternion m_lastWrittenRotation = AZ::Quaternion::CreateIdentity();
     };
 } // namespace NoclipProtocol

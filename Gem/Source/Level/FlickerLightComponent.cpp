@@ -106,6 +106,14 @@ namespace NoclipProtocol
 
     void FlickerLightComponent::Crackle()
     {
+        // Report the first few crackles in the log, so it is easy to tell whether they fire at all.
+        static int reported = 0;
+        if (reported < 5)
+        {
+            ++reported;
+            const bool hasSound = MiniAudio::MiniAudioPlaybackRequestBus::HasHandlers(GetEntityId());
+            AZ_Printf("NoclipProtocol", "Flicker Light crackle (%s)", hasSound ? "playing" : "no MiniAudio Playback on this entity");
+        }
         // Restart the one-shot from the top (Stop rewinds it).
         MiniAudio::MiniAudioPlaybackRequestBus::Event(GetEntityId(), &MiniAudio::MiniAudioPlaybackRequests::Stop);
         MiniAudio::MiniAudioPlaybackRequestBus::Event(GetEntityId(), &MiniAudio::MiniAudioPlaybackRequests::Play);

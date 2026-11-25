@@ -219,6 +219,31 @@ namespace NoclipProtocol::Level0
             }
         }
 
+        // 3b. The spawn room: a big open room centered on the spawn cell (it spans the four chunks around the
+        //     origin). Every wall between two of its cells goes; its outer walls keep the maze's doorways.
+        //     Both chunks sharing a border apply the same rule, so they agree.
+        const int r = settings.m_spawnRoomRadius;
+        auto inRoom = [r](int gx, int gy) { return gx >= -r && gx <= r && gy >= -r && gy <= r; };
+        if (r > 0)
+        {
+            for (int x = 0; x < n; ++x)
+            {
+                for (int y = 0; y <= n; ++y)
+                {
+                    // h[x][y] separates cells (x, y - 1) and (x, y)
+                    if (inRoom(baseX + x, baseY + y - 1) && inRoom(baseX + x, baseY + y)) { h[x][y] = false; }
+                }
+            }
+            for (int x = 0; x <= n; ++x)
+            {
+                for (int y = 0; y < n; ++y)
+                {
+                    // v[x][y] separates cells (x - 1, y) and (x, y)
+                    if (inRoom(baseX + x - 1, baseY + y) && inRoom(baseX + x, baseY + y)) { v[x][y] = false; }
+                }
+            }
+        }
+
         ChunkLayout layout;
         layout.m_chunkX = chunkX;
         layout.m_chunkY = chunkY;
@@ -257,7 +282,11 @@ namespace NoclipProtocol::Level0
             for (int y = 1; y < n; ++y)
             {
                 const bool touching = h[x - 1][y] || h[x][y] || v[x][y - 1] || v[x][y];
-                if (!touching && rng.NextUnit() < settings.m_pillarChance)
+                const int gx = baseX + x;
+                const int gy = baseY + y;
+                const bool roomInside = inRoom(gx - 1, gy - 1) && inRoom(gx, gy - 1) && inRoom(gx - 1, gy) && inRoom(gx, gy);
+                const float pillarRoll = rng.NextUnit(); // always drawn, so the rest of the chunk stays the same
+                if (!touching && !roomInside && pillarRoll < settings.m_pillarChance)
                 {
                     layout.m_pillars.push_back(Box{ originX + static_cast<float>(x) * cell, originY + static_cast<float>(y) * cell, height * 0.5f,
                                                     settings.m_pillarSize, settings.m_pillarSize, height });
@@ -271,7 +300,7 @@ namespace NoclipProtocol::Level0
 
         // 7. Lights, decided per global cell (independent of chunk generation order).
         //    Lit areas: mostly working, some flickering, a few dead. Dark zones: mostly missing, some dead, rare flicker.
-        //    The spawn cell is always lit.
+        //    The spawn room is always lit.
         for (int x = 0; x < n; ++x)
         {
             for (int y = 0; y < n; ++y)
@@ -279,9 +308,11 @@ namespace NoclipProtocol::Level0
                 const int gx = baseX + x;
                 const int gy = baseY + y;
                 const Point at{ (static_cast<float>(gx) + 0.5f) * cell, (static_cast<float>(gy) + 0.5f) * cell, height };
-                if (gx == 0 && gy == 0)
+                if (inRoom(gx, gy))
                 {
-                    layout.m_lights.push_back(Light{ at, LightState::Working });
+                    // The spawn room is fully lit, apart from one tired light in a far corner.
+                    const bool corner = r > 0 && gx == r && gy == r;
+                    layout.m_lights.push_back(Light{ at, corner ? LightState::Flickering : LightState::Working });
                     continue;
                 }
                 const bool dark = DarkZoneValue(settings, gx, gy) > 1.0f - settings.m_darkZoneShare;
@@ -330,5 +361,91 @@ namespace NoclipProtocol::Level0
         }
 
         return layout;
+    }
+
+    namespace
+    {
+        // Distance along (dx, dy) from (ox, oy) to a 2D box, or a large number if the ray misses.
+        float RayToBox(float ox, float oy, float dx, float dy, const Box& box)
+        {
+            const float big = 1.0e9f;
+            float tMin = 0.0f;
+            float tMax = big;
+            const float o[2] = { ox, oy };
+            const float d[2] = { dx, dy };
+            const float lo[2] = { box.m_cx - box.m_sx * 0.5f, box.m_cy - box.m_sy * 0.5f };
+            const float hi[2] = { box.m_cx + box.m_sx * 0.5f, box.m_cy + box.m_sy * 0.5f };
+            for (int axis = 0; axis < 2; ++axis)
+            {
+                if (std::fabs(d[axis]) < 1.0e-6f)
+                {
+                    if (o[axis] < lo[axis] || o[axis] > hi[axis])
+                    {
+                        return big;
+                    }
+                    continue;
+                }
+                float t1 = (lo[axis] - o[axis]) / d[axis];
+                float t2 = (hi[axis] - o[axis]) / d[axis];
+                if (t1 > t2)
+                {
+                    std::swap(t1, t2);
+                }
+                tMin = std::max(tMin, t1);
+                tMax = std::min(tMax, t2);
+                if (tMin > tMax)
+                {
+                    return big;
+                }
+            }
+            return tMin;
+        }
+    } // namespace
+
+    float OpenestYaw(const Settings& settings, float x, float y)
+    {
+        int cx = 0;
+        int cy = 0;
+        WorldToChunk(settings, x, y, cx, cy);
+        std::vector<Box> blockers;
+        for (int ix = cx - 1; ix <= cx + 1; ++ix)
+        {
+            for (int iy = cy - 1; iy <= cy + 1; ++iy)
+            {
+                const ChunkLayout layout = GenerateChunk(settings, ix, iy);
+                blockers.insert(blockers.end(), layout.m_walls.begin(), layout.m_walls.end());
+                blockers.insert(blockers.end(), layout.m_pillars.begin(), layout.m_pillars.end());
+            }
+        }
+
+        constexpr int directions = 16;
+        const float maxView = settings.m_cellSize * static_cast<float>(settings.m_chunkCells); // what is loaded around us
+        float distance[directions];
+        for (int i = 0; i < directions; ++i)
+        {
+            const float yaw = static_cast<float>(i) * 6.28318530718f / static_cast<float>(directions);
+            const float dx = -std::sin(yaw);
+            const float dy = std::cos(yaw);
+            float nearest = maxView;
+            for (const Box& box : blockers)
+            {
+                nearest = std::min(nearest, RayToBox(x, y, dx, dy, box));
+            }
+            distance[i] = nearest;
+        }
+
+        // Prefer a direction that is open and has open space either side of it (a room, not a slit).
+        int best = 0;
+        float bestScore = -1.0f;
+        for (int i = 0; i < directions; ++i)
+        {
+            const float score = distance[i] + 0.5f * (distance[(i + directions - 1) % directions] + distance[(i + 1) % directions]);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = i;
+            }
+        }
+        return static_cast<float>(best) * 6.28318530718f / static_cast<float>(directions);
     }
 } // namespace NoclipProtocol::Level0
