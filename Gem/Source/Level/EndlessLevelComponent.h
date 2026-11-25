@@ -102,6 +102,11 @@ namespace NoclipProtocol
         int m_chunkCellsField = 6;
         float m_lightFractionField = 0.35f;
         float m_openFractionField = 0.2f;
+        float m_roomChanceField = 0.35f;     // chance a chunk gets one big open room
+        float m_pillarChanceField = 0.6f;    // chance of a pillar on an open corner
+        int m_spawnRoomRadiusField = 3;      // forward base (spawn room): cells each way, 3 = 7 x 7 cells = 28 m
+        float m_darkZoneScaleField = 3.5f;   // dark zones are about this many cells across
+        bool m_enableRoomShifting = false;   // coming soon: rooms that rearrange when nobody is looking
         Level0::Settings m_settings;
 
         // Runtime state

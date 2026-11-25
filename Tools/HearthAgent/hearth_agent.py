@@ -43,7 +43,7 @@ LOG_DIR = PROJECT / "user" / "log"
 LAUNCHER = PROJECT / "build" / "linux" / "bin" / "profile" / "NoclipProtocol.GameLauncher"
 BUILD_TARGETS = ["NoclipProtocol.GameLauncher", "NoclipProtocol.HeadlessServerLauncher",
                  "NoclipProtocol.ServerLauncher", "NoclipProtocol.UnifiedLauncher", "Editor"]
-VERSION = "1.6"
+VERSION = "1.7"
 ENGINE_DIR = Path.home() / "O3DE" / "Engines" / "hearth-engine"
 ENGINE_REPO = "https://github.com/Dragongamer9/hearth-engine"
 ENGINE_BRANCH = "hearth/main"
@@ -54,6 +54,28 @@ SHOTS = BRIDGE / "shots"
 PROJECT_JSON = PROJECT / "project.json"
 HTTP_PORT = 47830
 HUB_DIR = PROJECT / "Tools" / "HearthEngine" / "hub"
+LEVEL0_PREFAB = PROJECT / "Levels" / "Level0" / "Level0.prefab"
+LEVELGEN_TOOL = HOME / "level0gen"
+LEVELGEN_SOURCES = [PROJECT / "Tools" / "Level0" / "level0gen.cpp",
+                    PROJECT / "Gem" / "Source" / "Level" / "Level0Json.cpp",
+                    PROJECT / "Gem" / "Source" / "Level" / "Level0Json.h",
+                    PROJECT / "Gem" / "Source" / "Level" / "Level0Layout.cpp",
+                    PROJECT / "Gem" / "Source" / "Level" / "Level0Layout.h"]
+# Level Generator settings: Hub name -> (field in the level file, label in the Editor, default, generator key)
+LEVELGEN_FIELDS = {
+    "seed": ("Seed", "Seed", 1, "seed"),
+    "newSeedEachRun": ("RandomSeedEachRun", "Random seed each run", True, None),
+    "openness": ("OpenFraction", "Openness", 0.2, "openFraction"),
+    "roomChance": ("RoomChance", "Open room chance", 0.35, "roomChance"),
+    "pillarChance": ("PillarChance", "Pillar chance", 0.6, "pillarChance"),
+    "baseSize": ("SpawnRoomRadius", "Forward base size", 3, "spawnRoomRadius"),
+    "darkness": ("DarkZoneShare", "Darkness", 0.4, "darkZoneShare"),
+    "darkZoneSize": ("DarkZoneScale", "Dark zone size", 3.5, "darkZoneScale"),
+    "stains": ("DecalChance", "Stains", 0.3, "decalChance"),
+    "flicker": ("EnableFlicker", "Flickering lights", True, None),
+    "dying": ("EnableDyingLights", "Dying lights", True, None),
+    "roomShifting": ("EnableRoomShifting", "Room shifting (soon)", False, None),
+}
 
 _build_lock = threading.Lock()
 _build_state = {"running": False, "started": None, "finished": None, "exit_code": None}
@@ -357,6 +379,9 @@ def op_game_start(args):
     else:
         cmd.append(f"--regset=/O3DE/Autoexec/ConsoleCommands/r_width={int(args.get('width', 1600))}")
         cmd.append(f"--regset=/O3DE/Autoexec/ConsoleCommands/r_height={int(args.get('height', 900))}")
+    for item in args.get("extra") or []:
+        if isinstance(item, str) and item.startswith("--regset=/NoclipProtocol/"):
+            cmd.append(item)
     launch = {}
     if LAUNCH_FILE.exists():
         try:
@@ -720,10 +745,186 @@ def op_engine(args):
     return {"ok": True, "started": [name for name, *_ in steps], "log": str(ENGINE_LOG)}
 
 
+# ---------- Level Generator (Hearth Engine Hub) ----------
+
+def _levelgen_clean(values):
+    """Only known settings, each the right type and in range."""
+    out = {}
+    for name, (_, _, default, _) in LEVELGEN_FIELDS.items():
+        value = values.get(name, default)
+        try:
+            if isinstance(default, bool):
+                value = bool(value)
+            elif name == "seed":
+                value = int(str(value).strip() or "1") % (1 << 64)
+            elif isinstance(default, int):
+                value = int(round(float(value)))
+            else:
+                value = float(value)
+        except (TypeError, ValueError):
+            value = default
+        out[name] = value
+    out["openness"] = min(1.0, max(0.0, out["openness"]))
+    out["roomChance"] = min(1.0, max(0.0, out["roomChance"]))
+    out["pillarChance"] = min(1.0, max(0.0, out["pillarChance"]))
+    out["darkness"] = min(1.0, max(0.0, out["darkness"]))
+    out["stains"] = min(1.0, max(0.0, out["stains"]))
+    out["darkZoneSize"] = min(8.0, max(1.0, out["darkZoneSize"]))
+    out["baseSize"] = min(5, max(0, out["baseSize"]))
+    out["roomShifting"] = False  # not built yet
+    return out
+
+
+def _levelgen_text(values):
+    v = _levelgen_clean(values)
+    parts = [f"{key}={v[name]}" for name, (_, _, _, key) in LEVELGEN_FIELDS.items() if key]
+    parts.append(f"enableFlicker={1 if v['flicker'] else 0}")
+    parts.append(f"enableDying={1 if v['dying'] else 0}")
+    return ";".join(parts)
+
+
+def _level0_component(data):
+    for entity in (data.get("Entities") or {}).values():
+        for component in (entity.get("Components") or {}).values():
+            template = component.get("m_template") if isinstance(component, dict) else None
+            if isinstance(template, dict) and template.get("$type") == "EndlessLevelComponent":
+                return template
+    return None
+
+
+def _seed_text(values):
+    """Seeds are 64-bit: send them to the Hub as text (JavaScript numbers would round them)."""
+    out = dict(values)
+    out["seed"] = str(out["seed"])
+    return out
+
+
+def op_levelgen_get(args):
+    """The Level 0 settings saved in the level."""
+    try:
+        data = json.loads(LEVEL0_PREFAB.read_text())
+    except (OSError, ValueError) as error:
+        return {"ok": False, "error": f"can't read the level: {error}"}
+    component = _level0_component(data) or {}
+    values = {name: component.get(field, default) for name, (field, _, default, _) in LEVELGEN_FIELDS.items()}
+    return {"ok": True, "values": _seed_text(_levelgen_clean(values)), "level": "Level 0", "name": "The Lobby"}
+
+
+def _levelgen_tool():
+    """Builds the small level0gen tool from the game's own generator code when it is missing or out of date."""
+    newest = max(p.stat().st_mtime for p in LEVELGEN_SOURCES)
+    if LEVELGEN_TOOL.exists() and LEVELGEN_TOOL.stat().st_mtime >= newest:
+        return None
+    compiler = shutil.which("clang++") or shutil.which("g++")
+    if not compiler:
+        return "no C++ compiler (clang++ or g++) found"
+    sources = [str(p) for p in LEVELGEN_SOURCES if p.suffix == ".cpp"]
+    tmp = LEVELGEN_TOOL.with_suffix(".new")
+    run = subprocess.run(["nice", "-n", "10", compiler, "-std=c++17", "-O2", "-o", str(tmp)] + sources,
+                         capture_output=True, text=True, timeout=180)
+    if run.returncode != 0:
+        return "level0gen didn't compile: " + run.stderr[-1500:]
+    tmp.replace(LEVELGEN_TOOL)
+    return None
+
+
+def _levelgen_run(argv, timeout=60):
+    problem = _levelgen_tool()
+    if problem:
+        return {"ok": False, "error": problem}
+    run = subprocess.run([str(LEVELGEN_TOOL)] + argv, capture_output=True, text=True, timeout=timeout)
+    if run.returncode != 0:
+        return {"ok": False, "error": run.stderr[-800:] or f"exit code {run.returncode}"}
+    try:
+        return {"ok": True, "data": json.loads(run.stdout)}
+    except ValueError:
+        return {"ok": False, "error": "level0gen gave bad output"}
+
+
+def op_levelgen_area(args):
+    """Walls, pillars, lights and stains for a block of chunks (default 4 x 4 around spawn), from the real generator."""
+    values = _levelgen_clean(args.get("values") or {})
+    area = [int(args.get(k, d)) for k, d in (("minX", -2), ("minY", -2), ("maxX", 1), ("maxY", 1))]
+    result = _levelgen_run(["area", _levelgen_text(values)] + [str(n) for n in area])
+    if result.get("ok"):
+        result["values"] = _seed_text(values)
+    return result
+
+
+def op_levelgen_tests(args):
+    values = _levelgen_clean(args.get("values") or {})
+    seeds = max(1, min(200, int(args.get("seeds", 50))))
+    return _levelgen_run(["tests", _levelgen_text(values), str(seeds)], timeout=120)
+
+
+def op_levelgen_apply(args):
+    """Saves the settings into Level 0: through the open editor when it has the level, otherwise in the level file."""
+    values = _levelgen_clean(args.get("values") or {})
+    if editor_processes() and bridge_alive():
+        pairs = {LEVELGEN_FIELDS[name][1]: values[name] for name in LEVELGEN_FIELDS if name != "roomShifting"}
+        code = f"""
+import azlmbr.bus as b, azlmbr.editor as ed, azlmbr.entity as ent, azlmbr.legacy.general as g
+pairs = {json.dumps(pairs)}
+if g.get_current_level_name().lower() != 'level0':
+    print('NOT_LEVEL0')
+else:
+    tid = ed.EditorComponentAPIBus(b.Broadcast, 'FindComponentTypeIdsByEntityType', ['Endless Level'], ent.EntityType().Game)
+    done = []
+    for e in ed.ToolsApplicationRequestBus(b.Broadcast, 'GetAllEntities') or []:
+        got = ed.EditorComponentAPIBus(b.Broadcast, 'GetComponentOfType', e, tid[0]) if tid else None
+        if got and got.IsSuccess():
+            comp = got.GetValue()
+            paths = ed.EditorComponentAPIBus(b.Broadcast, 'BuildComponentPropertyList', comp)
+            for label, value in pairs.items():
+                for p in paths:
+                    if p == label or p.endswith('|' + label):
+                        ok = ed.EditorComponentAPIBus(b.Broadcast, 'SetComponentProperty', comp, p, value).IsSuccess()
+                        done.append((label, ok))
+                        break
+    print('SET', done)
+    print('SAVED', g.save_level())
+"""
+        answer = bridge_python(code, timeout=60)
+        output = (answer or {}).get("output", "") if isinstance(answer, dict) else ""
+        if "NOT_LEVEL0" not in output and "SAVED True" in output:
+            return {"ok": True, "via": "editor", "values": _seed_text(values), "detail": output[-600:]}
+        if editor_processes():
+            return {"ok": False, "error": "the editor is open but couldn't apply the settings (is Level 0 open?)",
+                    "detail": output[-600:]}
+    try:
+        data = json.loads(LEVEL0_PREFAB.read_text())
+    except (OSError, ValueError) as error:
+        return {"ok": False, "error": f"can't read the level: {error}"}
+    component = _level0_component(data)
+    if component is None:
+        return {"ok": False, "error": "Level 0 has no Endless Level component"}
+    for name, (field, _, default, _) in LEVELGEN_FIELDS.items():
+        if values[name] == default:
+            component.pop(field, None)
+        else:
+            component[field] = values[name]
+    backup = LEVEL0_PREFAB.with_suffix(".prefab.bak")
+    shutil.copy2(LEVEL0_PREFAB, backup)
+    tmp = LEVEL0_PREFAB.with_suffix(".prefab.tmp")
+    tmp.write_text(json.dumps(data, indent=4) + "\n")
+    tmp.replace(LEVEL0_PREFAB)
+    return {"ok": True, "via": "file", "values": _seed_text(values)}
+
+
+def op_levelgen_play(args):
+    """Starts the game on Level 0 with exactly the settings on screen (not saved to the level)."""
+    values = _levelgen_clean(args.get("values") or {})
+    extra = [f"--regset=/NoclipProtocol/Level0/Override={_levelgen_text(values)}"]
+    return op_game_start({"fullscreen": bool(args.get("fullscreen", True)), "level": "Level0",
+                          "width": args.get("width", 1600), "height": args.get("height", 900), "extra": extra})
+
+
 OPS = {"engine": op_engine, "new_project": op_new_project, "hub_info": op_hub_info, "set_part": op_set_part, "list_projects": op_list_projects,
        "probe": op_probe, "parts": op_parts, "set_parts": op_set_parts, "status": op_status, "editor_start": op_editor_start, "editor_stop": op_editor_stop,
        "build": op_build, "game_start": op_game_start, "game_stop": op_game_stop,
-       "crash_report": op_crash_report, "logs": op_logs}
+       "crash_report": op_crash_report, "logs": op_logs,
+       "levelgen_get": op_levelgen_get, "levelgen_area": op_levelgen_area, "levelgen_tests": op_levelgen_tests,
+       "levelgen_apply": op_levelgen_apply, "levelgen_play": op_levelgen_play}
 
 
 # ---------- request loop ----------
@@ -908,7 +1109,7 @@ def start_http(token):
             if not str(target).startswith(str(HUB_DIR.resolve())) or not target.is_file():
                 return self._send(404, {"error": "not found"})
             body = target.read_bytes()
-            if target.name == "index.html":
+            if target.suffix == ".html":
                 body = body.replace(b"__HEARTH_TOKEN__", _Api.token.encode())
             kinds = {".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css",
                      ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".woff2": "font/woff2"}

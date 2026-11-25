@@ -1,5 +1,6 @@
 #include "EndlessLevelComponent.h"
 #include "Level0Scripting.h"
+#include "Level0Json.h"
 
 #include <AzCore/Asset/AssetManager.h>
 #include <AzCore/Asset/AssetManagerBus.h>
@@ -8,6 +9,7 @@
 #include <AzCore/Math/Transform.h>
 #include <AzCore/Serialization/EditContext.h>
 #include <AzCore/Serialization/SerializeContext.h>
+#include <AzCore/Settings/SettingsRegistry.h>
 #include <AzCore/std/algorithm.h>
 #include <AzCore/std/chrono/chrono.h>
 #include <AzFramework/Components/NonUniformScaleComponent.h>
@@ -52,7 +54,12 @@ namespace NoclipProtocol
                 ->Field("DecalMoldPrefab", &EndlessLevelComponent::m_decalMoldPrefab)
                 ->Field("DecalWornPrefab", &EndlessLevelComponent::m_decalWornPrefab)
                 ->Field("LightDyingPrefab", &EndlessLevelComponent::m_lightDyingPrefab)
-                ->Field("EnableDyingLights", &EndlessLevelComponent::m_enableDyingLights);
+                ->Field("EnableDyingLights", &EndlessLevelComponent::m_enableDyingLights)
+                ->Field("RoomChance", &EndlessLevelComponent::m_roomChanceField)
+                ->Field("PillarChance", &EndlessLevelComponent::m_pillarChanceField)
+                ->Field("SpawnRoomRadius", &EndlessLevelComponent::m_spawnRoomRadiusField)
+                ->Field("DarkZoneScale", &EndlessLevelComponent::m_darkZoneScaleField)
+                ->Field("EnableRoomShifting", &EndlessLevelComponent::m_enableRoomShifting);
 
             if (auto edit = serialize->GetEditContext())
             {
@@ -83,10 +90,26 @@ namespace NoclipProtocol
                         "Share of maze walls knocked out (higher = more open)")
                         ->Attribute(AZ::Edit::Attributes::Min, 0.0f)
                         ->Attribute(AZ::Edit::Attributes::Max, 1.0f)
+                    ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_roomChanceField, "Open room chance",
+                        "Chance a chunk gets one big open room")
+                        ->Attribute(AZ::Edit::Attributes::Min, 0.0f)
+                        ->Attribute(AZ::Edit::Attributes::Max, 1.0f)
+                    ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_pillarChanceField, "Pillar chance",
+                        "Chance of a pillar on an open corner")
+                        ->Attribute(AZ::Edit::Attributes::Min, 0.0f)
+                        ->Attribute(AZ::Edit::Attributes::Max, 1.0f)
+                    ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_spawnRoomRadiusField, "Forward base size",
+                        "Spawn room: cells each way from the middle (2 = 20 x 20 m, 3 = 28 x 28 m)")
+                        ->Attribute(AZ::Edit::Attributes::Min, 0)
+                        ->Attribute(AZ::Edit::Attributes::Max, 5)
                     ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_darkZoneShareField, "Darkness",
                         "Share of the world inside dark zones (dead or missing lights)")
                         ->Attribute(AZ::Edit::Attributes::Min, 0.0f)
                         ->Attribute(AZ::Edit::Attributes::Max, 1.0f)
+                    ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_darkZoneScaleField, "Dark zone size",
+                        "About how many cells across a dark zone is")
+                        ->Attribute(AZ::Edit::Attributes::Min, 1.0f)
+                        ->Attribute(AZ::Edit::Attributes::Max, 8.0f)
                     ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_decalChanceField, "Stains",
                         "Chance a room gets a wet spot, worn patch or mold")
                         ->Attribute(AZ::Edit::Attributes::Min, 0.0f)
@@ -100,6 +123,9 @@ namespace NoclipProtocol
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_enableDeadLights, "Dead lights", "")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_enableStains, "Stains", "")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_enableDyingLights, "Dying lights", "Lights that go out when you walk under them")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_enableRoomShifting, "Room shifting (soon)",
+                        "Rooms that rearrange when nobody is looking. Not built yet.")
+                        ->Attribute(AZ::Edit::Attributes::ReadOnly, true)
                     ->ClassElement(AZ::Edit::ClassElements::Group, "Tile pieces")
                         ->Attribute(AZ::Edit::Attributes::AutoExpand, false)
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_wallPrefab, "Wall", "Spawnable product path")
@@ -134,11 +160,35 @@ namespace NoclipProtocol
         m_settings.m_openFraction = m_openFractionField;
         m_settings.m_darkZoneShare = m_darkZoneShareField;
         m_settings.m_decalChance = m_decalChanceField;
+        m_settings.m_roomChance = m_roomChanceField;
+        m_settings.m_pillarChance = m_pillarChanceField;
+        m_settings.m_spawnRoomRadius = AZStd::clamp(m_spawnRoomRadiusField, 0, 5);
+        m_settings.m_darkZoneScale = AZStd::max(1.0f, m_darkZoneScaleField);
         m_settings.m_seed = m_seed;
         if (m_randomSeedEachRun)
         {
             const auto now = AZStd::chrono::steady_clock::now().time_since_epoch().count();
             m_settings.m_seed = static_cast<AZ::u64>(now) ^ (static_cast<AZ::u64>(reinterpret_cast<uintptr_t>(this)) << 17);
+        }
+        // "Walk it in Play" from the Hearth Engine Level Generator: the game is started with the settings on screen,
+        // as "key=value;..." in /NoclipProtocol/Level0/Override, so you walk exactly the map you were looking at.
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            AZStd::string overrideText;
+            if (registry->Get(overrideText, "/NoclipProtocol/Level0/Override") && !overrideText.empty())
+            {
+                Level0::ApplySettingsText(m_settings, std::string(overrideText.c_str()));
+                const std::string text(overrideText.c_str());
+                auto flag = [&text](const char* key, bool current)
+                {
+                    const std::string needle = std::string(key) + "=";
+                    const size_t at = text.find(needle);
+                    return at == std::string::npos ? current : text[at + needle.size()] != '0';
+                };
+                m_enableFlicker = flag("enableFlicker", m_enableFlicker);
+                m_enableDyingLights = flag("enableDying", m_enableDyingLights);
+                AZ_Printf("NoclipProtocol", "Level 0 settings from the Level Generator: %s", overrideText.c_str());
+            }
         }
         AZ_Printf("NoclipProtocol", "Endless Level 0 seed: %llu", static_cast<unsigned long long>(m_settings.m_seed));
 

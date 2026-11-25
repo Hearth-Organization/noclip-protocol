@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace NoclipProtocol::Level0
 {
@@ -67,6 +68,8 @@ namespace NoclipProtocol::Level0
             TagLight = 14,
             TagZone = 15,
             TagDecal = 16,
+            TagSmallRoom = 17,
+            TagSpawnLight = 18,
         };
 
         float Smooth(float t) { return t * t * (3.0f - 2.0f * t); }
@@ -219,6 +222,36 @@ namespace NoclipProtocol::Level0
             }
         }
 
+        // 3a. Small rooms dotted through the maze: up to four tries per chunk, each one coming true with the
+        //     open room chance (0.35 gives about 1.4 small rooms per chunk). 2 x 2 or 2 x 3 cells (8 x 8 m or 8 x 12 m),
+        //     clear inside but still walled round by the maze, so they feel like rooms you find, not holes.
+        //     Their own random stream, so the rest of the chunk doesn't change when this does.
+        {
+            Rng roomRng(Hash(settings.m_seed, TagSmallRoom, chunkX, chunkY));
+            for (int attempt = 0; attempt < 4 && n >= 3; ++attempt)
+            {
+                const bool make = roomRng.NextUnit() < settings.m_roomChance;
+                const bool wide = roomRng.NextUnit() < 0.5f;
+                const bool long3 = roomRng.NextUnit() < 0.4f;
+                const int rw = wide && long3 ? 3 : 2;
+                const int rd = !wide && long3 ? 3 : 2;
+                const int rx = roomRng.NextInt(std::max(1, n - rw + 1));
+                const int ry = roomRng.NextInt(std::max(1, n - rd + 1));
+                if (!make)
+                {
+                    continue;
+                }
+                for (int x = rx; x < std::min(n, rx + rw); ++x)
+                {
+                    for (int y = ry + 1; y < std::min(n, ry + rd); ++y) { h[x][y] = false; }
+                }
+                for (int x = rx + 1; x < std::min(n, rx + rw); ++x)
+                {
+                    for (int y = ry; y < std::min(n, ry + rd); ++y) { v[x][y] = false; }
+                }
+            }
+        }
+
         // 3b. The spawn room (the players' first base): a big open room centered on the spawn cell, spanning the
         //     four chunks around the origin. Walled all round, with two doorways side by side in the north
         //     wall, so the back of the room is the safe end to build in. A hallway loops around the outside of it, so every part of the
@@ -329,7 +362,7 @@ namespace NoclipProtocol::Level0
 
         // 7. Lights, decided per global cell (independent of chunk generation order).
         //    Lit areas: mostly working, some flickering, a few dead. Dark zones: mostly missing, some dead, rare flicker.
-        //    The spawn room is always lit.
+        //    The spawn room is mostly lit: the cells around spawn always work, elsewhere some lights are out.
         for (int x = 0; x < n; ++x)
         {
             for (int y = 0; y < n; ++y)
@@ -339,9 +372,16 @@ namespace NoclipProtocol::Level0
                 const Point at{ (static_cast<float>(gx) + 0.5f) * cell, (static_cast<float>(gy) + 0.5f) * cell, height };
                 if (inRoom(gx, gy))
                 {
-                    // The spawn room is fully lit, apart from one tired light in a far corner.
+                    // Mostly lit, but it has been here a while: about one light in five is dead and a few flicker.
+                    // The spawn cell and the cells next to it always work, so you never start in the dark.
                     const bool corner = r > 0 && gx == r && gy == r;
-                    layout.m_lights.push_back(Light{ at, corner ? LightState::Flickering : LightState::Working });
+                    const bool nearSpawn = std::abs(gx) + std::abs(gy) <= 1;
+                    const float spawnRoll = Unit(Hash(settings.m_seed, TagSpawnLight, gx, gy));
+                    LightState state = LightState::Working;
+                    if (corner) { state = LightState::Flickering; }
+                    else if (!nearSpawn && spawnRoll < 0.20f) { state = LightState::Dead; }
+                    else if (!nearSpawn && spawnRoll < 0.26f) { state = LightState::Flickering; }
+                    layout.m_lights.push_back(Light{ at, state });
                     continue;
                 }
                 const bool dark = DarkZoneValue(settings, gx, gy) > 1.0f - settings.m_darkZoneShare;

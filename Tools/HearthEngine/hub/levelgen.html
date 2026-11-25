@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hearth Engine · Level Generator</title>
+<link rel="icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0d0c0b; --card:#171513; --line:rgba(255,255,255,0.06); --line2:rgba(255,255,255,0.1); --text:#ece6de; --dim:#8d857b;
+          --ember:#e8743b; --ink:#1a0f08; --chip:#24211e; --track:#2c2824; --ok:#7fe0a0; --bad:#ff7a66; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:Geist,Inter,system-ui,sans-serif; font-size:13px; }
+  .page { min-height:100vh; padding:10px; display:flex; flex-direction:column; gap:10px; }
+  header { display:flex; flex-wrap:wrap; align-items:center; gap:14px; padding:6px 8px; }
+  .logo { width:30px; height:30px; border-radius:9px; background:var(--ember); display:flex; align-items:center; justify-content:center; }
+  .actions { margin-left:auto; display:flex; flex-wrap:wrap; gap:8px; }
+  button { font:inherit; color:var(--text); cursor:pointer; }
+  .pill { padding:7px 14px; border:1px solid var(--line2); border-radius:999px; background:transparent; }
+  .pill.primary { font-weight:600; padding:7px 18px; border:0; background:var(--ember); color:var(--ink); }
+  .pill:disabled { opacity:.5; cursor:default; }
+  button:focus-visible, input:focus-visible { outline:2px solid var(--ember); outline-offset:2px; }
+  .body { flex:1; display:flex; flex-wrap:wrap; gap:10px; }
+  main { flex:999 1 560px; min-width:0; display:flex; flex-direction:column; gap:10px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; }
+  .mapbox { position:relative; height:640px; border:1px solid var(--line); border-radius:14px; background:#0f0e0c; overflow:hidden;
+            display:flex; align-items:center; justify-content:center; }
+  canvas { width:100%; max-width:600px; aspect-ratio:1; border-radius:10px; }
+  .legend { position:absolute; left:14px; top:14px; display:flex; flex-wrap:wrap; gap:6px; font-size:12px; }
+  .chip { display:flex; align-items:center; gap:7px; padding:5px 10px; border-radius:999px; background:rgba(18,16,14,0.8); }
+  .sw { width:8px; height:8px; border-radius:2px; }
+  .size { position:absolute; right:14px; bottom:14px; padding:5px 10px; border-radius:999px; background:rgba(18,16,14,0.8);
+          font-family:'Geist Mono',monospace; font-size:11px; }
+  .busy { position:absolute; left:14px; bottom:14px; padding:5px 10px; border-radius:999px; background:rgba(18,16,14,0.8); font-size:11px; color:var(--dim); display:none; }
+  .stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+  .stat { padding:12px 14px; }
+  .stat .k { font-size:12px; color:var(--dim); }
+  .stat .v { margin-top:4px; font-size:20px; font-weight:600; }
+  .stat .n { margin-top:2px; font-size:11px; color:var(--dim); min-height:14px; }
+  aside { flex:1 1 300px; max-width:360px; display:flex; flex-direction:column; gap:10px; }
+  section { padding:14px; display:flex; flex-direction:column; gap:14px; }
+  section.seed { gap:10px; }
+  .title { font-weight:600; }
+  .seedrow { display:flex; gap:6px; }
+  .seedrow input { flex:1; min-width:0; font-family:'Geist Mono',monospace; font-size:12px; padding:9px 12px; border:1px solid var(--line2);
+                   border-radius:10px; background:#0f0e0d; color:var(--text); }
+  .icon { width:38px; border:0; border-radius:10px; background:var(--chip); display:flex; align-items:center; justify-content:center; }
+  .row { display:flex; align-items:center; justify-content:space-between; }
+  label.slide { display:flex; flex-direction:column; gap:8px; }
+  .val { font-family:'Geist Mono',monospace; font-size:12px; padding:1px 8px; border-radius:999px; background:var(--chip); color:var(--text); }
+  input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:999px; outline:none; margin:0; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--text); border:3px solid var(--ember); }
+  input[type=range]::-moz-range-thumb { width:10px; height:10px; border-radius:50%; background:var(--text); border:3px solid var(--ember); }
+  [role=switch] { width:32px; height:18px; border-radius:999px; border:0; padding:0; background:var(--ember); position:relative; }
+  [role=switch] span { position:absolute; top:2px; width:14px; height:14px; border-radius:50%; background:var(--ink); right:2px; }
+  [role=switch][aria-checked=false] { background:#3a3530; }
+  [role=switch][aria-checked=false] span { right:auto; left:2px; background:var(--dim); }
+  [role=switch][aria-disabled=true] { cursor:default; }
+  #toast { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); padding:10px 16px; border-radius:12px; background:#24211e;
+           border:1px solid var(--line2); display:none; max-width:min(560px,90vw); }
+  a.back { color:var(--dim); text-decoration:none; font-size:11px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <span class="logo"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 1 C12 5 14 7 14 11 A5 5 0 0 1 4 11 C4 8 6 7 7 4 C8 6 9 6 9 1 Z" fill="#1a0f08"/></svg></span>
+    <div style="display:flex;flex-direction:column"><span style="font-weight:600">Level Generator</span><span id="levelLine" style="font-size:11px;color:var(--dim)">Level 0 · The Lobby</span></div>
+    <div class="actions">
+      <button class="pill" id="testsBtn">Run layout tests</button>
+      <button class="pill" id="playBtn">Walk it in Play</button>
+      <button class="pill primary" id="applyBtn">Apply to level</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <main>
+      <div class="mapbox">
+        <canvas id="map" width="1200" height="1200" role="img" aria-label="Top-down map of 16 generated Level 0 chunks around the spawn room"></canvas>
+        <div class="legend">
+          <span class="chip"><span class="sw" style="background:#fff8cd"></span>Working</span>
+          <span class="chip"><span class="sw" style="background:#ffa028"></span>Flickering</span>
+          <span class="chip"><span class="sw" style="background:#5f5a50"></span>Dead</span>
+          <span class="chip"><span class="sw" style="background:#ff5f4b"></span>Dying</span>
+          <span class="chip"><span class="sw" style="background:transparent;border:2px solid #7fe0a0"></span>Forward base</span>
+        </div>
+        <div class="busy" id="busy">Generating…</div>
+        <div class="size">16 chunks · 96 × 96 m</div>
+      </div>
+      <div class="stats">
+        <div class="card stat"><div class="k">Reachable cells</div><div class="v" id="sReach">–</div><div class="n" id="nReach"></div></div>
+        <div class="card stat"><div class="k">Walls per chunk</div><div class="v" id="sWalls">–</div><div class="n" id="nWalls"></div></div>
+        <div class="card stat"><div class="k">Lights per chunk</div><div class="v" id="sLights">–</div><div class="n" id="nLights"></div></div>
+        <div class="card stat"><div class="k">Clear view at spawn</div><div class="v" id="sView">–</div><div class="n" id="nView"></div></div>
+      </div>
+    </main>
+
+    <aside>
+      <section class="card seed" aria-label="Seed">
+        <label for="seed" class="title">Seed</label>
+        <div class="seedrow">
+          <input id="seed" type="text" inputmode="numeric" spellcheck="false" autocomplete="off">
+          <button class="icon" id="newSeed" aria-label="New seed"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8 A5 5 0 1 1 10 3.4 M10 1 V4 H13" fill="none" stroke="#ece6de" stroke-width="1.5"/></svg></button>
+        </div>
+        <div class="row"><span id="lNewSeed">New seed every run</span><button role="switch" id="newSeedEachRun" aria-labelledby="lNewSeed"><span></span></button></div>
+      </section>
+
+      <section class="card" aria-label="Layout">
+        <div class="title">Layout</div>
+        <label class="slide"><span class="row"><span>Openness</span><span class="val" id="vOpenness"></span></span>
+          <input type="range" id="openness" min="0" max="1" step="0.05"></label>
+        <label class="slide"><span class="row"><span>Open room chance</span><span class="val" id="vRoomChance"></span></span>
+          <input type="range" id="roomChance" min="0" max="1" step="0.05"></label>
+        <label class="slide"><span class="row"><span>Pillar chance</span><span class="val" id="vPillarChance"></span></span>
+          <input type="range" id="pillarChance" min="0" max="1" step="0.05"></label>
+        <label class="slide"><span class="row"><span>Forward base size</span><span class="val" id="vBaseSize"></span></span>
+          <input type="range" id="baseSize" min="0" max="5" step="1"></label>
+      </section>
+
+      <section class="card" aria-label="Horror" style="flex:1">
+        <div class="title">Horror</div>
+        <label class="slide"><span class="row"><span>Darkness</span><span class="val" id="vDarkness"></span></span>
+          <input type="range" id="darkness" min="0" max="1" step="0.05"></label>
+        <label class="slide"><span class="row"><span>Dark zone size</span><span class="val" id="vDarkZoneSize"></span></span>
+          <input type="range" id="darkZoneSize" min="1" max="8" step="0.5"></label>
+        <label class="slide"><span class="row"><span>Stains</span><span class="val" id="vStains"></span></span>
+          <input type="range" id="stains" min="0" max="1" step="0.05"></label>
+        <div class="row"><span id="lFlicker">Flickering lights</span><button role="switch" id="flicker" aria-labelledby="lFlicker"><span></span></button></div>
+        <div class="row"><span id="lDying">Dying lights</span><button role="switch" id="dying" aria-labelledby="lDying"><span></span></button></div>
+        <div class="row"><span id="lShift">Room shifting (soon)</span><button role="switch" id="roomShifting" aria-labelledby="lShift" aria-checked="false" aria-disabled="true" title="Not built yet"><span></span></button></div>
+      </section>
+      <a class="back" href="/">← Hearth Engine Hub</a>
+    </aside>
+  </div>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+const TOKEN = "__HEARTH_TOKEN__";
+const $ = (id) => document.getElementById(id);
+const SLIDERS = ["openness", "roomChance", "pillarChance", "baseSize", "darkness", "darkZoneSize", "stains"];
+const SWITCHES = ["newSeedEachRun", "flicker", "dying"];
+let values = null;       // what's on screen
+let saved = null;        // what the level has
+let area = null;         // last generated map
+let fullTests = null;    // last "Run layout tests" result (for these exact values)
+
+async function api(op, args = {}) {
+  const r = await fetch("/api/" + op, { method: "POST", headers: { "X-Hearth-Token": TOKEN, "Content-Type": "application/json" },
+                                         body: JSON.stringify(args) });
+  if (!r.ok) throw new Error("agent answered " + r.status);
+  const data = await r.json();
+  if (data.ok === false) throw new Error(data.error || "failed");
+  return data;
+}
+function toast(text, ms = 5000) {
+  const t = $("toast"); t.textContent = text; t.style.display = "block";
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.style.display = "none", ms);
+}
+function fill(el) {
+  const p = (el.value - el.min) / (el.max - el.min) * 100;
+  el.style.background = `linear-gradient(90deg,#e8743b ${p}%,#2c2824 ${p}%)`;
+}
+function labelFor(name, v) {
+  if (name === "darkness") return Math.round(v * 100) + "%";
+  if (name === "darkZoneSize") return (+v).toFixed(1) + " cells";
+  if (name === "baseSize") { const m = (2 * v + 1) * 4; return `${m} × ${m} m`; }
+  return (+v).toFixed(2);
+}
+function show() {
+  $("seed").value = String(values.seed);
+  for (const name of SLIDERS) {
+    const el = $(name); el.value = values[name]; fill(el);
+    $("v" + name[0].toUpperCase() + name.slice(1)).textContent = labelFor(name, values[name]);
+  }
+  for (const name of SWITCHES) $(name).setAttribute("aria-checked", values[name] ? "true" : "false");
+  const changed = saved && JSON.stringify(values) !== JSON.stringify(saved);
+  $("applyBtn").textContent = changed ? "Apply to level" : "Applied";
+  $("applyBtn").disabled = !changed;
+}
+
+// ---------- map ----------
+const COLORS = { 0: "#fff8cd", 1: "#ffa028", 2: "#5f5a50", 3: "#ff5f4b" };
+function draw() {
+  const c = $("map"), g = c.getContext("2d"), W = c.width;
+  g.fillStyle = "#14120f"; g.fillRect(0, 0, W, W);
+  if (!area) return;
+  const size = area.chunkSize, lo = area.min[0] * size, span = (area.max[0] - area.min[0] + 1) * size;
+  const k = W / span;
+  const X = (x) => (x - lo) * k, Y = (y) => W - (y - area.min[1] * size) * k;
+  // floor tint and chunk lines
+  g.fillStyle = "#1d1a15"; g.fillRect(0, 0, W, W);
+  g.strokeStyle = "rgba(255,255,255,0.05)"; g.lineWidth = 1;
+  for (let i = 1; i < span / size; i++) { const p = i * size * k; g.beginPath(); g.moveTo(p, 0); g.lineTo(p, W); g.moveTo(0, p); g.lineTo(W, p); g.stroke(); }
+  // stains
+  if (values.stains > 0) {
+    for (const [x, y, s] of area.decals) { g.fillStyle = "rgba(120,96,50,0.35)"; g.beginPath(); g.arc(X(x), Y(y), Math.max(2, s * k * 0.45), 0, Math.PI * 2); g.fill(); }
+  }
+  const r = values.baseSize, cell = size / 6;
+  // lights
+  for (const [x, y, s0] of area.lights) {
+    let s = s0;
+    if (s === 1 && !values.flicker) s = 0;
+    if (s === 3 && !values.dying) s = 0;
+    const col = COLORS[s] || "#5f5a50";
+    if (s !== 2) { const grd = g.createRadialGradient(X(x), Y(y), 0, X(x), Y(y), cell * k * 0.7);
+      grd.addColorStop(0, col + "40"); grd.addColorStop(1, col + "00"); g.fillStyle = grd;
+      g.fillRect(X(x) - cell * k, Y(y) - cell * k, cell * k * 2, cell * k * 2); }
+    g.fillStyle = col; const d = Math.max(4, cell * k * 0.22); g.fillRect(X(x) - d / 2, Y(y) - d / 2, d, d);
+  }
+  // walls and pillars
+  g.fillStyle = "#e6d48c";
+  for (const [x, y, w, h] of area.walls) g.fillRect(X(x - w / 2), Y(y + h / 2), Math.max(2, w * k), Math.max(2, h * k));
+  g.fillStyle = "#c9b46a";
+  for (const [x, y, w, h] of area.pillars) g.fillRect(X(x - w / 2), Y(y + h / 2), w * k, h * k);
+  // forward base outline, on top of its walls
+  const bx0 = X(-r * cell), by0 = Y((r + 1) * cell), bw = (2 * r + 1) * cell * k;
+  g.strokeStyle = "#7fe0a0"; g.lineWidth = 4; g.setLineDash([]); g.strokeRect(bx0 - 8, by0 - 8, bw + 16, bw + 16);
+  // spawn and facing
+  const [sx, sy] = area.spawn, yaw = area.spawnYaw;
+  g.strokeStyle = "#7fe0a0"; g.lineWidth = 4; g.beginPath(); g.moveTo(X(sx), Y(sy));
+  g.lineTo(X(sx - Math.sin(yaw) * 5), Y(sy + Math.cos(yaw) * 5)); g.stroke();
+  g.fillStyle = "#7fe0a0"; g.beginPath(); g.arc(X(sx), Y(sy), 9, 0, Math.PI * 2); g.fill();
+}
+
+function showStats(t, note) {
+  $("sReach").textContent = `${t.reachable} / ${t.total}`;
+  $("sWalls").textContent = t.wallsPerChunk.toFixed(1);
+  $("sLights").textContent = t.lightsPerChunk.toFixed(1);
+  $("sView").textContent = `${Math.round(t.minView)} m min`;
+  const n = note || "";
+  $("nReach").textContent = t.reachable === t.total ? n || "every cell connected" : "some cells are cut off";
+  $("nReach").style.color = t.reachable === t.total ? "" : "var(--bad)";
+  $("nWalls").textContent = n; $("nLights").textContent = n;
+  $("nView").textContent = n ? n : `${Math.round(t.avgView)} m along the way you face`;
+}
+
+let pending = 0;
+async function regenerate() {
+  const mine = ++pending;
+  $("busy").style.display = "block";
+  try {
+    const [a, t] = await Promise.all([api("levelgen_area", { values }), api("levelgen_tests", { values, seeds: 1 })]);
+    if (mine !== pending) return;
+    area = a.data; fullTests = null; draw(); showStats(t.data, "");
+  } catch (e) { if (mine === pending) toast("Couldn't generate: " + e.message, 8000); }
+  finally { if (mine === pending) $("busy").style.display = "none"; }
+}
+let timer = null;
+function changed() { show(); clearTimeout(timer); timer = setTimeout(regenerate, 120); }
+
+// ---------- controls ----------
+for (const name of SLIDERS) $(name).addEventListener("input", (e) => { values[name] = +e.target.value; changed(); });
+for (const name of SWITCHES) $(name).addEventListener("click", () => { values[name] = !values[name]; changed(); });
+$("roomShifting").addEventListener("click", () => toast("Room shifting isn't built yet."));
+$("seed").addEventListener("change", (e) => {
+  const digits = e.target.value.replace(/\D/g, "");
+  if (!digits) { e.target.value = values.seed; return; }
+  values.seed = BigInt.asUintN(64, BigInt(digits)).toString(); changed();
+});
+$("newSeed").addEventListener("click", () => {
+  const b = new Uint32Array(2); crypto.getRandomValues(b);
+  values.seed = ((BigInt(b[0]) << 32n) | BigInt(b[1])).toString(); changed();
+});
+$("testsBtn").addEventListener("click", async () => {
+  const btn = $("testsBtn"); btn.disabled = true; btn.textContent = "Testing 50 seeds…";
+  try {
+    const t = (await api("levelgen_tests", { values, seeds: 50 })).data;
+    fullTests = t;
+    showStats(t, `over ${t.seeds} seeds`);
+    const ok = t.reachable === t.total && t.deterministic;
+    toast(ok ? `Layout tests passed: ${t.seeds} seeds, every cell reachable, same rooms every time, at least ${Math.round(t.minView)} m clear at spawn.`
+             : `Layout tests found problems: ${t.total - t.reachable} cells cut off${t.deterministic ? "" : ", rooms not the same every time"}.`, 9000);
+  } catch (e) { toast("Tests failed to run: " + e.message, 8000); }
+  finally { btn.disabled = false; btn.textContent = "Run layout tests"; }
+});
+$("playBtn").addEventListener("click", async () => {
+  const btn = $("playBtn"); btn.disabled = true; btn.textContent = "Starting…";
+  try { await api("levelgen_play", { values, fullscreen: true }); toast("Playing this exact map full screen. Close the game to come back."); }
+  catch (e) { toast("Couldn't start the game: " + e.message, 8000); }
+  finally { btn.disabled = false; btn.textContent = "Walk it in Play"; }
+});
+$("applyBtn").addEventListener("click", async () => {
+  const btn = $("applyBtn"); btn.disabled = true; btn.textContent = "Applying…";
+  try {
+    const r = await api("levelgen_apply", { values });
+    saved = JSON.parse(JSON.stringify(r.values)); values = JSON.parse(JSON.stringify(r.values));
+    toast(r.via === "editor" ? "Saved into Level 0 in the open editor." : "Saved into Level 0.");
+  } catch (e) { toast("Couldn't apply: " + e.message, 9000); }
+  show();
+});
+
+(async () => {
+  try {
+    const r = await api("levelgen_get");
+    values = r.values; values.seed = String(values.seed);
+    saved = JSON.parse(JSON.stringify(values));
+    $("levelLine").textContent = `${r.level} · ${r.name}`;
+    show(); regenerate();
+  } catch (e) { toast("Can't reach the Hearth Engine agent: " + e.message, 15000); }
+})();
+</script>
+</body>
+</html>

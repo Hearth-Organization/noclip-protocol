@@ -12,6 +12,8 @@ set(FILES
     Source/Player/FootstepsComponent.h
     Source/Level/Level0Layout.cpp
     Source/Level/Level0Layout.h
+    Source/Level/Level0Json.cpp
+    Source/Level/Level0Json.h
     Source/Level/Level0Scripting.cpp
     Source/Level/Level0Scripting.h
     Source/Level/EndlessLevelComponent.cpp
