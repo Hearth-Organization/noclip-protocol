@@ -10,6 +10,7 @@
 #include "Level/FlickerLightComponent.h"
 #include "Scripting/HearthBlocksComponent.h"
 #include "Hud/HearthHudComponent.h"
+#include "Debug/HearthDebugOverlayComponent.h"
 
 #include <NoclipProtocol/NoclipProtocolTypeIds.h>
 
@@ -35,6 +36,7 @@ namespace NoclipProtocol
                 FlickerLightComponent::CreateDescriptor(),
                 HearthBlocksComponent::CreateDescriptor(),
                 HearthHudComponent::CreateDescriptor(),
+                HearthDebugOverlayComponent::CreateDescriptor(),
             });
         }
 

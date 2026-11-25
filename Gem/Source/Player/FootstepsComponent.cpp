@@ -6,6 +6,7 @@
 #include <AzCore/std/algorithm.h>
 #include <cmath>
 #include <MiniAudio/MiniAudioPlaybackBus.h>
+#include <AzCore/Settings/SettingsRegistry.h>
 #include <MiniAudio/SoundAsset.h>
 
 namespace NoclipProtocol
@@ -104,6 +105,13 @@ namespace NoclipProtocol
 
     void FootstepsComponent::PlayStep(float volumePercent)
     {
+        // Counted for the debug overlay ("Steps heard: 0 of 19"; monsters add to the heard count when they hear one).
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            AZ::s64 steps = 0;
+            registry->Get(steps, "/NoclipProtocol/Debug/Steps");
+            registry->Set("/NoclipProtocol/Debug/Steps", steps + 1);
+        }
         if (m_stepSounds.empty())
         {
             return;

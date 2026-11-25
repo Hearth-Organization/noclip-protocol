@@ -290,6 +290,14 @@ namespace NoclipProtocol
         int playerY = 0;
         Level0::WorldToChunk(m_settings, position.GetX(), position.GetY(), playerX, playerY);
 
+        // For the debug overlay: the seed and the chunk the player is in (0, 0 is the forward base).
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Set("/NoclipProtocol/Level0/Seed", AZStd::string::format("%llu", static_cast<unsigned long long>(m_settings.m_seed)));
+            registry->Set("/NoclipProtocol/Level0/PlayerChunk", AZStd::string::format("%d, %d%s", playerX, playerY,
+                (playerX == 0 && playerY == 0) ? " · forward base" : ""));
+        }
+
         // Shift the rooms (a Hearth Blocks script asked): every chunk but the player's is rebuilt with new rooms.
         if (auto* registry = AZ::SettingsRegistry::Get())
         {

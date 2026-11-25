@@ -1,5 +1,7 @@
 #include "FirstPersonControllerComponent.h"
 
+#include <AzCore/Settings/SettingsRegistry.h>
+
 #include <AzCore/Component/TransformBus.h>
 #include <AzCore/Math/MathUtils.h>
 #include <AzCore/Math/Quaternion.h>
@@ -167,6 +169,35 @@ namespace NoclipProtocol
         {
             AZ::TransformBus::Event(m_cameraEntity, &AZ::TransformBus::Events::SetLocalRotationQuaternion,
                 AZ::Quaternion::CreateRotationX(m_pitch));
+        }
+
+        // --- Fly (noclip), from the debug overlay (F4): through walls, where you look, no gravity ---
+        bool fly = false;
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Get(fly, "/NoclipProtocol/Player/Fly");
+        }
+        if (fly)
+        {
+            const float forwardFly = (m_forward ? 1.0f : 0.0f) - (m_back ? 1.0f : 0.0f);
+            const float rightFly = (m_right ? 1.0f : 0.0f) - (m_left ? 1.0f : 0.0f);
+            const AZ::Quaternion look = AZ::Quaternion::CreateRotationZ(m_yaw) * AZ::Quaternion::CreateRotationX(m_pitch);
+            AZ::Vector3 flyMove = look.TransformVector(AZ::Vector3(rightFly, forwardFly, 0.0f));
+            if (m_jumpRequested)
+            {
+                flyMove += AZ::Vector3::CreateAxisZ();
+            }
+            m_jumpRequested = false;
+            if (flyMove.GetLengthSq() > 1.0f)
+            {
+                flyMove.Normalize();
+            }
+            AZ::Vector3 at = AZ::Vector3::CreateZero();
+            AZ::TransformBus::EventResult(at, GetEntityId(), &AZ::TransformBus::Events::GetWorldTranslation);
+            at += flyMove * (m_sprint ? m_sprintSpeed * 3.0f : m_walkSpeed * 2.0f) * deltaTime;
+            Physics::CharacterRequestBus::Event(GetEntityId(), &Physics::CharacterRequests::SetBasePosition, at);
+            m_verticalSpeed = 0.0f;
+            return;
         }
 
         // --- Ground check ---

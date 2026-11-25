@@ -5,6 +5,7 @@
 #include <AzCore/Component/TransformBus.h>
 #include <AzCore/Serialization/EditContext.h>
 #include <AzCore/Serialization/SerializeContext.h>
+#include <AzCore/Settings/SettingsRegistry.h>
 #include <AzCore/std/algorithm.h>
 #include <AzFramework/Components/CameraBus.h>
 #include <MiniAudio/MiniAudioPlaybackBus.h>
@@ -132,6 +133,20 @@ namespace NoclipProtocol
 
     void FlickerLightComponent::OnTick(float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
+        // "All lights on" in the debug overlay: every flickering light stays on until it's switched off again.
+        bool allOn = false;
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Get(allOn, "/NoclipProtocol/Debug/AllLightsOn");
+        }
+        if (allOn)
+        {
+            if (!m_lit)
+            {
+                SetLit(true);
+            }
+            return;
+        }
         if (m_diesWhenNear)
         {
             if (!m_dying)

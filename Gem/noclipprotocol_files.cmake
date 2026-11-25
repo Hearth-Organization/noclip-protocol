@@ -25,4 +25,6 @@ set(FILES
     Source/Scripting/HearthBlocksComponent.h
     Source/Hud/HearthHudComponent.cpp
     Source/Hud/HearthHudComponent.h
+    Source/Debug/HearthDebugOverlayComponent.cpp
+    Source/Debug/HearthDebugOverlayComponent.h
 )
