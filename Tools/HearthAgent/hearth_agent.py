@@ -157,6 +157,32 @@ def remember_editor_launch():
         return
 
 
+def project_engine_editor():
+    """The Editor of the engine this project uses (user/project.json engine_path, else the engine named in
+    project.json from the o3de manifest), so a remembered launch of another engine is never reused."""
+    roots = []
+    try:
+        roots.append(json.loads((PROJECT / "user" / "project.json").read_text()).get("engine_path") or "")
+    except (OSError, ValueError):
+        pass
+    try:
+        name = json.loads((PROJECT / "project.json").read_text()).get("engine", "")
+        manifest = json.loads((Path.home() / ".o3de" / "o3de_manifest.json").read_text())
+        for root in manifest.get("engines", []):
+            try:
+                if json.loads((Path(root) / "engine.json").read_text()).get("engine_name") == name:
+                    roots.append(root)
+            except (OSError, ValueError):
+                pass
+    except (OSError, ValueError):
+        pass
+    for root in roots:
+        editor = Path(root) / "bin" / "Linux" / "profile" / "Default" / "Editor"
+        if root and editor.exists():
+            return str(editor)
+    return None
+
+
 def default_editor_launch():
     # The installed Hearth Engine first, then other O3DE installs.
     candidates = [c for c in ("/opt/hearth-engine/bin/Linux/profile/Default/Editor",
@@ -253,6 +279,10 @@ def op_editor_start(args):
         except ValueError:
             launch = None
     launch = launch or default_editor_launch()
+    engine_editor = project_engine_editor()
+    if launch and engine_editor and launch.get("args") and os.path.realpath(launch["args"][0]) != os.path.realpath(engine_editor):
+        log(f"the project uses {engine_editor}; not reusing the remembered {launch['args'][0]}")
+        launch = dict(launch, args=[engine_editor] + list(launch["args"][1:]))
     other = args.get("project_path")
     if other and launch:
         other_path = Path(other).resolve()
