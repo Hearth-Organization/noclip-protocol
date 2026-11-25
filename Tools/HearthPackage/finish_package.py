@@ -80,6 +80,13 @@ def main():
     shutil.copytree(export, game, symlinks=True)
     if args.leave_out_editor:
         print(f"left out {leave_out_editor(game)} editor-only files")
+    # The game's HUD (Hearth Engine Game UI editor) is read at run time from the products folder.
+    hud = Path(__file__).resolve().parents[2] / "UI" / "HUD.uicanvas"
+    if hud.is_file():
+        products = [p for p in game.rglob("*") if p.is_dir() and p.name == "linux" and p.parent.name.lower() == "cache"] or [game]
+        for folder in products:
+            (folder / "ui").mkdir(parents=True, exist_ok=True)
+            shutil.copy2(hud, folder / "ui" / "hud.uicanvas")
     launcher = find_launcher(game, args.name)
     if not launcher:
         sys.exit("the export has no game launcher")

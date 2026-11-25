@@ -9,6 +9,7 @@
 #include "Level/EndlessLevelComponent.h"
 #include "Level/FlickerLightComponent.h"
 #include "Scripting/HearthBlocksComponent.h"
+#include "Hud/HearthHudComponent.h"
 
 #include <NoclipProtocol/NoclipProtocolTypeIds.h>
 
@@ -33,6 +34,7 @@ namespace NoclipProtocol
                 EndlessLevelComponent::CreateDescriptor(),
                 FlickerLightComponent::CreateDescriptor(),
                 HearthBlocksComponent::CreateDescriptor(),
+                HearthHudComponent::CreateDescriptor(),
             });
         }
 

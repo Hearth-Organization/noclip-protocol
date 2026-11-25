@@ -2,6 +2,7 @@
 
 #include <AzCore/Math/MathUtils.h>
 #include <AzCore/Math/Random.h>
+#include <AzCore/Settings/SettingsRegistry.h>
 #include <AzCore/Serialization/EditContext.h>
 #include <AzCore/Serialization/SerializeContext.h>
 #include <AzCore/Component/ComponentApplicationBus.h>
@@ -123,6 +124,11 @@ namespace NoclipProtocol
 
     void FlashlightComponent::OnTick(float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
+        // The HUD's flashlight bar (Hearth HUD, bind "player.flashlight").
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Set("/NoclipProtocol/Hud/player.flashlight", static_cast<double>(GetBatteryFraction()));
+        }
         if (!m_switchedOn || m_batterySeconds <= 0.0f)
         {
             SetLightVisible(false);

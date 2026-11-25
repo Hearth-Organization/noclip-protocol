@@ -23,4 +23,6 @@ set(FILES
     Source/Cinematics/CinematicCommands.cpp
     Source/Scripting/HearthBlocksComponent.cpp
     Source/Scripting/HearthBlocksComponent.h
+    Source/Hud/HearthHudComponent.cpp
+    Source/Hud/HearthHudComponent.h
 )
