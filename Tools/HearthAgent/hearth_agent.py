@@ -342,7 +342,7 @@ def op_build(args):
         if _engine_state.get("running"):
             return {"ok": False, "error": "the engine is building; game builds wait until it's done or stopped"}
         wait_for_compilers(240)
-        jobs = str(safe_jobs(args.get("jobs") or 2))
+        jobs = str(safe_jobs(args.get("jobs") or hearth_setting("laptop", "buildJobs", 2, int)))
         high, cap = build_caps()
         cmd = limited([cmake, "--build", "build/linux", "--target", *BUILD_TARGETS, "--config", "profile", "-j", jobs],
                       high, cap)
@@ -1074,6 +1074,54 @@ def safe_jobs(requested, per_job_mb=900, keep_free_mb=1800):
     return int(max(1, min(int(requested), fit)))
 
 
+def hearth_setting(section, key, default, kind=str):
+    """A value from the Hearth Engine settings (~/.config/hearth-engine/settings.ini, written by the Hub's
+    first-run setup and Settings page). Never written here: the agent only reads what the owner chose."""
+    import configparser
+    path = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "hearth-engine" / "settings.ini"
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.optionxform = str
+    try:
+        parser.read(path)
+        value = parser.get(section, key)
+    except (configparser.Error, OSError):
+        return default
+    if kind is bool:
+        return value.strip().lower() in ("true", "1", "yes", "on")
+    try:
+        return kind(value)
+    except ValueError:
+        return default
+
+
+_paused_assets = set()
+
+
+def pause_assets_for_game():
+    """Laptop setting "Pause asset processing while a game runs": stop the asset processor while the standalone
+    game runs, and let it carry on when the game closes."""
+    want_pause = bool(game_processes()) and hearth_setting("laptop", "pauseAssetsWhileGaming", False, bool)
+    names = ("AssetProcessor", "AssetBuilder")
+    if want_pause:
+        for fragment in names:
+            for pid, _ in find_processes(fragment):
+                if pid not in _paused_assets:
+                    try:
+                        os.kill(pid, signal.SIGSTOP)
+                        _paused_assets.add(pid)
+                        log(f"paused {fragment} {pid} while the game runs")
+                    except OSError:
+                        pass
+    elif _paused_assets:
+        for pid in list(_paused_assets):
+            try:
+                os.kill(pid, signal.SIGCONT)
+            except OSError:
+                pass
+            _paused_assets.discard(pid)
+        log("asset processing carries on (game closed)")
+
+
 def limited(cmd, memory_high_mb, memory_max_mb):
     """Run a heavy job in its own systemd scope with a memory cap: past the cap it slows down or that one
     job fails, instead of the whole computer freezing."""
@@ -1277,6 +1325,14 @@ def main():
     os.chmod(TOKEN_FILE, 0o600)
     token = TOKEN_FILE.read_text().strip()
     log(f"agent {VERSION} started, pid {os.getpid()}, project {PROJECT}")
+    # If an earlier agent paused asset processing for a game and then stopped, let it carry on.
+    for fragment in ("AssetProcessor", "AssetBuilder"):
+        for pid, _ in find_processes(fragment):
+            try:
+                if open(f"/proc/{pid}/stat").read().split(")")[-1].split()[0] == "T":
+                    os.kill(pid, signal.SIGCONT)
+            except (OSError, IndexError):
+                pass
     start_http(token)
     announce(token)
     fix_service_unit()
@@ -1297,6 +1353,10 @@ def main():
                 check_editor_exit()
             except Exception as error:
                 log(f"crash check: {error}")
+            try:
+                pause_assets_for_game()
+            except Exception as error:
+                log(f"asset pause: {error}")
             HEARTBEAT.write_text(json.dumps({"time": now, "pid": os.getpid(), "version": VERSION}))
             try:
                 changed = me.stat().st_mtime != my_mtime
