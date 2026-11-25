@@ -62,6 +62,17 @@
             "Id": "Entity_[1176639161715]",
             "Name": "Atom Default Environment",
             "Components": {
+                "AZ::Render::EditorBloomComponent": {
+                    "$type": "AZ::Render::EditorBloomComponent",
+                    "Id": 17841992857590544413,
+                    "Controller": {
+                        "Configuration": {
+                            "Enabled": true,
+                            "Threshold": 1.2000000476837158,
+                            "Intensity": 0.25
+                        }
+                    }
+                },
                 "AZ::Render::EditorDeferredFogComponent": {
                     "$type": "AZ::Render::EditorDeferredFogComponent",
                     "Id": 11759721409167755159,
@@ -80,9 +91,41 @@
                         }
                     }
                 },
+                "AZ::Render::EditorExposureControlComponent": {
+                    "$type": "AZ::Render::EditorExposureControlComponent",
+                    "Id": 11239358782638521500,
+                    "Controller": {
+                        "Configuration": {
+                            "ManualCompensation": 0.699999988079071
+                        }
+                    }
+                },
+                "AZ::Render::EditorHDRColorGradingComponent": {
+                    "$type": "AZ::Render::EditorHDRColorGradingComponent",
+                    "Id": 16986494482885569353,
+                    "Controller": {
+                        "Configuration": {
+                            "Enabled": true,
+                            "ColorGradingContrast": 8.0,
+                            "ColorGradingPreSaturation": -8.0,
+                            "WhiteBalanceWeight": 1.0,
+                            "WhiteBalanceKelvin": 5800.0
+                        }
+                    }
+                },
                 "AZ::Render::EditorPostFxLayerComponent": {
                     "$type": "AZ::Render::EditorPostFxLayerComponent",
                     "Id": 17607850372153916317
+                },
+                "AZ::Render::EditorVignetteComponent": {
+                    "$type": "AZ::Render::EditorVignetteComponent",
+                    "Id": 16439909979365727870,
+                    "Controller": {
+                        "Configuration": {
+                            "Enabled": true,
+                            "Intensity": 0.3499999940395355
+                        }
+                    }
                 },
                 "Component_[10757302973393310045]": {
                     "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
