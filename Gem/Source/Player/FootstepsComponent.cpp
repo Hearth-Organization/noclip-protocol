@@ -57,6 +57,12 @@ namespace NoclipProtocol
         m_distance = 0.0f;
         m_airborne = false;
         m_next = 0;
+        m_verticalSmooth = 0.0f;
+        m_debugTimer = 0.0f;
+        m_debugTotal = 0.0f;
+        m_stepsPlayed = 0;
+        AZ_TracePrintf("Footsteps", "Footsteps active: %zu step sounds, landing %s, follow %s\n", m_stepSounds.size(),
+            m_landSound.IsValid() ? "yes" : "no", m_follow.IsValid() ? m_follow.ToString().c_str() : "self");
         AZ::TickBus::Handler::BusConnect();
     }
 
@@ -98,6 +104,7 @@ namespace NoclipProtocol
                 % m_stepSounds.size();
         }
         m_next = pick;
+        ++m_stepsPlayed;
         PlaySound(m_stepSounds[pick], volumePercent * (0.85f + 0.3f * m_random.GetRandomFloat()));
     }
 
@@ -125,7 +132,23 @@ namespace NoclipProtocol
         }
 
         const float verticalSpeed = moved.GetZ() / deltaTime;
-        const bool airborneNow = std::fabs(verticalSpeed) > 1.0f;
+        // The character capsule bobs a few millimetres every frame; only a sustained vertical speed means a jump or fall.
+        m_verticalSmooth += (verticalSpeed - m_verticalSmooth) * AZStd::min(1.0f, deltaTime * 8.0f);
+        const bool airborneNow = std::fabs(m_verticalSmooth) > 1.5f;
+
+        // For the first minute of play, log twice a second while moving (to tune steps without guessing).
+        m_debugTotal += deltaTime;
+        m_debugTimer += deltaTime;
+        if (m_debugTotal < 60.0f && m_debugTimer >= 0.5f)
+        {
+            m_debugTimer = 0.0f;
+            const float flatSpeed = AZ::Vector3(moved.GetX(), moved.GetY(), 0.0f).GetLength() / deltaTime;
+            if (flatSpeed > 0.3f || airborneNow)
+            {
+                AZ_TracePrintf("Footsteps", "speed %.2f vz %.2f (smoothed %.2f) airborne %d steps %d\n", flatSpeed, verticalSpeed,
+                    m_verticalSmooth, airborneNow ? 1 : 0, m_stepsPlayed);
+            }
+        }
         if (airborneNow)
         {
             m_fallSpeed = AZStd::max(m_fallSpeed, -verticalSpeed);

@@ -52,6 +52,10 @@ namespace NoclipProtocol
         float m_fallSpeed = 0.0f;
         bool m_airborne = false;
         bool m_started = false;
+        float m_verticalSmooth = 0.0f; // smoothed vertical speed: physics jitters a little every frame
+        float m_debugTimer = 0.0f;     // short log so we can see what the steps do
+        float m_debugTotal = 0.0f;
+        int m_stepsPlayed = 0;
         size_t m_next = 0;
     };
 } // namespace NoclipProtocol
