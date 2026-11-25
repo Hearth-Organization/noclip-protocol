@@ -28,7 +28,17 @@ import time
 import traceback
 from pathlib import Path
 
-PROJECT = Path(__file__).resolve().parents[2]
+def _project_from_args():
+    """The project this agent works on: --project PATH, else HEARTH_PROJECT, else the project this file sits in.
+    (The Hearth Engine ships a copy of this agent in scripts/hearth/agent/ and starts it with --project.)"""
+    if "--project" in sys.argv[1:-1]:
+        return Path(sys.argv[sys.argv.index("--project") + 1]).expanduser().resolve()
+    if os.environ.get("HEARTH_PROJECT"):
+        return Path(os.environ["HEARTH_PROJECT"]).expanduser().resolve()
+    return Path(__file__).resolve().parents[2]
+
+
+PROJECT = _project_from_args()
 HOME = PROJECT / "user" / "HearthAgent"
 INBOX = HOME / "inbox"
 OUTBOX = HOME / "outbox"
@@ -43,7 +53,7 @@ LOG_DIR = PROJECT / "user" / "log"
 LAUNCHER = PROJECT / "build" / "linux" / "bin" / "profile" / "NoclipProtocol.GameLauncher"
 BUILD_TARGETS = ["NoclipProtocol.GameLauncher", "NoclipProtocol.HeadlessServerLauncher",
                  "NoclipProtocol.ServerLauncher", "NoclipProtocol.UnifiedLauncher", "Editor"]
-VERSION = "1.7"
+VERSION = "1.8"
 ENGINE_DIR = Path.home() / "O3DE" / "Engines" / "hearth-engine"
 ENGINE_REPO = "https://github.com/Dragongamer9/hearth-engine"
 ENGINE_BRANCH = "hearth/main"
@@ -637,6 +647,27 @@ def op_new_project(args):
     return {"ok": run.returncode == 0, "path": str(target), "output": (run.stdout + run.stderr)[-2000:]}
 
 
+def op_switch_project(args):
+    """Hub "Open project": restart this agent on another project in the projects folder (answers first)."""
+    target = Path(str(args.get("project_path", ""))).expanduser().resolve()
+    if not (target / "project.json").is_file():
+        return {"ok": False, "error": "that folder isn't a project"}
+    if target == PROJECT.resolve():
+        return {"ok": True, "note": "already on this project"}
+    if _build_state["running"]:
+        return {"ok": False, "error": "a build is running; switch when it's done"}
+
+    def restart():
+        time.sleep(0.5)
+        log(f"switching to project {target}")
+        me = Path(__file__).resolve()
+        argv = [a for i, a in enumerate(sys.argv[1:]) if a != "--project" and (i == 0 or sys.argv[i] != "--project")]
+        os.execv(sys.executable, [sys.executable, str(me), "--project", str(target)] + argv)
+
+    threading.Thread(target=restart, daemon=True).start()
+    return {"ok": True, "project": str(target)}
+
+
 def op_list_projects(args):
     projects = []
     for folder in sorted(PROJECTS_ROOT.iterdir()):
@@ -919,7 +950,7 @@ def op_levelgen_play(args):
                           "width": args.get("width", 1600), "height": args.get("height", 900), "extra": extra})
 
 
-OPS = {"engine": op_engine, "new_project": op_new_project, "hub_info": op_hub_info, "set_part": op_set_part, "list_projects": op_list_projects,
+OPS = {"engine": op_engine, "new_project": op_new_project, "hub_info": op_hub_info, "set_part": op_set_part, "list_projects": op_list_projects, "switch_project": op_switch_project,
        "probe": op_probe, "parts": op_parts, "set_parts": op_set_parts, "status": op_status, "editor_start": op_editor_start, "editor_stop": op_editor_stop,
        "build": op_build, "game_start": op_game_start, "game_stop": op_game_stop,
        "crash_report": op_crash_report, "logs": op_logs,
@@ -1000,10 +1031,35 @@ def own_scope(cmd):
     return list(cmd)
 
 
+def announce(token):
+    """Tell the Hearth Engine Hub where this agent is: ~/.config/hearth-engine/agent.json (only this user can read it)."""
+    config = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "hearth-engine"
+    try:
+        config.mkdir(parents=True, exist_ok=True)
+        path = config / "agent.json"
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"port": HTTP_PORT, "token": token, "project": str(PROJECT), "pid": os.getpid(),
+                                   "version": VERSION, "started": time.time()}))
+        os.chmod(tmp, 0o600)
+        tmp.replace(path)
+    except OSError as error:
+        log(f"agent.json not written: {error}")
+
+
 def install_desktop_entry():
     """Put Hearth Engine in the app menu: it opens the Hub."""
     apps = Path.home() / ".local" / "share" / "applications"
     entry = apps / "hearth-engine.desktop"
+    if shutil.which("hearth-engine"):
+        # The Hearth Engine .deb is installed: its own app menu entry opens the built-in Hub, so drop the old
+        # web-page entry (a user entry would hide the installed one).
+        try:
+            if entry.exists() and "xdg-open http://127.0.0.1" in entry.read_text():
+                entry.unlink()
+                log("app menu entry: removed the old web Hub entry (the engine's Hub is installed)")
+        except OSError as error:
+            log(f"app menu entry not removed: {error}")
+        return
     icon = HUB_DIR / "icon.svg"
     text = ("[Desktop Entry]\nType=Application\nName=Hearth Engine\nComment=Build, play and edit Noclip Protocol\n"
             f"Exec=xdg-open http://127.0.0.1:{HTTP_PORT}/\nIcon={icon}\nCategories=Development;Game;\nTerminal=false\n")
@@ -1157,6 +1213,7 @@ def main():
     token = TOKEN_FILE.read_text().strip()
     log(f"agent {VERSION} started, pid {os.getpid()}, project {PROJECT}")
     start_http(token)
+    announce(token)
     fix_service_unit()
     install_desktop_entry()
     me = Path(__file__).resolve()
@@ -1186,7 +1243,7 @@ def main():
                 else:
                     log("agent file changed, restarting into the new version")
                     lock.close()
-                    os.execv(sys.executable, [sys.executable, str(me)])
+                    os.execv(sys.executable, [sys.executable, str(me)] + sys.argv[1:])
         for path in sorted(INBOX.glob("*.json")):
             claimed = path.with_suffix(".working")
             try:
