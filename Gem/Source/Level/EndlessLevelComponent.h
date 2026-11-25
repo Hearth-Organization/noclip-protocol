@@ -44,9 +44,15 @@ namespace NoclipProtocol
         enum Piece : int
         {
             PieceWall = 0,
+            PiecePillar,
             PieceFloor,
             PieceCeiling,
             PieceLight,
+            PieceLightFlicker,
+            PieceLightDead,
+            PieceDecalWet,
+            PieceDecalMold,
+            PieceDecalWorn,
             PieceCount
         };
 
@@ -62,7 +68,7 @@ namespace NoclipProtocol
         bool PieceAssetsReady() const;
         void SpawnChunk(int chunkX, int chunkY);
         void DespawnChunk(Chunk& chunk);
-        void SpawnBox(AzFramework::EntitySpawnTicket& ticket, const Level0::Box& box, bool stretch);
+        void SpawnBox(AzFramework::EntitySpawnTicket& ticket, const Level0::Box& box, bool stretch, float yawRadians = 0.0f);
 
         // Settings (editable in the Editor)
         AZ::EntityId m_followEntity;
@@ -72,9 +78,23 @@ namespace NoclipProtocol
         int m_unloadRadius = 2; // chunks farther than this get removed
         int m_chunksPerFrame = 1;
         AZStd::string m_wallPrefab = "prefabs/level0/l0_wall.spawnable";
+        AZStd::string m_pillarPrefab = "prefabs/level0/l0_pillar.spawnable";
         AZStd::string m_floorPrefab = "prefabs/level0/l0_floor.spawnable";
         AZStd::string m_ceilingPrefab = "prefabs/level0/l0_ceiling.spawnable";
         AZStd::string m_lightPrefab = "prefabs/level0/l0_light.spawnable";
+        AZStd::string m_lightFlickerPrefab = "prefabs/level0/l0_lightflicker.spawnable";
+        AZStd::string m_lightDeadPrefab = "prefabs/level0/l0_lightdead.spawnable";
+        AZStd::string m_decalWetPrefab = "prefabs/level0/l0_decalwet.spawnable";
+        AZStd::string m_decalMoldPrefab = "prefabs/level0/l0_decalmold.spawnable";
+        AZStd::string m_decalWornPrefab = "prefabs/level0/l0_decalworn.spawnable";
+        // Feature switches (for finding problems and for performance)
+        bool m_enablePillars = true;
+        bool m_enableLightBulbs = true;     // real point lights (off = glowing panels only)
+        bool m_enableFlicker = true;        // off = flickering lights become working lights
+        bool m_enableDeadLights = true;     // off = dead lights become missing
+        bool m_enableStains = true;
+        float m_darkZoneShareField = 0.4f;
+        float m_decalChanceField = 0.3f;
         int m_chunkCellsField = 6;
         float m_lightFractionField = 0.35f;
         float m_openFractionField = 0.2f;

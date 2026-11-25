@@ -28,8 +28,12 @@ namespace NoclipProtocol::Level0
         float m_openFraction = 0.2f;   // share of leftover interior maze walls knocked out
         float m_borderExtraOpen = 0.15f; // chance of extra doorways on chunk borders (beyond the guaranteed two)
         float m_roomChance = 0.35f;    // chance a chunk gets one big open room
-        float m_lightFraction = 0.35f; // share of cells with a ceiling light
-        float m_pillarChance = 0.5f;   // chance of a pillar on an open interior corner
+        float m_lightFraction = 0.35f; // kept for compatibility; lighting now comes from zones (below)
+        float m_pillarChance = 0.6f;   // chance of a pillar on an open interior corner
+        float m_pillarSize = 0.8f;     // chunky square pillars, meters
+        float m_darkZoneShare = 0.4f;  // share of the world inside dark zones (dead / missing lights)
+        float m_darkZoneScale = 3.5f;  // dark zones are about this many cells across
+        float m_decalChance = 0.3f;    // chance a cell gets a floor stain
     };
 
     //! An axis-aligned box: center and full size, in world meters. Z is up; floor top is z = 0.
@@ -44,14 +48,44 @@ namespace NoclipProtocol::Level0
         float m_x, m_y, m_z;
     };
 
+    enum class LightState : int
+    {
+        Working = 0,
+        Flickering,
+        Dead,
+    };
+
+    struct Light
+    {
+        Point m_position; // at the ceiling surface
+        LightState m_state;
+    };
+
+    enum class DecalType : int
+    {
+        Wet = 0,
+        Mold,
+        Worn,
+    };
+
+    struct Decal
+    {
+        Point m_position; // on the floor
+        float m_yawRadians;
+        float m_size;      // meters across
+        DecalType m_type;
+    };
+
     struct ChunkLayout
     {
         int m_chunkX = 0;
         int m_chunkY = 0;
-        std::vector<Box> m_walls;    // includes pillars
+        std::vector<Box> m_walls;   // fixed one-cell segments, so wall textures never stretch
+        std::vector<Box> m_pillars;
         Box m_floor{};
         Box m_ceiling{};
-        std::vector<Point> m_lights; // ceiling light positions (at the ceiling surface)
+        std::vector<Light> m_lights; // cells with no light at all are simply absent
+        std::vector<Decal> m_decals;
     };
 
     //! Builds the layout of one chunk.
@@ -67,4 +101,7 @@ namespace NoclipProtocol::Level0
     //! vertical == true: the line x = lineIndex (in cells), segment from cell y = cell to cell + 1.
     //! vertical == false: the line y = lineIndex, segment from cell x = cell to cell + 1.
     bool IsBorderOpen(const Settings& settings, bool vertical, int lineIndex, int cell);
+
+    //! 0..1 "darkness" of the area around a world cell; above (1 - darkZoneShare) the lights are dead or gone.
+    float DarkZoneValue(const Settings& settings, int cellX, int cellY);
 } // namespace NoclipProtocol::Level0

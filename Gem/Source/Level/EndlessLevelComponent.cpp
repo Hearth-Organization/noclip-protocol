@@ -3,6 +3,7 @@
 #include <AzCore/Asset/AssetManager.h>
 #include <AzCore/Asset/AssetManagerBus.h>
 #include <AzCore/Component/TransformBus.h>
+#include <AzCore/Math/Quaternion.h>
 #include <AzCore/Math/Transform.h>
 #include <AzCore/Serialization/EditContext.h>
 #include <AzCore/Serialization/SerializeContext.h>
@@ -20,7 +21,7 @@ namespace NoclipProtocol
         if (auto serialize = azrtti_cast<AZ::SerializeContext*>(context))
         {
             serialize->Class<EndlessLevelComponent, AZ::Component>()
-                ->Version(1)
+                ->Version(2)
                 ->Field("FollowEntity", &EndlessLevelComponent::m_followEntity)
                 ->Field("Seed", &EndlessLevelComponent::m_seed)
                 ->Field("RandomSeedEachRun", &EndlessLevelComponent::m_randomSeedEachRun)
@@ -30,10 +31,23 @@ namespace NoclipProtocol
                 ->Field("ChunkCells", &EndlessLevelComponent::m_chunkCellsField)
                 ->Field("LightFraction", &EndlessLevelComponent::m_lightFractionField)
                 ->Field("OpenFraction", &EndlessLevelComponent::m_openFractionField)
+                ->Field("DarkZoneShare", &EndlessLevelComponent::m_darkZoneShareField)
+                ->Field("DecalChance", &EndlessLevelComponent::m_decalChanceField)
+                ->Field("EnablePillars", &EndlessLevelComponent::m_enablePillars)
+                ->Field("EnableLightBulbs", &EndlessLevelComponent::m_enableLightBulbs)
+                ->Field("EnableFlicker", &EndlessLevelComponent::m_enableFlicker)
+                ->Field("EnableDeadLights", &EndlessLevelComponent::m_enableDeadLights)
+                ->Field("EnableStains", &EndlessLevelComponent::m_enableStains)
                 ->Field("WallPrefab", &EndlessLevelComponent::m_wallPrefab)
+                ->Field("PillarPrefab", &EndlessLevelComponent::m_pillarPrefab)
                 ->Field("FloorPrefab", &EndlessLevelComponent::m_floorPrefab)
                 ->Field("CeilingPrefab", &EndlessLevelComponent::m_ceilingPrefab)
-                ->Field("LightPrefab", &EndlessLevelComponent::m_lightPrefab);
+                ->Field("LightPrefab", &EndlessLevelComponent::m_lightPrefab)
+                ->Field("LightFlickerPrefab", &EndlessLevelComponent::m_lightFlickerPrefab)
+                ->Field("LightDeadPrefab", &EndlessLevelComponent::m_lightDeadPrefab)
+                ->Field("DecalWetPrefab", &EndlessLevelComponent::m_decalWetPrefab)
+                ->Field("DecalMoldPrefab", &EndlessLevelComponent::m_decalMoldPrefab)
+                ->Field("DecalWornPrefab", &EndlessLevelComponent::m_decalWornPrefab);
 
             if (auto edit = serialize->GetEditContext())
             {
@@ -64,10 +78,34 @@ namespace NoclipProtocol
                         "Share of maze walls knocked out (higher = more open)")
                         ->Attribute(AZ::Edit::Attributes::Min, 0.0f)
                         ->Attribute(AZ::Edit::Attributes::Max, 1.0f)
-                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_wallPrefab, "Wall piece", "Spawnable product path")
-                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_floorPrefab, "Floor piece", "Spawnable product path")
-                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_ceilingPrefab, "Ceiling piece", "Spawnable product path")
-                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_lightPrefab, "Light piece", "Spawnable product path");
+                    ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_darkZoneShareField, "Darkness",
+                        "Share of the world inside dark zones (dead or missing lights)")
+                        ->Attribute(AZ::Edit::Attributes::Min, 0.0f)
+                        ->Attribute(AZ::Edit::Attributes::Max, 1.0f)
+                    ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_decalChanceField, "Stains",
+                        "Chance a room gets a wet spot, worn patch or mold")
+                        ->Attribute(AZ::Edit::Attributes::Min, 0.0f)
+                        ->Attribute(AZ::Edit::Attributes::Max, 1.0f)
+                    ->ClassElement(AZ::Edit::ClassElements::Group, "Features")
+                        ->Attribute(AZ::Edit::Attributes::AutoExpand, true)
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_enablePillars, "Pillars", "")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_enableLightBulbs, "Light bulbs",
+                        "Real lights in working fixtures (off = glowing panels only)")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_enableFlicker, "Flickering lights", "")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_enableDeadLights, "Dead lights", "")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_enableStains, "Stains", "")
+                    ->ClassElement(AZ::Edit::ClassElements::Group, "Tile pieces")
+                        ->Attribute(AZ::Edit::Attributes::AutoExpand, false)
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_wallPrefab, "Wall", "Spawnable product path")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_pillarPrefab, "Pillar", "Spawnable product path")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_floorPrefab, "Floor", "Spawnable product path")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_ceilingPrefab, "Ceiling", "Spawnable product path")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_lightPrefab, "Light", "Spawnable product path")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_lightFlickerPrefab, "Flickering light", "Spawnable product path")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_lightDeadPrefab, "Dead light", "Spawnable product path")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_decalWetPrefab, "Wet spot", "Spawnable product path")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_decalMoldPrefab, "Mold", "Spawnable product path")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_decalWornPrefab, "Worn patch", "Spawnable product path");
             }
         }
     }
@@ -87,6 +125,8 @@ namespace NoclipProtocol
         m_settings.m_chunkCells = AZStd::max(2, m_chunkCellsField);
         m_settings.m_lightFraction = m_lightFractionField;
         m_settings.m_openFraction = m_openFractionField;
+        m_settings.m_darkZoneShare = m_darkZoneShareField;
+        m_settings.m_decalChance = m_decalChanceField;
         m_settings.m_seed = m_seed;
         if (m_randomSeedEachRun)
         {
@@ -116,7 +156,9 @@ namespace NoclipProtocol
 
     bool EndlessLevelComponent::LoadPieceAssets()
     {
-        const AZStd::string* paths[PieceCount] = { &m_wallPrefab, &m_floorPrefab, &m_ceilingPrefab, &m_lightPrefab };
+        const AZStd::string* paths[PieceCount] = { &m_wallPrefab, &m_pillarPrefab, &m_floorPrefab, &m_ceilingPrefab, &m_lightPrefab,
+                                                   &m_lightFlickerPrefab, &m_lightDeadPrefab, &m_decalWetPrefab, &m_decalMoldPrefab,
+                                                   &m_decalWornPrefab };
         bool allFound = true;
         for (int i = 0; i < PieceCount; ++i)
         {
@@ -224,24 +266,61 @@ namespace NoclipProtocol
         {
             SpawnBox(chunk.m_tickets[PieceWall], wall, true);
         }
+        if (m_enablePillars)
+        {
+            for (const Level0::Box& pillar : layout.m_pillars)
+            {
+                SpawnBox(chunk.m_tickets[PiecePillar], pillar, true);
+            }
+        }
         SpawnBox(chunk.m_tickets[PieceFloor], layout.m_floor, true);
         SpawnBox(chunk.m_tickets[PieceCeiling], layout.m_ceiling, true);
-        for (const Level0::Point& light : layout.m_lights)
+        for (const Level0::Light& light : layout.m_lights)
         {
-            SpawnBox(chunk.m_tickets[PieceLight], Level0::Box{ light.m_x, light.m_y, light.m_z, 1.0f, 1.0f, 1.0f }, false);
+            Level0::LightState state = light.m_state;
+            if (state == Level0::LightState::Flickering && !m_enableFlicker)
+            {
+                state = Level0::LightState::Working;
+            }
+            if (state == Level0::LightState::Dead && !m_enableDeadLights)
+            {
+                continue;
+            }
+            Piece piece = PieceLightDead;
+            if (state == Level0::LightState::Working)
+            {
+                piece = m_enableLightBulbs ? PieceLight : PieceLightDead; // no bulbs: show a panel, no light
+            }
+            else if (state == Level0::LightState::Flickering)
+            {
+                piece = PieceLightFlicker;
+            }
+            SpawnBox(chunk.m_tickets[piece],
+                Level0::Box{ light.m_position.m_x, light.m_position.m_y, light.m_position.m_z, 1.0f, 1.0f, 1.0f }, false);
+        }
+        if (m_enableStains)
+        {
+            for (const Level0::Decal& decal : layout.m_decals)
+            {
+                const Piece piece = decal.m_type == Level0::DecalType::Wet ? PieceDecalWet
+                                  : (decal.m_type == Level0::DecalType::Mold ? PieceDecalMold : PieceDecalWorn);
+                // Stains are paper-thin see-through patches lying on the carpet (a few mm up, so they never z-fight).
+                SpawnBox(chunk.m_tickets[piece],
+                    Level0::Box{ decal.m_position.m_x, decal.m_position.m_y, 0.01f, decal.m_size, decal.m_size, 0.01f }, true, decal.m_yawRadians);
+            }
         }
 
         m_chunks.emplace(Key(chunkX, chunkY), AZStd::move(chunk));
     }
 
-    void EndlessLevelComponent::SpawnBox(AzFramework::EntitySpawnTicket& ticket, const Level0::Box& box, bool stretch)
+    void EndlessLevelComponent::SpawnBox(AzFramework::EntitySpawnTicket& ticket, const Level0::Box& box, bool stretch, float yawRadians)
     {
         const AZ::Vector3 translation(box.m_cx, box.m_cy, box.m_cz);
         const AZ::Vector3 scale(box.m_sx, box.m_sy, box.m_sz);
 
         AzFramework::SpawnAllEntitiesOptionalArgs args;
         args.m_preInsertionCallback =
-            [translation, scale, stretch]([[maybe_unused]] AzFramework::EntitySpawnTicket::Id ticketId, AzFramework::SpawnableEntityContainerView view)
+            [translation, scale, stretch, yawRadians]([[maybe_unused]] AzFramework::EntitySpawnTicket::Id ticketId, AzFramework::SpawnableEntityContainerView view)
         {
             if (view.empty())
             {
@@ -252,7 +331,8 @@ namespace NoclipProtocol
             if (auto* transform = container->FindComponent<AzFramework::TransformComponent>())
             {
                 AzFramework::TransformComponentConfiguration config;
-                config.m_localTransform = AZ::Transform::CreateTranslation(translation);
+                config.m_localTransform = AZ::Transform::CreateFromQuaternionAndTranslation(
+                    AZ::Quaternion::CreateRotationZ(yawRadians), translation);
                 config.m_worldTransform = config.m_localTransform;
                 transform->SetConfiguration(config);
             }

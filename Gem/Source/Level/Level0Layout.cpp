@@ -65,7 +65,11 @@ namespace NoclipProtocol::Level0
             TagBorderExtra = 12,
             TagChunk = 13,
             TagLight = 14,
+            TagZone = 15,
+            TagDecal = 16,
         };
+
+        float Smooth(float t) { return t * t * (3.0f - 2.0f * t); }
     } // namespace
 
     bool IsBorderOpen(const Settings& settings, bool vertical, int lineIndex, int cell)
@@ -83,6 +87,22 @@ namespace NoclipProtocol::Level0
             return true;
         }
         return Unit(Hash(settings.m_seed, TagBorderExtra, vertical ? 1 : 0, lineIndex, cell)) < settings.m_borderExtraOpen;
+    }
+
+    float DarkZoneValue(const Settings& settings, int cellX, int cellY)
+    {
+        // Smooth value noise over a coarse lattice, so dark zones are connected blobs, not random dark cells.
+        const float scale = std::max(1.0f, settings.m_darkZoneScale);
+        const float fx = static_cast<float>(cellX) / scale;
+        const float fy = static_cast<float>(cellY) / scale;
+        const int x0 = static_cast<int>(std::floor(fx));
+        const int y0 = static_cast<int>(std::floor(fy));
+        const float tx = Smooth(fx - static_cast<float>(x0));
+        const float ty = Smooth(fy - static_cast<float>(y0));
+        auto lattice = [&](int x, int y) { return Unit(Hash(settings.m_seed, TagZone, x, y)); };
+        const float a = lattice(x0, y0) + (lattice(x0 + 1, y0) - lattice(x0, y0)) * tx;
+        const float b = lattice(x0, y0 + 1) + (lattice(x0 + 1, y0 + 1) - lattice(x0, y0 + 1)) * tx;
+        return a + (b - a) * ty;
     }
 
     void WorldToChunk(const Settings& settings, float x, float y, int& chunkX, int& chunkY)
@@ -206,31 +226,28 @@ namespace NoclipProtocol::Level0
         const float originY = static_cast<float>(baseY) * cell;
         const float chunkSize = static_cast<float>(n) * cell;
 
-        // 4. Merge wall runs into long segments. Lines y = 0..n-1 and x = 0..n-1 (the north/east lines are the neighbors').
+        // 4. Walls: one fixed-size segment per cell edge (cell + thickness long), so the wallpaper texture maps 1:1.
+        //    Lines y = 0..n-1 and x = 0..n-1 only (the north/east lines are the neighbors').
         for (int y = 0; y < n; ++y)
         {
-            int x = 0;
-            while (x < n)
+            for (int x = 0; x < n; ++x)
             {
-                if (!h[x][y]) { ++x; continue; }
-                const int start = x;
-                while (x < n && h[x][y]) { ++x; }
-                const float length = static_cast<float>(x - start) * cell;
-                layout.m_walls.push_back(Box{ originX + static_cast<float>(start) * cell + length * 0.5f, originY + static_cast<float>(y) * cell,
-                                              height * 0.5f, length + thick, thick, height });
+                if (h[x][y])
+                {
+                    layout.m_walls.push_back(Box{ originX + (static_cast<float>(x) + 0.5f) * cell, originY + static_cast<float>(y) * cell,
+                                                  height * 0.5f, cell + thick, thick, height });
+                }
             }
         }
         for (int x = 0; x < n; ++x)
         {
-            int y = 0;
-            while (y < n)
+            for (int y = 0; y < n; ++y)
             {
-                if (!v[x][y]) { ++y; continue; }
-                const int start = y;
-                while (y < n && v[x][y]) { ++y; }
-                const float length = static_cast<float>(y - start) * cell;
-                layout.m_walls.push_back(Box{ originX + static_cast<float>(x) * cell, originY + static_cast<float>(start) * cell + length * 0.5f,
-                                              height * 0.5f, thick, length + thick, height });
+                if (v[x][y])
+                {
+                    layout.m_walls.push_back(Box{ originX + static_cast<float>(x) * cell, originY + (static_cast<float>(y) + 0.5f) * cell,
+                                                  height * 0.5f, thick, cell + thick, height });
+                }
             }
         }
 
@@ -242,8 +259,8 @@ namespace NoclipProtocol::Level0
                 const bool touching = h[x - 1][y] || h[x][y] || v[x][y - 1] || v[x][y];
                 if (!touching && rng.NextUnit() < settings.m_pillarChance)
                 {
-                    layout.m_walls.push_back(Box{ originX + static_cast<float>(x) * cell, originY + static_cast<float>(y) * cell, height * 0.5f,
-                                                  0.5f, 0.5f, height });
+                    layout.m_pillars.push_back(Box{ originX + static_cast<float>(x) * cell, originY + static_cast<float>(y) * cell, height * 0.5f,
+                                                    settings.m_pillarSize, settings.m_pillarSize, height });
                 }
             }
         }
@@ -252,18 +269,62 @@ namespace NoclipProtocol::Level0
         layout.m_floor = Box{ originX + chunkSize * 0.5f, originY + chunkSize * 0.5f, -0.05f, chunkSize, chunkSize, 0.1f };
         layout.m_ceiling = Box{ originX + chunkSize * 0.5f, originY + chunkSize * 0.5f, height + 0.05f, chunkSize, chunkSize, 0.1f };
 
-        // 7. Lights (hashed per global cell so they don't depend on generation order). Spawn cell always lit.
+        // 7. Lights, decided per global cell (independent of chunk generation order).
+        //    Lit areas: mostly working, some flickering, a few dead. Dark zones: mostly missing, some dead, rare flicker.
+        //    The spawn cell is always lit.
         for (int x = 0; x < n; ++x)
         {
             for (int y = 0; y < n; ++y)
             {
                 const int gx = baseX + x;
                 const int gy = baseY + y;
-                const bool spawn = gx == 0 && gy == 0;
-                if (spawn || Unit(Hash(settings.m_seed, TagLight, gx, gy)) < settings.m_lightFraction)
+                const Point at{ (static_cast<float>(gx) + 0.5f) * cell, (static_cast<float>(gy) + 0.5f) * cell, height };
+                if (gx == 0 && gy == 0)
                 {
-                    layout.m_lights.push_back(Point{ (static_cast<float>(gx) + 0.5f) * cell, (static_cast<float>(gy) + 0.5f) * cell, height });
+                    layout.m_lights.push_back(Light{ at, LightState::Working });
+                    continue;
                 }
+                const bool dark = DarkZoneValue(settings, gx, gy) > 1.0f - settings.m_darkZoneShare;
+                const float roll = Unit(Hash(settings.m_seed, TagLight, gx, gy));
+                if (dark)
+                {
+                    if (roll < 0.05f) { layout.m_lights.push_back(Light{ at, LightState::Flickering }); }
+                    else if (roll < 0.35f) { layout.m_lights.push_back(Light{ at, LightState::Dead }); }
+                    // otherwise missing: pitch black
+                }
+                else
+                {
+                    if (roll < 0.70f) { layout.m_lights.push_back(Light{ at, LightState::Working }); }
+                    else if (roll < 0.82f) { layout.m_lights.push_back(Light{ at, LightState::Flickering }); }
+                    else if (roll < 0.94f) { layout.m_lights.push_back(Light{ at, LightState::Dead }); }
+                }
+            }
+        }
+
+        // 8. Floor stains: wet spots, worn patches, mold (more damp and mold in the dark).
+        for (int x = 0; x < n; ++x)
+        {
+            for (int y = 0; y < n; ++y)
+            {
+                const int gx = baseX + x;
+                const int gy = baseY + y;
+                const uint64_t hd = Hash(settings.m_seed, TagDecal, gx, gy);
+                const bool dark = DarkZoneValue(settings, gx, gy) > 1.0f - settings.m_darkZoneShare;
+                const float chance = settings.m_decalChance * (dark ? 1.6f : 1.0f);
+                if (Unit(hd) >= chance)
+                {
+                    continue;
+                }
+                const float kind = Unit(Mix(hd ^ 1));
+                const DecalType type = kind < (dark ? 0.4f : 0.5f) ? DecalType::Wet
+                                     : (kind < (dark ? 0.65f : 0.85f) ? DecalType::Worn : DecalType::Mold);
+                const float ox = (Unit(Mix(hd ^ 2)) - 0.5f) * cell * 0.6f;
+                const float oy = (Unit(Mix(hd ^ 3)) - 0.5f) * cell * 0.6f;
+                layout.m_decals.push_back(Decal{
+                    Point{ (static_cast<float>(gx) + 0.5f) * cell + ox, (static_cast<float>(gy) + 0.5f) * cell + oy, 0.0f },
+                    Unit(Mix(hd ^ 4)) * 6.2831853f,
+                    1.5f + Unit(Mix(hd ^ 5)) * 1.8f,
+                    type });
             }
         }
 

@@ -12,4 +12,6 @@ set(FILES
     Source/Level/Level0Layout.h
     Source/Level/EndlessLevelComponent.cpp
     Source/Level/EndlessLevelComponent.h
+    Source/Level/FlickerLightComponent.cpp
+    Source/Level/FlickerLightComponent.h
 )
