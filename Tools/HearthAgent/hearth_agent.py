@@ -43,7 +43,7 @@ LOG_DIR = PROJECT / "user" / "log"
 LAUNCHER = PROJECT / "build" / "linux" / "bin" / "profile" / "NoclipProtocol.GameLauncher"
 BUILD_TARGETS = ["NoclipProtocol.GameLauncher", "NoclipProtocol.HeadlessServerLauncher",
                  "NoclipProtocol.ServerLauncher", "NoclipProtocol.UnifiedLauncher", "Editor"]
-VERSION = "1.5"
+VERSION = "1.6"
 ENGINE_DIR = Path.home() / "O3DE" / "Engines" / "hearth-engine"
 ENGINE_REPO = "https://github.com/Dragongamer9/hearth-engine"
 ENGINE_BRANCH = "hearth/main"
@@ -193,6 +193,10 @@ def op_status(args):
         "build": dict(_build_state),
         "memory_free_mb": meminfo.get("MemAvailable"),
         "memory_total_mb": meminfo.get("MemTotal"),
+        "memory_detail": {k: meminfo.get(k) for k in ("MemFree", "MemAvailable", "Cached", "Buffers", "Shmem",
+                                                       "SwapTotal", "SwapFree", "Committed_AS")},
+        "top_memory": top_memory(),
+        "compilers_running": len(compilers_running()),
         "editor_launch_known": LAUNCH_FILE.exists(),
     }
 
@@ -200,6 +204,13 @@ def op_status(args):
 def op_editor_start(args):
     if editor_processes():
         return {"ok": True, "note": "editor already running"}
+    if not args.get("force"):
+        if not wait_for_compilers(int(args.get("compiler_wait", 180))):
+            return {"ok": False, "error": "a build is still compiling; not opening the editor on top of it"}
+        free = meminfo().get("MemAvailable", 0)
+        if free < int(args.get("min_free_mb", 1800)):
+            return {"ok": False, "error": f"only {free} MB free; the editor needs about 1.8 GB",
+                    "top_memory": top_memory()}
     launch = None
     if LAUNCH_FILE.exists():
         try:
@@ -293,8 +304,13 @@ def op_build(args):
         cmake = find_cmake()
         if not cmake:
             return {"ok": False, "error": "cmake not found"}
-        jobs = str(args.get("jobs") or max(1, (os.cpu_count() or 2) - 1))
-        cmd = [cmake, "--build", "build/linux", "--target", *BUILD_TARGETS, "--config", "profile", "-j", jobs]
+        if _engine_state.get("running"):
+            return {"ok": False, "error": "the engine is building; game builds wait until it's done or stopped"}
+        wait_for_compilers(240)
+        jobs = str(safe_jobs(args.get("jobs") or 2))
+        high, cap = build_caps()
+        cmd = limited([cmake, "--build", "build/linux", "--target", *BUILD_TARGETS, "--config", "profile", "-j", jobs],
+                      high, cap)
         _build_state.update(running=True, started=time.time(), finished=None, exit_code=None)
         with open(BUILD_LOG, "wb") as out:
             code = 0
@@ -650,7 +666,7 @@ def op_engine(args):
                 "disk_free_gb": round(disk.free / 2**30, 1), "log_tail": "\n".join(text.splitlines()[-12:])}
     if action == "stop":
         stopped = []
-        for name in ("ninja", "cmake"):
+        for name in ("ninja", "cmake", "clang", "ccache", "mold"):
             for pid, cmd in find_processes(name):
                 if str(ENGINE_DIR) in " ".join(cmd) or os.path.realpath(f"/proc/{pid}/cwd").startswith(str(ENGINE_DIR)):
                     try:
@@ -677,20 +693,28 @@ def op_engine(args):
         steps.append(("update", ["git", "pull", "--ff-only"], str(ENGINE_DIR), env))
         steps.append(("lfs files", ["git", "lfs", "pull"], str(ENGINE_DIR), env))
     elif action == "build":
-        if editor_processes() and args.get("stop_editor", True):
+        if editor_processes():
+            if not args.get("stop_editor", True):
+                _engine_lock.release()
+                return {"ok": False, "error": "close the editor before an engine build"}
             op_editor_stop({"save": True})
+        wait_for_compilers(240)
         build_env = dict(env)
-        build_env["HEARTH_JOBS"] = str(int(args.get("jobs", 5)))
-        steps.append(("build", ["bash", str(ENGINE_DIR / "scripts" / "hearth" / "build-laptop.sh"), str(PROJECT)],
-                      str(ENGINE_DIR), build_env))
+        build_env["HEARTH_JOBS"] = str(safe_jobs(args.get("jobs", 4)))
+        high, cap = build_caps()
+        steps.append(("build", limited(["bash", str(ENGINE_DIR / "scripts" / "hearth" / "build-laptop.sh"), str(PROJECT)],
+                                       high, cap), str(ENGINE_DIR), build_env))
     else:
         _engine_lock.release()
         return {"ok": False, "error": "action must be status, setup, update, build or stop"}
     if args.get("then_build") and action in ("setup", "update"):
+        if editor_processes():
+            op_editor_stop({"save": True})
         build_env = dict(env)
-        build_env["HEARTH_JOBS"] = str(int(args.get("jobs", 5)))
-        steps.append(("build", ["bash", str(ENGINE_DIR / "scripts" / "hearth" / "build-laptop.sh"), str(PROJECT)],
-                      str(ENGINE_DIR), build_env))
+        build_env["HEARTH_JOBS"] = str(safe_jobs(args.get("jobs", 4)))
+        high, cap = build_caps()
+        steps.append(("build", limited(["bash", str(ENGINE_DIR / "scripts" / "hearth" / "build-laptop.sh"), str(PROJECT)],
+                                       high, cap), str(ENGINE_DIR), build_env))
     _engine_state.update(running=True, step=None, started=time.time(), finished=None, exit_code=None)
     threading.Thread(target=_engine_run, args=(steps,), daemon=True).start()
     return {"ok": True, "started": [name for name, *_ in steps], "log": str(ENGINE_LOG)}
@@ -703,6 +727,70 @@ OPS = {"engine": op_engine, "new_project": op_new_project, "hub_info": op_hub_in
 
 
 # ---------- request loop ----------
+
+def meminfo():
+    try:
+        return {l.split(":")[0]: int(l.split()[1]) // 1024 for l in open("/proc/meminfo")}
+    except OSError:
+        return {}
+
+
+def top_memory(count=6):
+    """The programs using the most memory right now (name and MB), to see what fills the RAM."""
+    users = []
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
+            continue
+        try:
+            name = Path(f"/proc/{entry}/comm").read_text().strip()
+            for line in open(f"/proc/{entry}/status"):
+                if line.startswith("VmRSS"):
+                    users.append((int(line.split()[1]) // 1024, name))
+                    break
+        except OSError:
+            continue
+    totals = {}
+    for mb, name in users:
+        totals[name] = totals.get(name, 0) + mb
+    return sorted(((mb, name) for name, mb in totals.items()), reverse=True)[:count]
+
+
+def compilers_running():
+    return [pid for pid, _ in find_processes("clang") + find_processes("cc1plus") + find_processes("ninja")
+            + find_processes("ld.mold") + find_processes("mold")]
+
+
+def wait_for_compilers(timeout=180):
+    """Wait until no compiler or linker is running (a stopped build's last jobs can keep going for a minute)."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not compilers_running():
+            return True
+        time.sleep(2)
+    return False
+
+
+def safe_jobs(requested, per_job_mb=900, keep_free_mb=1800):
+    """How many compile jobs fit in the memory that's free right now, keeping room for the desktop."""
+    available = meminfo().get("MemAvailable", 0)
+    fit = max(1, (available - keep_free_mb) // per_job_mb)
+    return int(max(1, min(int(requested), fit)))
+
+
+def limited(cmd, memory_high_mb, memory_max_mb):
+    """Run a heavy job in its own systemd scope with a memory cap: past the cap it slows down or that one
+    job fails, instead of the whole computer freezing."""
+    if shutil.which("systemd-run"):
+        return ["systemd-run", "--user", "--scope", "--quiet", "--collect",
+                "-p", f"MemoryHigh={memory_high_mb}M", "-p", f"MemoryMax={memory_max_mb}M",
+                "-p", "MemorySwapMax=1G", "--", "nice", "-n", "15"] + list(cmd)
+    return ["nice", "-n", "15"] + list(cmd)
+
+
+def build_caps():
+    total = meminfo().get("MemTotal", 8000)
+    return int(total * 0.45), int(total * 0.6)   # MemoryHigh, MemoryMax
+
 
 def own_scope(cmd):
     """Run a program in its own systemd scope, so restarting the agent never takes it down."""
