@@ -87,6 +87,12 @@ def main():
         for folder in products:
             (folder / "ui").mkdir(parents=True, exist_ok=True)
             shutil.copy2(hud, folder / "ui" / "hud.uicanvas")
+    monsters = Path(__file__).resolve().parents[2] / "Monsters" / "monsters.json"
+    if monsters.is_file():
+        products = [p for p in game.rglob("*") if p.is_dir() and p.name == "linux" and p.parent.name.lower() == "cache"] or [game]
+        for folder in products:
+            (folder / "monsters").mkdir(parents=True, exist_ok=True)
+            shutil.copy2(monsters, folder / "monsters" / "monsters.json")
     launcher = find_launcher(game, args.name)
     if not launcher:
         sys.exit("the export has no game launcher")

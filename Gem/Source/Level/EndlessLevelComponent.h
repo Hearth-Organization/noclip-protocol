@@ -40,6 +40,9 @@ namespace NoclipProtocol
         // AZ::TickBus
         void OnTick(float deltaTime, AZ::ScriptTimePoint time) override;
 
+        //! The layout settings in use (seed included), for monsters finding their way.
+        const Level0::Settings& GetSettings() const { return m_settings; }
+
     private:
         enum Piece : int
         {

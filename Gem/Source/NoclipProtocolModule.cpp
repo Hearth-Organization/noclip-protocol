@@ -11,6 +11,7 @@
 #include "Scripting/HearthBlocksComponent.h"
 #include "Hud/HearthHudComponent.h"
 #include "Debug/HearthDebugOverlayComponent.h"
+#include "Monsters/HearthMonsterComponent.h"
 
 #include <NoclipProtocol/NoclipProtocolTypeIds.h>
 
@@ -37,6 +38,7 @@ namespace NoclipProtocol
                 HearthBlocksComponent::CreateDescriptor(),
                 HearthHudComponent::CreateDescriptor(),
                 HearthDebugOverlayComponent::CreateDescriptor(),
+                HearthMonsterComponent::CreateDescriptor(),
             });
         }
 
