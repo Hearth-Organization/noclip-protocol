@@ -303,7 +303,28 @@ class _Bridge:
             return {"ok": True, "output": "namespace reset"}
         return {"ok": False, "error": f"unknown op {op!r}"}
 
+    def _drive_allowed(self):
+        """The owner's "Let Claude drive" switch (Play menu, playtest Take back control): while the game is
+        running and it's off, Claude may watch but not run code in the game."""
+        try:
+            import azlmbr.legacy.general as general
+            if not general.is_in_game_mode():
+                return True
+        except Exception:  # noqa: BLE001
+            return True
+        import configparser
+        path = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "hearth-engine", "settings.ini")
+        parser = configparser.ConfigParser(interpolation=None)
+        parser.optionxform = str
+        try:
+            parser.read(path)
+            return parser.get("claude", "drive", fallback="true").strip().lower() in ("true", "1", "yes")
+        except configparser.Error:
+            return True
+
     def _run_python(self, code):
+        if not self._drive_allowed():
+            return {"ok": False, "error": "the owner took back control (Let Claude drive is off); screenshots still work"}
         output = io.StringIO()
         try:
             with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
