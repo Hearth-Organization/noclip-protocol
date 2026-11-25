@@ -11,6 +11,8 @@ Tools:
   o3de_console     - run an editor console command
   o3de_screenshot  - capture the editor viewport as an image
   o3de_log         - read the end of the editor log (works even if the editor crashed)
+  hearth_engine    - the Hearth Engine agent (Tools/HearthAgent): build, start/stop the editor and game,
+                     crash reports and logs, even while the editor is closed
 
 Standard library only. Usage: mcp_server.py --project /path/to/NoclipProtocol
 """
@@ -222,6 +224,46 @@ def _prune_shots(folder, keep):
             pass
 
 
+def tool_hearth_engine(args):
+    folder = os.path.join(PROJECT, "user", "HearthAgent")
+    op = args.get("op", "status")
+    if op == "result":
+        answer = os.path.join(folder, "outbox", str(args.get("request_id", "")) + ".json")
+        if not os.path.exists(answer):
+            return _text("No answer yet for that request; it may still be running (check op status).")
+        with open(answer, "r", encoding="utf-8") as handle:
+            text = handle.read()
+        os.remove(answer)
+        return _text(text)
+    try:
+        with open(os.path.join(folder, "heartbeat.json"), "r", encoding="utf-8") as beat:
+            age = time.time() - float(json.load(beat)["time"])
+        with open(os.path.join(folder, "token"), "r", encoding="utf-8") as token_file:
+            token = token_file.read().strip()
+    except (OSError, ValueError, KeyError):
+        return _text("The Hearth Engine agent isn't installed yet. Run in a terminal: "
+                     f"python3 {os.path.join(PROJECT, 'Tools', 'HearthAgent', 'install.py')}", is_error=True)
+    if age > 30:
+        return _text(f"The Hearth Engine agent isn't running (last heartbeat {int(age)} s ago).", is_error=True)
+    request_id = "mcp-" + base64.b32encode(os.urandom(5)).decode().lower()
+    inbox = os.path.join(folder, "inbox")
+    tmp = os.path.join(inbox, request_id + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as handle:
+        json.dump({"id": request_id, "token": token, "op": op, "args": args.get("args") or {}}, handle)
+    os.rename(tmp, os.path.join(inbox, request_id + ".json"))
+    answer = os.path.join(folder, "outbox", request_id + ".json")
+    deadline = time.time() + float(args.get("wait_seconds", 600))
+    while time.time() < deadline:
+        if os.path.exists(answer):
+            time.sleep(0.1)
+            with open(answer, "r", encoding="utf-8") as handle:
+                text = handle.read()
+            os.remove(answer)
+            return _text(text)
+        time.sleep(0.5)
+    return _text(f"Still running. Fetch the answer later with op 'result' and request_id '{request_id}'.")
+
+
 def _text(text, is_error=False):
     return {"content": [{"type": "text", "text": text}], "isError": is_error}
 
@@ -278,6 +320,27 @@ TOOLS = [
             },
         },
         "handler": tool_log,
+    },
+    {
+        "name": "hearth_engine",
+        "description": "Talk to the Hearth Engine agent, a helper that runs outside the editor. ops: status (editor, "
+                       "game, build, memory), editor_start (args: wait_seconds), editor_stop (args: save, timeout), "
+                       "build (closes the editor, builds, reopens it; args: stop_editor, reopen_editor, jobs), "
+                       "game_start (standalone game; args: fullscreen, width, height, level), game_stop, "
+                       "crash_report, logs (args: which = editor|game|build|agent|asset_processor|editor_stdout|"
+                       "game_stdout, lines), result (args: request_id, for an answer that took too long).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "op": {"type": "string", "enum": ["status", "editor_start", "editor_stop", "build", "game_start",
+                                                  "game_stop", "crash_report", "logs", "result"]},
+                "args": {"type": "object", "description": "Arguments for the op."},
+                "request_id": {"type": "string", "description": "For op 'result'."},
+                "wait_seconds": {"type": "number", "description": "How long to wait for the answer (default 600)."},
+            },
+            "required": ["op"],
+        },
+        "handler": tool_hearth_engine,
     },
 ]
 
