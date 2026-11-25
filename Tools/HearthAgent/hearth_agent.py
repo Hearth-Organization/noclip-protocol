@@ -727,6 +727,7 @@ PART_CATALOGUE = [
     {"name": "Vegetation", "about": "Grass and trees", "gems": ["Vegetation"], "note": "Not needed yet"},
     {"name": "Script Canvas", "about": "Visual scripting", "gems": ["ScriptCanvas"], "note": "Code lives in C++"},
     {"name": "Cloth", "about": "Cloth simulation", "gems": ["NvCloth"], "note": "Not needed yet"},
+    {"name": "Profiler", "about": "Frame timings for the Profiler window", "gems": ["Profiler"], "note": "Turn on to profile"},
 ]
 
 
