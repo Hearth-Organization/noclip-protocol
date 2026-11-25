@@ -208,40 +208,83 @@ def dead_panel(out):
 
 
 def decal(out, name, n, color_fn):
-    """RGBA decal: color_fn returns (rgb, alpha) for an n x n image; alpha fades to zero at the edges."""
+    """RGBA floor stain: color_fn returns (rgb, alpha) for an n x n image.
+
+    Stains are drawn on a flat quad, so the shape itself must carry the edge: an irregular,
+    noise-warped outline (never a circle) that reaches zero well before the image border.
+    """
     y, x = np.mgrid[0:n, 0:n].astype(float)
     r = np.sqrt(((x - n / 2) / (n / 2)) ** 2 + ((y - n / 2) / (n / 2)) ** 2)
-    edge = np.clip((1.0 - r) / 0.35, 0, 1)
-    rgb, alpha = color_fn(n)
-    alpha = np.clip(alpha * edge, 0, 1)
+    safety = np.clip((0.97 - r) / 0.12, 0, 1)
+    rgb, alpha = color_fn(n, r)
+    alpha = np.clip(alpha * safety, 0, 1)
     # Color and opacity as separate images: O3DE's _basecolor preset drops alpha, _opacity keeps it.
     save(rgb, os.path.join(out, f"level0_{name}_basecolor.png"))
     save(alpha, os.path.join(out, f"level0_{name}_opacity.png"), "L")
 
 
-def wet_spot(n):
-    shape = periodic_noise(n, n, 260, octaves=3, persistence=0.45)
-    alpha = np.clip((shape - 0.4) / 0.22, 0, 1) * 0.8
-    ring = np.clip(1.0 - np.abs(shape - 0.45) * 25.0, 0, 1) * 0.25  # dried tide-mark edge
-    rgb = np.ones((n, n, 3)) * np.array([0.33, 0.27, 0.12])
-    rgb = rgb * (1 - ring[..., None]) + np.array([0.25, 0.2, 0.08]) * ring[..., None]
-    return rgb, np.clip(alpha + ring, 0, 1)
+CARPET = np.array([0.74, 0.64, 0.30])
 
 
-def mold(n):
-    clusters = periodic_noise(n, n, 90, octaves=4)
-    speckle = periodic_noise(n, n, 4, octaves=3, persistence=0.7)
-    alpha = np.clip((clusters - 0.5) / 0.15, 0, 1) * np.clip((speckle - 0.35) / 0.2, 0, 1)
-    tone = periodic_noise(n, n, 30, octaves=3)
-    rgb = np.array([0.16, 0.2, 0.09]) * (0.6 + 0.6 * tone)[..., None]
-    return rgb, alpha * 0.95
+def organic(n, r, size, softness, warp=0.5):
+    """Blob mask with a ragged, lobed outline: radial falloff pushed around by two noise layers."""
+    big = periodic_noise(n, n, 140, octaves=3) - 0.5
+    small = periodic_noise(n, n, 35, octaves=3) - 0.5
+    d = r + warp * big + 0.18 * small
+    return np.clip((size - d) / softness, 0, 1)
 
 
-def worn(n):
-    shape = periodic_noise(n, n, 160, octaves=5)
-    grit = periodic_noise(n, n, 5, octaves=3)
-    alpha = np.clip((shape - 0.38) / 0.25, 0, 1) * 0.8
-    rgb = np.array([0.42, 0.39, 0.31]) * (0.8 + 0.3 * grit)[..., None]  # grey-brown worn concrete look
+def wet_spot(n, r):
+    """Soaked carpet: darker toward the middle where it is wettest, a thin darker tide line where
+    it is drying at the edge, and a couple of small splashes."""
+    body = organic(n, r, 0.55, 0.22, warp=0.6)        # 0 outside .. 1 deep inside, soft
+    edge = organic(n, r, 0.55, 0.03, warp=0.6)         # same outline, crisp
+    y, x = np.mgrid[0:n, 0:n].astype(float)
+    for cx, cy, s in [(0.80, 0.28, 0.06), (0.20, 0.78, 0.045)]:
+        dr = np.sqrt(((x / n - cx) ** 2 + (y / n - cy) ** 2)) + 0.03 * (periodic_noise(n, n, 10, 2) - 0.5)
+        splash = np.clip((s - dr) / 0.025, 0, 1)
+        body = np.maximum(body, splash * 0.6)
+        edge = np.maximum(edge, np.clip((s - dr) / 0.006, 0, 1))
+    tide = np.clip(edge - body * 1.6, 0, 1)            # band just inside the crisp outline
+    depth = periodic_noise(n, n, 70, octaves=3)
+    rgb = np.ones((n, n, 3)) * CARPET * 0.45 * np.array([1.0, 0.94, 0.82])
+    rgb *= (0.92 + 0.16 * depth)[..., None]
+    rgb = rgb * (1 - tide[..., None]) + np.array([0.27, 0.21, 0.09]) * tide[..., None]
+    alpha = body * (0.35 + 0.3 * depth) + tide * 0.45 + edge * 0.12
+    return rgb, alpha
+
+
+def mold(n, r):
+    """Mold: round colonies of mixed sizes, each a near-black green core fading through olive to a
+    faint brown stain; dense in the middle, thinning out toward the edge."""
+    rng = np.random.default_rng(77)
+    y, x = np.mgrid[0:n, 0:n].astype(float) / n
+    wobble = periodic_noise(n, n, 18, octaves=2) - 0.5
+    core = np.zeros((n, n))
+    halo = np.zeros((n, n))
+    for _ in range(70):
+        ang, dist = rng.uniform(0, 2 * np.pi), 0.36 * np.sqrt(rng.random())
+        cx, cy = 0.5 + dist * np.cos(ang), 0.5 + dist * np.sin(ang)
+        size = rng.uniform(0.008, 0.035) * (1.3 - dist * 1.6)
+        d = np.sqrt((x - cx) ** 2 + (y - cy) ** 2) + 0.012 * wobble
+        core = np.maximum(core, np.clip((size - d) / (size * 0.35), 0, 1))
+        halo = np.maximum(halo, np.clip((size * 2.6 - d) / (size * 1.8), 0, 1))
+    stain = organic(n, r, 0.5, 0.3, warp=0.6)
+    rgb = np.ones((n, n, 3)) * CARPET * 0.62 * np.array([0.95, 0.9, 0.7])
+    rgb = rgb * (1 - halo[..., None] * 0.8) + np.array([0.28, 0.29, 0.12]) * (halo[..., None] * 0.8)
+    rgb = rgb * (1 - core[..., None]) + np.array([0.06, 0.08, 0.035]) * core[..., None]
+    alpha = np.maximum(np.maximum(core * 0.95, halo * 0.5), stain * 0.22)
+    return rgb, alpha
+
+
+def worn(n, r):
+    """Foot-traffic grime: a broad, very soft darkening, streaky in one direction."""
+    area = organic(n, r, 0.55, 0.35, warp=0.6)
+    y, x = np.mgrid[0:n, 0:n].astype(float)
+    streak = periodic_noise(n, n, 50, octaves=3)
+    rgb = np.ones((n, n, 3)) * CARPET * 0.55 * np.array([0.95, 0.88, 0.75])
+    rgb = rgb * (0.85 + 0.3 * streak)[..., None]
+    alpha = area * (0.25 + 0.3 * streak)
     return rgb, alpha
 
 
