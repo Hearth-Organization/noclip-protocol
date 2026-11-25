@@ -303,6 +303,22 @@ class _Bridge:
             return {"ok": True, "output": "namespace reset"}
         return {"ok": False, "error": f"unknown op {op!r}"}
 
+    @staticmethod
+    def _claude_setting(key, default=True):
+        """A switch from Hearth Settings › Claude (~/.config/hearth-engine/settings.ini, [claude] section)."""
+        import configparser
+        path = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "hearth-engine", "settings.ini")
+        parser = configparser.ConfigParser(interpolation=None)
+        parser.optionxform = str
+        try:
+            parser.read(path)
+            value = parser.get("claude", key, fallback=None)
+        except configparser.Error:
+            return default
+        if value is None:
+            return default
+        return value.strip().lower() in ("true", "1", "yes", "on")
+
     def _drive_allowed(self):
         """The owner's "Let Claude drive" switch (Play menu, playtest Take back control): while the game is
         running and it's off, Claude may watch but not run code in the game."""
@@ -323,6 +339,8 @@ class _Bridge:
             return True
 
     def _run_python(self, code):
+        if not self._claude_setting("editLevels"):
+            return {"ok": False, "error": "Hearth Settings › Claude: 'Can edit levels' is off, so Claude can't run editor Python; screenshots still work"}
         if not self._drive_allowed():
             return {"ok": False, "error": "the owner took back control (Let Claude drive is off); screenshots still work"}
         output = io.StringIO()
@@ -335,6 +353,8 @@ class _Bridge:
             return {"ok": False, "output": output.getvalue(), "error": traceback.format_exc()}
 
     def _run_console(self, command):
+        if not self._claude_setting("editLevels"):
+            return {"ok": False, "error": "Hearth Settings › Claude: 'Can edit levels' is off, so Claude can't run console commands"}
         try:
             import azlmbr.legacy.general as general
             general.run_console(command)

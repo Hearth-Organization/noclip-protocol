@@ -240,7 +240,7 @@ def op_editor_start(args):
     if editor_processes():
         return {"ok": True, "note": "editor already running"}
     if not args.get("force"):
-        if not wait_for_compilers(int(args.get("compiler_wait", 180))):
+        if hearth_setting("laptop", "waitForBuilds", True, bool) and not wait_for_compilers(int(args.get("compiler_wait", 180))):
             return {"ok": False, "error": "a build is still compiling; not opening the editor on top of it"}
         free = meminfo().get("MemAvailable", 0)
         if free < int(args.get("min_free_mb", 1800)):
@@ -342,7 +342,7 @@ def op_build(args):
         if _engine_state.get("running"):
             return {"ok": False, "error": "the engine is building; game builds wait until it's done or stopped"}
         wait_for_compilers(240)
-        jobs = str(safe_jobs(args.get("jobs") or hearth_setting("laptop", "buildJobs", 2, int)))
+        jobs = str(safe_jobs(args.get("jobs") or settings_jobs()))
         high, cap = build_caps()
         cmd = limited([cmake, "--build", "build/linux", "--target", *BUILD_TARGETS, "--config", "profile", "-j", jobs],
                       high, cap)
@@ -913,6 +913,11 @@ def op_engine(args):
                         pass
         log(f"engine build stopped: {stopped}")
         return {"ok": True, "stopped": stopped}
+    building_here = action == "build" or (args.get("then_build") and action in ("setup", "update"))
+    if building_here and hearth_setting("laptop", "cloudEngineBuilds", True, bool) and not args.get("local"):
+        return {"ok": False, "cloud": True,
+                "error": "Hearth Settings › Build in the cloud is on: engine builds run on GitHub, not this laptop "
+                         "(pass local: true, or turn the setting off, to build here anyway)"}
     if not _engine_lock.acquire(blocking=False):
         return {"ok": False, "error": "engine work already running", "state": dict(_engine_state)}
     env = dict(os.environ)
@@ -937,7 +942,7 @@ def op_engine(args):
             op_editor_stop({"save": True})
         wait_for_compilers(240)
         build_env = dict(env)
-        build_env["HEARTH_JOBS"] = str(safe_jobs(args.get("jobs", 4)))
+        build_env["HEARTH_JOBS"] = str(safe_jobs(args.get("jobs") or settings_jobs()))
         high, cap = build_caps()
         steps.append(("build", limited(["bash", str(ENGINE_DIR / "scripts" / "hearth" / "build-laptop.sh"), str(PROJECT)],
                                        high, cap), str(ENGINE_DIR), build_env))
@@ -948,7 +953,7 @@ def op_engine(args):
         if editor_processes():
             op_editor_stop({"save": True})
         build_env = dict(env)
-        build_env["HEARTH_JOBS"] = str(safe_jobs(args.get("jobs", 4)))
+        build_env["HEARTH_JOBS"] = str(safe_jobs(args.get("jobs") or settings_jobs()))
         high, cap = build_caps()
         steps.append(("build", limited(["bash", str(ENGINE_DIR / "scripts" / "hearth" / "build-laptop.sh"), str(PROJECT)],
                                        high, cap), str(ENGINE_DIR), build_env))
@@ -1238,10 +1243,20 @@ def pause_assets_for_game():
         log("asset processing carries on (game closed)")
 
 
+def settings_jobs():
+    """Hearth Settings › Performance › Build jobs at once: a number, or Auto (0), which lets the free memory
+    decide (about one job per 900 MB free, see safe_jobs)."""
+    choice = hearth_setting("laptop", "buildJobsChoice", None, int)
+    if choice is None:
+        return hearth_setting("laptop", "buildJobs", 2, int)
+    return choice if choice > 0 else (os.cpu_count() or 2)
+
+
 def limited(cmd, memory_high_mb, memory_max_mb):
     """Run a heavy job in its own systemd scope with a memory cap: past the cap it slows down or that one
-    job fails, instead of the whole computer freezing."""
-    if shutil.which("systemd-run"):
+    job fails, instead of the whole computer freezing. Hearth Settings › "Never let builds freeze the laptop"
+    (on unless the owner turns it off)."""
+    if shutil.which("systemd-run") and hearth_setting("laptop", "limitBuildMemory", True, bool):
         return ["systemd-run", "--user", "--scope", "--quiet", "--collect",
                 "-p", f"MemoryHigh={memory_high_mb}M", "-p", f"MemoryMax={memory_max_mb}M",
                 "-p", "MemorySwapMax=1G", "--", "nice", "-n", "15"] + list(cmd)
@@ -1345,6 +1360,8 @@ def handle(path, token):
         result = {"ok": False, "error": "bad token"}
     elif request.get("op") not in OPS:
         result = {"ok": False, "error": f"unknown op; choose from {sorted(OPS)}"}
+    elif claude_refusal(request["op"], request.get("args") or {}):
+        result = claude_refusal(request["op"], request.get("args") or {})
     else:
         try:
             result = OPS[request["op"]](request.get("args") or {})
@@ -1354,6 +1371,30 @@ def handle(path, token):
     tmp.write_text(json.dumps({"id": request_id, "op": request.get("op"), "result": result,
                                "answered": time.time()}, indent=2, default=str))
     tmp.rename(OUTBOX / (request_id + ".json"))
+
+
+# Hearth Settings › Claude switches, applied to requests from Claude (the file inbox its hearth_engine tool uses).
+CLAUDE_GATES = {
+    "readLogs": ("logs", "crash_report"),
+    "buildAndPlay": ("build", "game_start", "game_stop", "editor_start", "editor_stop", "coop_start", "coop_stop",
+                     "levelgen_play", "engine"),
+    "editLevels": ("levelgen_apply", "levelgen_area"),
+}
+CLAUDE_GATE_NAMES = {"readLogs": "Can read logs", "buildAndPlay": "Can build and play", "editLevels": "Can edit levels"}
+
+
+def claude_refusal(op, args):
+    if op == "engine" and args.get("action", "status") in ("status", "stop"):
+        return None
+    for key, ops in CLAUDE_GATES.items():
+        if op in ops and not hearth_setting("claude", key, True, bool):
+            return {"ok": False, "error": f"Hearth Settings › Claude: '{CLAUDE_GATE_NAMES[key]}' is off"}
+    big = (op == "engine" and args.get("action") in ("build", "update", "setup")) or (op == "build" and args.get("reconfigure"))
+    if big and hearth_setting("claude", "askBigBuilds", True, bool) and not args.get("owner_ok"):
+        return {"ok": False, "needs_owner": True,
+                "error": "Hearth Settings › Claude: 'Ask before big builds' is on. Ask the owner in chat, then send "
+                         "the same request with owner_ok: true"}
+    return None
 
 
 class _Api:

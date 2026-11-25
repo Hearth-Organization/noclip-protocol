@@ -199,7 +199,23 @@ def tool_screenshot(_args):
                         {"type": "text", "text": f"Viewport screenshot saved at {path}"}]}
 
 
+def _claude_allowed(key):
+    """A switch from Hearth Settings › Claude (~/.config/hearth-engine/settings.ini); on unless the owner turned it off."""
+    import configparser
+    path = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "hearth-engine", "settings.ini")
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.optionxform = str
+    try:
+        parser.read(path)
+        value = parser.get("claude", key, fallback="true")
+    except configparser.Error:
+        return True
+    return value.strip().lower() in ("true", "1", "yes", "on")
+
+
 def tool_log(args):
+    if not _claude_allowed("readLogs"):
+        return _text("Hearth Settings › Claude: 'Can read logs' is off.", is_error=True)
     lines = max(10, min(int(args.get("lines", 80)), 2000))
     contains = args.get("contains", "")
     path = os.path.join(PROJECT, "user", "log", "Editor.log")
