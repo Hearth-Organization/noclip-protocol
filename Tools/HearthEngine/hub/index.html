@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hearth Engine</title>
+<link rel="icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0d0c0b; --card:#171513; --well:#1f1c19; --line:rgba(255,255,255,0.06); --text:#ece6de; --dim:#8d857b;
+          --ember:#e8743b; --ink:#1a0f08; --ok:#a6dd97; --okbg:rgba(127,207,106,0.12); --warn:#ffcf7a; --warnbg:rgba(255,190,80,0.12);
+          --bad:#ff9b8a; --badbg:rgba(224,98,79,0.14); }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:13px/1.45 Geist, Inter, "Noto Sans", system-ui, sans-serif; }
+  .page { min-height:100vh; padding:24px; display:flex; flex-direction:column; gap:18px; max-width:1480px; margin:0 auto; }
+  header { display:flex; flex-wrap:wrap; align-items:center; gap:14px; }
+  .logo { width:40px; height:40px; border-radius:12px; background:var(--ember); display:flex; align-items:center; justify-content:center; }
+  h1 { margin:0; font-size:20px; font-weight:700; }
+  .sub { font-size:12px; color:var(--dim); }
+  .spacer { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+  button { font:inherit; cursor:pointer; padding:8px 16px; border-radius:999px; border:1px solid rgba(255,255,255,0.1); background:transparent; color:var(--text); }
+  button.primary { border:0; background:var(--ember); color:var(--ink); font-weight:600; padding:8px 18px; }
+  button:disabled { opacity:.45; cursor:default; }
+  button:focus-visible, [role=switch]:focus-visible { outline:2px solid var(--ember); outline-offset:2px; }
+  .layout { display:flex; flex-wrap:wrap; gap:18px; }
+  main { flex:999 1 560px; min-width:0; display:flex; flex-direction:column; gap:18px; }
+  aside { flex:1 1 340px; max-width:440px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; }
+  .project { overflow:hidden; }
+  .cover { height:240px; position:relative; background:#2a2620 center/cover no-repeat; }
+  .cover .info { position:absolute; left:20px; bottom:18px; display:flex; flex-direction:column; gap:6px; }
+  .pill { align-self:flex-start; padding:4px 10px; border-radius:999px; background:rgba(18,16,14,0.8); font-size:11px; }
+  .title { font-size:30px; font-weight:700; color:#fff6dd; text-shadow:0 2px 8px rgba(0,0,0,.7); }
+  .row { padding:16px 20px; display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+  .stats { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; }
+  @media (max-width:640px) { .stats { grid-template-columns:1fr; } }
+  .stat { padding:14px 16px; }
+  .stat .k { font-size:12px; color:var(--dim); } .stat .v { margin-top:4px; font-size:20px; font-weight:600; } .stat .n { font-size:12px; color:var(--dim); }
+  .parts { padding:16px; display:flex; flex-direction:column; gap:8px; }
+  .part { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:10px; background:var(--well); }
+  .part .t { flex:1; min-width:0; } .part .name { font-weight:500; } .part .about { font-size:12px; color:var(--dim); }
+  [role=switch] { flex:none; width:32px; height:18px; padding:0; border:0; border-radius:999px; background:#3a3530; position:relative; cursor:pointer; }
+  [role=switch]::after { content:""; position:absolute; left:2px; top:2px; width:14px; height:14px; border-radius:50%; background:var(--dim); transition:left .15s; }
+  [role=switch][aria-checked=true] { background:var(--ember); }
+  [role=switch][aria-checked=true]::after { left:16px; background:var(--ink); }
+  [role=switch][aria-disabled=true] { opacity:.55; cursor:default; }
+  .others { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px; }
+  .other { padding:14px 16px; display:flex; flex-direction:column; gap:10px; }
+  .toast { position:fixed; right:20px; bottom:20px; max-width:420px; padding:12px 16px; border-radius:12px; background:#24211e; border:1px solid rgba(255,255,255,0.1); display:none; white-space:pre-wrap; }
+  dialog { background:var(--card); color:var(--text); border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:20px; width:min(420px, 92vw); }
+  dialog::backdrop { background:rgba(0,0,0,.6); }
+  input[type=text] { width:100%; font:inherit; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:#0f0e0d; color:var(--text); }
+  .mono { font-family:"Geist Mono", monospace; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <span class="logo" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 18 18"><path d="M9 1 C12 5 14 7 14 11 A5 5 0 0 1 4 11 C4 8 6 7 7 4 C8 6 9 6 9 1 Z" fill="#1a0f08"/></svg>
+    </span>
+    <div><h1>Hearth Engine</h1><div class="sub" id="engineLine">Preview · built on O3DE (Apache 2.0)</div></div>
+    <div class="spacer">
+      <button id="openProject">Open project</button>
+      <button class="primary" id="newProject">New project</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <main>
+      <section class="card project" aria-label="Current project">
+        <div class="cover" id="cover">
+          <div class="info">
+            <span class="pill" id="buildPill">Checking…</span>
+            <span class="title" id="projectName">…</span>
+          </div>
+        </div>
+        <div class="row">
+          <span class="sub" id="projectLine"></span>
+          <div class="spacer">
+            <button id="buildBtn">Build</button>
+            <button id="playBtn">Play standalone</button>
+            <button class="primary" id="editorBtn">Open editor</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="stats">
+        <div class="card stat"><div class="k">Game memory</div><div class="v" id="gameMem">—</div><div class="n" id="gameMemNote">standalone launcher</div></div>
+        <div class="card stat"><div class="k">Editor memory</div><div class="v" id="editorMem">—</div><div class="n" id="editorMemNote"></div></div>
+        <div class="card stat"><div class="k">Parts switched on</div><div class="v" id="partsCount">—</div><div class="n" id="partsNote">others ready to turn on</div></div>
+      </div>
+
+      <section aria-label="Other games" id="othersSection" hidden>
+        <div class="sub" style="margin-bottom:8px">Other games</div>
+        <div class="others" id="others"></div>
+      </section>
+    </main>
+
+    <aside class="card parts" aria-label="Engine parts">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:4px">
+        <span style="font-weight:600; font-size:15px">Engine parts</span><span class="sub">changes need a rebuild</span>
+      </div>
+      <div id="parts"></div>
+      <button class="primary" id="rebuildBtn" hidden>Rebuild with these parts</button>
+    </aside>
+  </div>
+</div>
+
+<dialog id="newDialog">
+  <form method="dialog" style="display:flex; flex-direction:column; gap:12px">
+    <div style="font-weight:600; font-size:15px">New project</div>
+    <label>Name<br><input type="text" id="newName" placeholder="MyGame" pattern="[A-Za-z][A-Za-z0-9_]{1,40}" required></label>
+    <div class="sub">Letters, digits and _ only. It goes next to your other projects.</div>
+    <div style="display:flex; gap:8px; justify-content:flex-end">
+      <button value="cancel" formnovalidate>Cancel</button>
+      <button class="primary" value="create" id="createBtn">Create</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="openDialog">
+  <form method="dialog" style="display:flex; flex-direction:column; gap:12px">
+    <div style="font-weight:600; font-size:15px">Open project</div>
+    <div id="projectList" style="display:flex; flex-direction:column; gap:6px"></div>
+    <div style="display:flex; justify-content:flex-end"><button value="cancel">Close</button></div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const TOKEN = "__HEARTH_TOKEN__";
+const $ = (id) => document.getElementById(id);
+let info = null;
+let busy = {};
+
+async function api(op, args = {}) {
+  const r = await fetch("/api/" + op, { method: "POST", headers: { "X-Hearth-Token": TOKEN, "Content-Type": "application/json" },
+                                         body: JSON.stringify(args) });
+  if (!r.ok) throw new Error("agent answered " + r.status);
+  return r.json();
+}
+function toast(text, ms = 5000) {
+  const t = $("toast"); t.textContent = text; t.style.display = "block";
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.style.display = "none", ms);
+}
+function pretty(name) { return (name || "").replace(/([a-z])([A-Z])/g, "$1 $2"); }
+function ago(seconds) {
+  if (!seconds) return null;
+  const d = Date.now() / 1000 - seconds;
+  if (d < 90) return "just now"; if (d < 3600) return Math.round(d / 60) + " min ago";
+  if (d < 86400) return Math.round(d / 3600) + " h ago"; return Math.round(d / 86400) + " days ago";
+}
+
+function render() {
+  if (!info) return;
+  const p = info.project;
+  $("engineLine").textContent = `Preview · built on O3DE ${info.engine.o3de_version || ""} (Apache 2.0)`.replace("  ", " ");
+  $("projectName").textContent = pretty(p.name);
+  document.title = "Hearth Engine · " + pretty(p.name);
+  const opened = ago(p.last_opened);
+  $("projectLine").textContent = [p.level, opened ? "last opened " + opened : null].filter(Boolean).join(" · ");
+
+  const pill = $("buildPill"); const b = info.build;
+  if (b.running || busy.build) { pill.textContent = "Building…"; pill.style.color = "var(--warn)"; }
+  else if (info.pending_rebuild) { pill.textContent = "Rebuild needed · parts changed"; pill.style.color = "var(--warn)"; }
+  else if (b.last && b.last.ok) { pill.textContent = `Build OK${b.last.steps ? " · " + b.last.steps + " steps" : ""}`; pill.style.color = "var(--ok)"; }
+  else if (b.last && !b.last.ok) { pill.textContent = "Build failed · see build log"; pill.style.color = "var(--bad)"; }
+  else { pill.textContent = "Not built from the Hub yet"; pill.style.color = "var(--dim)"; }
+
+  $("buildBtn").disabled = !!(b.running || busy.build);
+  $("buildBtn").textContent = b.running || busy.build ? "Building…" : "Build";
+  $("playBtn").textContent = info.running.game ? "Stop game" : "Play standalone";
+  $("playBtn").disabled = !!busy.play;
+  $("editorBtn").textContent = info.running.editor ? "Editor is open" : (busy.editor ? "Opening…" : "Open editor");
+  $("editorBtn").disabled = info.running.editor || !!busy.editor;
+
+  const m = info.memory;
+  const gm = m.game_now_mb || (m.game_peak && m.game_peak.peak_mb);
+  $("gameMem").textContent = gm ? `${gm} MB` : "Not measured yet";
+  $("gameMemNote").textContent = m.game_now_mb ? "standalone launcher, running now" : (m.game_peak ? "standalone launcher, peak " + (ago(m.game_peak.when) || "") : "standalone launcher");
+  const em = m.editor_now_mb || (m.editor_peak && m.editor_peak.peak_mb);
+  $("editorMem").textContent = em ? `≈ ${em} MB` : "Not measured yet";
+  $("editorMemNote").textContent = m.editor_now_mb ? "open now" : (m.editor_peak ? "measured " + (ago(m.editor_peak.when) || "") : "");
+  $("partsCount").textContent = `${info.parts_on} of ${info.parts_total}`;
+
+  const list = $("parts"); list.innerHTML = "";
+  for (const part of info.parts) {
+    const row = document.createElement("div"); row.className = "part";
+    const text = document.createElement("div"); text.className = "t";
+    const name = document.createElement("div"); name.className = "name"; name.textContent = part.name;
+    const about = document.createElement("div"); about.className = "about";
+    about.textContent = part.about + (part.note && !part.on ? " · " + part.note : "") + (part.locked ? " · always on" : "");
+    text.append(name, about);
+    const sw = document.createElement("button"); sw.setAttribute("role", "switch");
+    sw.setAttribute("aria-checked", part.on ? "true" : "false"); sw.setAttribute("aria-label", part.name);
+    if (part.locked) sw.setAttribute("aria-disabled", "true");
+    sw.onclick = async () => {
+      if (part.locked) return toast(part.name + " is always on: the project needs it.");
+      const r = await api("set_part", { name: part.name, on: !part.on });
+      if (!r.ok) return toast(r.error || "Couldn't change that part.");
+      toast(`${part.name} ${part.on ? "off" : "on"}. Rebuild to apply.`); refresh();
+    };
+    row.append(text, sw); list.append(row);
+  }
+  $("rebuildBtn").hidden = !info.pending_rebuild;
+}
+
+async function renderOthers() {
+  const r = await api("list_projects");
+  const others = r.projects.filter((p) => !p.current);
+  $("othersSection").hidden = others.length === 0;
+  const box = $("others"); box.innerHTML = "";
+  for (const p of others) {
+    const card = document.createElement("div"); card.className = "card other";
+    const name = document.createElement("div"); name.style.fontWeight = "600"; name.textContent = pretty(p.name);
+    const btn = document.createElement("button"); btn.textContent = "Open editor";
+    btn.onclick = () => openProject(p.path);
+    card.append(name, btn); box.append(card);
+  }
+}
+
+async function refresh() {
+  try { info = await api("hub_info"); render(); }
+  catch (e) { $("buildPill").textContent = "Hearth Engine agent not reachable"; $("buildPill").style.color = "var(--bad)"; }
+}
+
+async function openProject(path) {
+  busy.editor = true; render(); toast("Opening the editor…");
+  const r = await api("editor_start", { project_path: path, wait_seconds: 240 });
+  busy.editor = false; refresh();
+  toast(r.ok ? "Editor is open." : "Couldn't open the editor: " + (r.error || ""));
+}
+
+$("buildBtn").onclick = async () => {
+  busy.build = true; render(); toast("Building. The editor closes for the build and opens again after.", 8000);
+  const r = await api("build", { reconfigure: !!(info && info.pending_rebuild), stop_editor: true, reopen_editor: true });
+  busy.build = false; refresh();
+  toast(r.ok ? `Build finished in ${r.seconds} s.` : "Build failed:\n" + (r.errors || []).slice(0, 4).join("\n"), 10000);
+};
+$("rebuildBtn").onclick = () => $("buildBtn").onclick();
+$("playBtn").onclick = async () => {
+  busy.play = true; render();
+  const r = info && info.running.game ? await api("game_stop") : await api("game_start", { fullscreen: true });
+  busy.play = false; refresh();
+  if (!r.ok) toast("Couldn't start the game: " + (r.error || ""));
+};
+$("editorBtn").onclick = () => openProject(null);
+$("newProject").onclick = () => { $("newName").value = ""; $("newDialog").showModal(); };
+$("newDialog").addEventListener("close", async () => {
+  if ($("newDialog").returnValue !== "create") return;
+  toast("Creating the project…", 60000);
+  const r = await api("new_project", { name: $("newName").value });
+  toast(r.ok ? "Project created." : "Couldn't create it: " + (r.error || r.output || ""));
+  renderOthers();
+});
+$("openProject").onclick = async () => {
+  const r = await api("list_projects"); const box = $("projectList"); box.innerHTML = "";
+  for (const p of r.projects) {
+    const btn = document.createElement("button"); btn.type = "button";
+    btn.style.textAlign = "left"; btn.style.borderRadius = "10px";
+    btn.textContent = pretty(p.name) + (p.current ? " (this project)" : "");
+    btn.onclick = () => { $("openDialog").close(); openProject(p.current ? null : p.path); };
+    box.append(btn);
+  }
+  $("openDialog").showModal();
+};
+
+const img = new Image();
+img.onload = () => { $("cover").style.backgroundImage = `url(/cover?${Date.now()})`; };
+img.src = "/cover?" + Date.now();
+refresh(); renderOthers();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>

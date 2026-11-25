@@ -43,7 +43,14 @@ LOG_DIR = PROJECT / "user" / "log"
 LAUNCHER = PROJECT / "build" / "linux" / "bin" / "profile" / "NoclipProtocol.GameLauncher"
 BUILD_TARGETS = ["NoclipProtocol.GameLauncher", "NoclipProtocol.HeadlessServerLauncher",
                  "NoclipProtocol.ServerLauncher", "NoclipProtocol.UnifiedLauncher", "Editor"]
-VERSION = "1.2"
+VERSION = "1.4"
+ENGINE_DIR = Path.home() / "O3DE" / "Engines" / "hearth-engine"
+ENGINE_REPO = "https://github.com/Dragongamer9/hearth-engine"
+ENGINE_BRANCH = "hearth/main"
+ENGINE_LOG = HOME / "engine_build.log"
+STATS_FILE = HOME / "stats.json"
+PROJECTS_ROOT = PROJECT.parent
+SHOTS = BRIDGE / "shots"
 PROJECT_JSON = PROJECT / "project.json"
 HTTP_PORT = 47830
 HUB_DIR = PROJECT / "Tools" / "HearthEngine" / "hub"
@@ -200,6 +207,14 @@ def op_editor_start(args):
         except ValueError:
             launch = None
     launch = launch or default_editor_launch()
+    other = args.get("project_path")
+    if other and launch:
+        other_path = Path(other).resolve()
+        if other_path.parent != PROJECTS_ROOT.resolve() or not (other_path / "project.json").is_file():
+            return {"ok": False, "error": "not a project in the projects folder"}
+        launch = dict(launch)
+        launch["args"] = [a for a in launch["args"] if not a.startswith("--project-path")] + [f"--project-path={other_path}"]
+        launch["cwd"] = str(other_path)
     if not launch:
         return {"ok": False, "error": "don't know where the editor is yet: open it once from the Project Manager"}
     env = session_env(launch.get("env", {}))
@@ -298,6 +313,12 @@ def op_build(args):
         errors = [l for l in text.splitlines() if "error" in l.lower() and "werror" not in l.lower()][:40]
         result = {"ok": code == 0, "exit_code": code, "seconds": round(_build_state["finished"] - _build_state["started"]),
                   "errors": errors, "log_tail": "\n".join(text.splitlines()[-25:])}
+        steps = [l for l in text.splitlines() if l.startswith("[") and "/" in l.split("]")[0]]
+        result["steps"] = steps[-1].split("]")[0].strip("[") if steps else None
+        if code == 0 and args.get("reconfigure"):
+            save_stats(pending_rebuild=False)
+        save_stats(last_build={"ok": code == 0, "finished": _build_state["finished"], "steps": result["steps"],
+                               "seconds": result["seconds"]})
         if reopen and code == 0:
             result["editor"] = op_editor_start({"wait_seconds": args.get("wait_seconds", 240)})
         return result
@@ -434,7 +455,237 @@ def op_set_parts(args):
             "next": "run build with reconfigure true"}
 
 
-OPS = {"probe": op_probe, "parts": op_parts, "set_parts": op_set_parts, "status": op_status, "editor_start": op_editor_start, "editor_stop": op_editor_stop,
+def load_stats():
+    try:
+        return json.loads(STATS_FILE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def save_stats(**values):
+    stats = load_stats()
+    stats.update(values)
+    STATS_FILE.write_text(json.dumps(stats, indent=2))
+
+
+def rss_mb(pid):
+    try:
+        for line in open(f"/proc/{pid}/status"):
+            if line.startswith("VmRSS"):
+                return int(line.split()[1]) // 1024
+    except OSError:
+        return None
+
+
+def track_memory():
+    """Remember the highest memory the editor and the game reach (per run), for the Hub's cards."""
+    stats = load_stats()
+    changed = False
+    for key, procs in (("editor_memory", editor_processes()), ("game_memory", game_processes())):
+        for pid, _ in procs[:1]:
+            mb = rss_mb(pid)
+            if not mb:
+                continue
+            old = stats.get(key) or {}
+            peak = max(mb, old.get("peak_mb", 0)) if old.get("pid") == pid else mb
+            if peak != old.get("peak_mb") or old.get("pid") != pid:
+                stats[key] = {"peak_mb": peak, "pid": pid, "when": time.time()}
+                changed = True
+    if changed:
+        STATS_FILE.write_text(json.dumps(stats, indent=2))
+
+
+# The engine parts the Hub lists, in the Hub's order. gems: what each switch turns on or off.
+PART_CATALOGUE = [
+    {"name": "Atom renderer", "about": "Lighting, fog, bloom, color grading", "gems": ["Atom"], "locked": True},
+    {"name": "PhysX", "about": "Player movement and collisions", "gems": ["PhysX5"]},
+    {"name": "MiniAudio", "about": "Hum, crackles, footsteps", "gems": ["MiniAudio"]},
+    {"name": "Prefabs and spawning", "about": "The endless level's tile pieces", "gems": ["PrefabBuilder"], "locked": True},
+    {"name": "Multiplayer", "about": "Co-op squads", "gems": ["Multiplayer"], "note": "Turn on for co-op"},
+    {"name": "UI (LyShine)", "about": "Built-in menu system", "gems": ["LyShine"], "note": "We draw our own UI"},
+    {"name": "Terrain", "about": "Outdoor landscapes", "gems": ["Terrain"], "note": "Not needed yet"},
+    {"name": "Vegetation", "about": "Grass and trees", "gems": ["Vegetation"], "note": "Not needed yet"},
+    {"name": "Script Canvas", "about": "Visual scripting", "gems": ["ScriptCanvas"], "note": "Code lives in C++"},
+    {"name": "Cloth", "about": "Cloth simulation", "gems": ["NvCloth"], "note": "Not needed yet"},
+]
+
+
+def engine_info():
+    launch = {}
+    try:
+        launch = json.loads(LAUNCH_FILE.read_text())
+    except (OSError, ValueError):
+        pass
+    editor = (launch.get("args") or [None])[0]
+    if editor:
+        root = Path(editor).resolve().parents[4]
+        for name in ("engine.json",):
+            try:
+                data = json.loads((root / name).read_text())
+                return {"o3de_version": data.get("display_version") or data.get("O3DEVersion") or data.get("version"),
+                        "engine_root": str(root)}
+            except (OSError, ValueError):
+                pass
+    return {"o3de_version": None, "engine_root": None}
+
+
+def last_level():
+    text = tail(LOG_DIR / "Editor.log", 4000)
+    for line in reversed(text.splitlines()):
+        if "Successfully opened document" in line:
+            return Path(line.split("document", 1)[1].strip()).stem
+    return None
+
+
+def op_hub_info(args):
+    data = json.loads(PROJECT_JSON.read_text())
+    gems = set(data.get("gem_names", []))
+    parts = [{**p, "on": all(g in gems for g in p["gems"])} for p in PART_CATALOGUE]
+    stats = load_stats()
+    try:
+        launch = json.loads(LAUNCH_FILE.read_text())
+    except (OSError, ValueError):
+        launch = {}
+    editors = editor_processes()
+    games = game_processes()
+    return {
+        "agent_version": VERSION,
+        "engine": engine_info(),
+        "project": {"name": data.get("display_name") or data.get("project_name"), "path": str(PROJECT),
+                    "level": last_level(), "last_opened": launch.get("seen")},
+        "running": {"editor": bool(editors), "game": bool(games)},
+        "build": {**_build_state, "last": stats.get("last_build")},
+        "memory": {"editor_now_mb": rss_mb(editors[0][0]) if editors else None,
+                   "game_now_mb": rss_mb(games[0][0]) if games else None,
+                   "editor_peak": stats.get("editor_memory"), "game_peak": stats.get("game_memory")},
+        "parts": parts, "parts_on": sum(p["on"] for p in parts), "parts_total": len(parts),
+        "pending_rebuild": stats.get("pending_rebuild", False),
+    }
+
+
+def op_set_part(args):
+    """Hub switch: turn one catalogue part on or off (needs a rebuild afterwards)."""
+    part = next((p for p in PART_CATALOGUE if p["name"] == args.get("name")), None)
+    if not part:
+        return {"ok": False, "error": "unknown part"}
+    if part.get("locked"):
+        return {"ok": False, "error": f"{part['name']} can't be turned off: the project needs it"}
+    key = "enable" if args.get("on") else "disable"
+    result = op_set_parts({key: part["gems"]})
+    if result.get("ok"):
+        save_stats(pending_rebuild=True)
+    return result
+
+
+def op_new_project(args):
+    """Create a new O3DE project next to this one, from the engine's default template."""
+    import re
+    name = str(args.get("name", ""))
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{1,40}", name):
+        return {"ok": False, "error": "use letters, digits and _ (start with a letter)"}
+    target = PROJECTS_ROOT / name
+    if target.exists():
+        return {"ok": False, "error": "a project with that name already exists"}
+    root = engine_info().get("engine_root")
+    script = Path(root) / "scripts" / "o3de.sh" if root else None
+    if not script or not script.exists():
+        return {"ok": False, "error": "can't find the engine's o3de.sh"}
+    run = subprocess.run([str(script), "create-project", "--project-path", str(target)],
+                         capture_output=True, text=True, timeout=600)
+    log(f"new project {name}: exit {run.returncode}")
+    return {"ok": run.returncode == 0, "path": str(target), "output": (run.stdout + run.stderr)[-2000:]}
+
+
+def op_list_projects(args):
+    projects = []
+    for folder in sorted(PROJECTS_ROOT.iterdir()):
+        project_file = folder / "project.json"
+        if project_file.is_file():
+            try:
+                data = json.loads(project_file.read_text())
+            except ValueError:
+                continue
+            projects.append({"name": data.get("display_name") or data.get("project_name"), "path": str(folder),
+                             "current": folder.resolve() == PROJECT.resolve()})
+    return {"projects": projects}
+
+
+_engine_lock = threading.Lock()
+_engine_state = {"running": False, "step": None, "started": None, "finished": None, "exit_code": None}
+
+
+def _engine_run(steps):
+    """Run engine setup steps one after another in the background, logging to engine_build.log."""
+    try:
+        with open(ENGINE_LOG, "ab") as out:
+            for name, cmd, cwd, env in steps:
+                _engine_state["step"] = name
+                out.write(f"\n== {name}: {' '.join(cmd)} ==\n".encode()); out.flush()
+                log(f"engine {name}: {' '.join(cmd)}")
+                code = subprocess.call(cmd, cwd=cwd, env=env, stdout=out, stderr=subprocess.STDOUT)
+                _engine_state["exit_code"] = code
+                if code != 0:
+                    log(f"engine {name} failed with code {code}")
+                    return
+            log("engine steps finished")
+    finally:
+        _engine_state.update(running=False, finished=time.time())
+        _engine_lock.release()
+
+
+def op_engine(args):
+    """Hearth Engine on this machine. args action: status | setup (download) | update (pull) | build."""
+    action = args.get("action", "status")
+    if action == "status":
+        progress = None
+        text = tail(ENGINE_LOG, 40)
+        for line in reversed(text.splitlines()):
+            if line.startswith("[") and "/" in line.split("]")[0]:
+                progress = line.split("]")[0].strip("[")
+                break
+        git_lfs = subprocess.run(["git", "lfs", "version"], capture_output=True, text=True).returncode == 0
+        disk = shutil.disk_usage(str(Path.home()))
+        return {"state": dict(_engine_state), "progress": progress, "engine_dir": str(ENGINE_DIR),
+                "downloaded": (ENGINE_DIR / "engine.json").exists(), "git_lfs": git_lfs,
+                "disk_free_gb": round(disk.free / 2**30, 1), "log_tail": "\n".join(text.splitlines()[-12:])}
+    if not _engine_lock.acquire(blocking=False):
+        return {"ok": False, "error": "engine work already running", "state": dict(_engine_state)}
+    env = dict(os.environ)
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    steps = []
+    if action == "setup":
+        if (ENGINE_DIR / "engine.json").exists():
+            _engine_lock.release()
+            return {"ok": True, "note": "already downloaded; use update"}
+        ENGINE_DIR.parent.mkdir(parents=True, exist_ok=True)
+        steps.append(("download", ["git", "clone", "--depth", "1", "--branch", ENGINE_BRANCH, ENGINE_REPO,
+                                   str(ENGINE_DIR)], str(ENGINE_DIR.parent), env))
+        steps.append(("lfs files", ["git", "lfs", "pull"], str(ENGINE_DIR), env))
+    elif action == "update":
+        steps.append(("update", ["git", "pull", "--ff-only"], str(ENGINE_DIR), env))
+        steps.append(("lfs files", ["git", "lfs", "pull"], str(ENGINE_DIR), env))
+    elif action == "build":
+        if editor_processes() and args.get("stop_editor"):
+            op_editor_stop({"save": True})
+        build_env = dict(env)
+        build_env["HEARTH_JOBS"] = str(int(args.get("jobs", 3)))
+        steps.append(("build", ["bash", str(ENGINE_DIR / "scripts" / "hearth" / "build-laptop.sh"), str(PROJECT)],
+                      str(ENGINE_DIR), build_env))
+    else:
+        _engine_lock.release()
+        return {"ok": False, "error": "action must be status, setup, update or build"}
+    if args.get("then_build") and action in ("setup", "update"):
+        build_env = dict(env)
+        build_env["HEARTH_JOBS"] = str(int(args.get("jobs", 3)))
+        steps.append(("build", ["bash", str(ENGINE_DIR / "scripts" / "hearth" / "build-laptop.sh"), str(PROJECT)],
+                      str(ENGINE_DIR), build_env))
+    _engine_state.update(running=True, step=None, started=time.time(), finished=None, exit_code=None)
+    threading.Thread(target=_engine_run, args=(steps,), daemon=True).start()
+    return {"ok": True, "started": [name for name, *_ in steps], "log": str(ENGINE_LOG)}
+
+
+OPS = {"engine": op_engine, "new_project": op_new_project, "hub_info": op_hub_info, "set_part": op_set_part, "list_projects": op_list_projects,
+       "probe": op_probe, "parts": op_parts, "set_parts": op_set_parts, "status": op_status, "editor_start": op_editor_start, "editor_stop": op_editor_stop,
        "build": op_build, "game_start": op_game_start, "game_stop": op_game_stop,
        "crash_report": op_crash_report, "logs": op_logs}
 
@@ -446,6 +697,22 @@ def own_scope(cmd):
     if shutil.which("systemd-run") and os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"):
         return ["systemd-run", "--user", "--scope", "--quiet", "--collect", "--"] + list(cmd)
     return list(cmd)
+
+
+def install_desktop_entry():
+    """Put Hearth Engine in the app menu: it opens the Hub."""
+    apps = Path.home() / ".local" / "share" / "applications"
+    entry = apps / "hearth-engine.desktop"
+    icon = HUB_DIR / "icon.svg"
+    text = ("[Desktop Entry]\nType=Application\nName=Hearth Engine\nComment=Build, play and edit Noclip Protocol\n"
+            f"Exec=xdg-open http://127.0.0.1:{HTTP_PORT}/\nIcon={icon}\nCategories=Development;Game;\nTerminal=false\n")
+    try:
+        if not entry.exists() or entry.read_text() != text:
+            apps.mkdir(parents=True, exist_ok=True)
+            entry.write_text(text)
+            log("app menu entry: Hearth Engine")
+    except OSError as error:
+        log(f"app menu entry not written: {error}")
 
 
 def fix_service_unit():
@@ -530,6 +797,11 @@ def start_http(token):
             if self.headers.get("Host") not in allowed_hosts:
                 return self._send(403, {"error": "bad host"})
             path = self.path.split("?")[0]
+            if path == "/cover":
+                shots = sorted(SHOTS.glob("*.png"), key=lambda p: p.stat().st_mtime) if SHOTS.is_dir() else []
+                if not shots:
+                    return self._send(404, {"error": "no screenshots yet"})
+                return self._send(200, shots[-1].read_bytes(), "image/png")
             if path in ("/", "/index.html"):
                 path = "/index.html"
             target = (HUB_DIR / path.lstrip("/")).resolve()
@@ -585,6 +857,7 @@ def main():
     log(f"agent {VERSION} started, pid {os.getpid()}, project {PROJECT}")
     start_http(token)
     fix_service_unit()
+    install_desktop_entry()
     me = Path(__file__).resolve()
     my_mtime = me.stat().st_mtime
     last_seen = 0.0
@@ -593,12 +866,16 @@ def main():
         if now - last_seen > 5:
             last_seen = now
             remember_editor_launch()
+            try:
+                track_memory()
+            except Exception as error:
+                log(f"memory tracking: {error}")
             HEARTBEAT.write_text(json.dumps({"time": now, "pid": os.getpid(), "version": VERSION}))
             try:
                 changed = me.stat().st_mtime != my_mtime
             except OSError:
                 changed = False
-            if changed and not _build_state["running"]:
+            if changed and not _build_state["running"] and not _engine_state["running"]:
                 time.sleep(1.0)  # let the new file finish landing
                 try:
                     compile(me.read_text(), str(me), "exec")
