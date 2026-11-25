@@ -21,4 +21,6 @@ set(FILES
     Source/Level/FlickerLightComponent.cpp
     Source/Level/FlickerLightComponent.h
     Source/Cinematics/CinematicCommands.cpp
+    Source/Scripting/HearthBlocksComponent.cpp
+    Source/Scripting/HearthBlocksComponent.h
 )

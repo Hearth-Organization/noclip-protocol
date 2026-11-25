@@ -115,6 +115,7 @@ namespace NoclipProtocol
         AZStd::unordered_map<AZ::u64, Chunk> m_chunks;
         bool m_assetsMissing = false;
         bool m_announced = false;
+        AZ::s64 m_shiftsSeen = 0;      // /NoclipProtocol/Level0/Shifts (Hearth Blocks "Shift the rooms")
         int m_spawnedPieces = 0;      // counts SpawnBox calls, for the editor's "9 chunks · 412 pieces"
         AZStd::string m_statsShown;   // what was last written to /Hearth/Viewport/Stats
         void PublishStats();

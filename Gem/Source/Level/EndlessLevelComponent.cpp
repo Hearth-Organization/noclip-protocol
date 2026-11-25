@@ -166,6 +166,10 @@ namespace NoclipProtocol
         m_settings.m_spawnRoomRadius = AZStd::clamp(m_spawnRoomRadiusField, 0, 5);
         m_settings.m_darkZoneScale = AZStd::max(1.0f, m_darkZoneScaleField);
         m_settings.m_seed = m_seed;
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Get(m_shiftsSeen, "/NoclipProtocol/Level0/Shifts");
+        }
         if (m_randomSeedEachRun)
         {
             const auto now = AZStd::chrono::steady_clock::now().time_since_epoch().count();
@@ -285,6 +289,29 @@ namespace NoclipProtocol
         int playerX = 0;
         int playerY = 0;
         Level0::WorldToChunk(m_settings, position.GetX(), position.GetY(), playerX, playerY);
+
+        // Shift the rooms (a Hearth Blocks script asked): every chunk but the player's is rebuilt with new rooms.
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            AZ::s64 shifts = 0;
+            registry->Get(shifts, "/NoclipProtocol/Level0/Shifts");
+            if (shifts != m_shiftsSeen)
+            {
+                m_shiftsSeen = shifts;
+                m_settings.m_seed += 0x9E3779B97F4A7C15ull;
+                for (auto it = m_chunks.begin(); it != m_chunks.end();)
+                {
+                    if (it->second.m_x == playerX && it->second.m_y == playerY)
+                    {
+                        ++it;
+                        continue;
+                    }
+                    DespawnChunk(it->second);
+                    it = m_chunks.erase(it);
+                }
+                AZ_Printf("NoclipProtocol", "Endless Level 0: the rooms shifted");
+            }
+        }
 
         // Unload chunks that are far away.
         for (auto it = m_chunks.begin(); it != m_chunks.end();)

@@ -8,6 +8,7 @@
 #include "Player/FootstepsComponent.h"
 #include "Level/EndlessLevelComponent.h"
 #include "Level/FlickerLightComponent.h"
+#include "Scripting/HearthBlocksComponent.h"
 
 #include <NoclipProtocol/NoclipProtocolTypeIds.h>
 
@@ -31,6 +32,7 @@ namespace NoclipProtocol
                 FootstepsComponent::CreateDescriptor(),
                 EndlessLevelComponent::CreateDescriptor(),
                 FlickerLightComponent::CreateDescriptor(),
+                HearthBlocksComponent::CreateDescriptor(),
             });
         }
 
