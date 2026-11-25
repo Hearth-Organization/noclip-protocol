@@ -20,4 +20,5 @@ set(FILES
     Source/Level/EndlessLevelComponent.h
     Source/Level/FlickerLightComponent.cpp
     Source/Level/FlickerLightComponent.h
+    Source/Cinematics/CinematicCommands.cpp
 )
