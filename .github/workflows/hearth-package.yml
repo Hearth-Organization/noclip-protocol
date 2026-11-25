@@ -1,0 +1,97 @@
+# Noclip Protocol: package the game on GitHub (hearth-32), started by Hearth Engine's "Package the game".
+# Hearth OS: a draft release with the AppImage and SHA256SUMS.txt (nothing is public until the owner publishes it;
+# the Hearth Store installs from published releases). Steam and test builds: a workflow artifact.
+#
+# If the hearth-engine repo is private, add a repository secret HEARTH_ENGINE_TOKEN that can read its releases.
+
+name: Hearth package
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "hearthos, steam or test"
+        required: true
+        default: test
+      version:
+        description: "The version (the owner picks it)"
+        required: true
+      levels:
+        description: "Levels, comma separated"
+        required: true
+      leave_out_editor:
+        description: "Leave out editor-only files"
+        required: false
+        default: "true"
+
+concurrency:
+  group: hearth-package
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: hearth-32
+    timeout-minutes: 90
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install Hearth Engine (latest release)
+        env:
+          GH_TOKEN: ${{ secrets.HEARTH_ENGINE_TOKEN || github.token }}
+        run: |
+          tag="$(gh release list --repo Hearth-Organization/hearth-engine --limit 30 --json tagName \
+                 --jq '[.[] | select(.tagName | startswith("hearth-sdk-linux-"))][0].tagName')"
+          gh release download "$tag" --repo Hearth-Organization/hearth-engine --pattern '*.deb' --dir /tmp/hearth
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build clang libfuse2 /tmp/hearth/*.deb
+          /opt/hearth-engine/scripts/o3de.sh register --this-engine
+          curl -fsSL -o /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool
+
+      - name: Export the game
+        run: |
+          levels=""
+          IFS=',' read -ra list <<< "${{ inputs.levels }}"
+          for level in "${list[@]}"; do levels="$levels --level-name $(echo "$level" | xargs)"; done
+          /opt/hearth-engine/scripts/o3de.sh export-project \
+            -es /opt/hearth-engine/scripts/o3de/ExportScripts/export_source_built_project.py \
+            -pp "$GITHUB_WORKSPACE" -out "$GITHUB_WORKSPACE/build/export" -cfg release --fail-on-asset-errors $levels
+
+      - name: Finish the package
+        env:
+          APPIMAGETOOL: /tmp/appimagetool
+        run: |
+          name="$(python3 -c "import json;print(json.load(open('project.json'))['project_name'])")"
+          display="$(python3 -c "import json;d=json.load(open('project.json'));print(d.get('display_name') or d['project_name'])")"
+          export_dir="$(find build/export -mindepth 1 -maxdepth 1 -type d | head -1)"
+          extra=""
+          if [ "${{ inputs.leave_out_editor }}" = "true" ]; then extra="--leave-out-editor"; fi
+          python3 Tools/HearthPackage/finish_package.py --export "$export_dir" --target "${{ inputs.target }}" \
+            --name "$name" --display "$display" --version "${{ inputs.version }}" --out build/packages \
+            --icon "$(python3 -c "import json;print(json.load(open('project.json')).get('icon_path','preview.png'))")" $extra
+          tar --zstd -cf package.tar.zst -C build packages
+
+      - name: Draft release for the Hearth Store
+        if: inputs.target == 'hearthos'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ inputs.version }}" build/packages/*.AppImage build/packages/SHA256SUMS.txt --draft \
+            --title "Noclip Protocol ${{ inputs.version }}" \
+            --notes "Packaged by Hearth Engine. A draft: publish it to put it in the Hearth Store."
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: package.tar.zst
+          retention-days: 14

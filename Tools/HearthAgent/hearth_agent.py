@@ -1147,6 +1147,177 @@ def op_cloud_status(args):
     return dict(_cloud_state)
 
 
+# ---------- Package the game ----------
+PACKAGE_WORKFLOW = "hearth-package.yml"
+_package_state = {"running": False, "step": None, "error": None, "finished": None, "result": None}
+
+
+def asset_db_rows(sql, params=()):
+    import sqlite3
+    db = PROJECT / "Cache" / "assetdb.sqlite"
+    if not db.exists():
+        return []
+    connection = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5)
+    try:
+        return connection.execute(sql, params).fetchall()
+    finally:
+        connection.close()
+
+
+def op_package_checks(args):
+    """Checks before packaging: the levels processed without errors, Level 0's layout tests, failed files."""
+    levels = args.get("levels") or [p.name for p in (PROJECT / "Levels").iterdir() if p.is_dir()]
+    checks = []
+    # Status 2/3 = failed, 4 = completed (AzToolsFramework::AssetSystem::JobStatus).
+    bad_levels = []
+    for level in levels:
+        rows = asset_db_rows("SELECT Jobs.Status FROM Jobs JOIN Sources ON Jobs.SourcePK = Sources.SourceID "
+                             "WHERE lower(Sources.SourceName) = lower(?)", (f"Levels/{level}/{level}.prefab",))
+        if not rows or any(status in (2, 3) for (status,) in rows):
+            bad_levels.append(level)
+    checks.append({"ok": not bad_levels, "text": "All levels open without errors" if not bad_levels
+                   else "These levels have problems: " + ", ".join(bad_levels)})
+    if (PROJECT / "Levels" / "Level0").is_dir() and "Level0" in levels:
+        current = op_levelgen_get({}).get("values") or {}
+        tests = op_levelgen_tests({"values": current, "seeds": 50})
+        passed = bool(tests.get("ok"))
+        checks.append({"ok": passed, "text": "Level 0 layout tests pass (50 seeds)" if passed
+                       else "Level 0 layout tests fail: " + str(tests.get("error") or tests.get("output") or "")[:200]})
+    failed = asset_db_rows("SELECT DISTINCT Sources.SourceName FROM Jobs JOIN Sources ON Jobs.SourcePK = Sources.SourceID "
+                           "WHERE Jobs.Status IN (2, 3)")
+    level_text = ""
+    for level in levels:
+        try:
+            level_text += (PROJECT / "Levels" / level / f"{level}.prefab").read_text().lower()
+        except OSError:
+            pass
+    for prefab in (PROJECT / "Prefabs").rglob("*.prefab"):
+        try:
+            level_text += prefab.read_text().lower()
+        except OSError:
+            pass
+    used = [name for (name,) in failed if Path(name).stem.lower() in level_text]
+    if failed:
+        unused = len(failed) - len(used)
+        text = f"{len(failed)} file{'s' if len(failed) != 1 else ''} failed to process"
+        text += " (not used in the game)" if not used else f" ({len(used)} used in the game: {', '.join(Path(u).name for u in used[:3])})"
+        checks.append({"ok": not used, "warn": not used, "text": text, "files": [name for (name,) in failed][:20]})
+    # Estimate: what the levels' assets take in the cache, about two thirds of that once bundled.
+    cache = PROJECT / "Cache" / "linux"
+    size = sum(f.stat().st_size for f in cache.rglob("*") if f.is_file()) if cache.exists() else 0
+    stats = load_stats()
+    minutes = stats.get("package_minutes") or 12
+    return {"checks": checks, "download_bytes": int(size * 0.66), "github_minutes": minutes,
+            "github_cost": round(minutes * 0.082, 2), "last_package": stats.get("last_package")}
+
+
+def op_package(args):
+    """Package the game. args: target (hearthos|steam|test), version (the owner's), levels, leave_out_editor, cloud."""
+    if _package_state["running"]:
+        return {"ok": True, "state": dict(_package_state)}
+    target = args.get("target")
+    version = str(args.get("version") or "").strip()
+    levels = [str(l) for l in (args.get("levels") or [])]
+    if target not in ("hearthos", "steam", "test"):
+        return {"ok": False, "error": "target must be hearthos, steam or test"}
+    if not version:
+        return {"ok": False, "error": "a version is needed: the owner picks it"}
+    if not levels:
+        return {"ok": False, "error": "pick at least one level"}
+    leave_out = bool(args.get("leave_out_editor", True))
+    cloud = bool(args.get("cloud", True))
+    data = json.loads(PROJECT_JSON.read_text())
+    name = data["project_name"]
+    display = data.get("display_name") or name
+    out = PROJECT / "build" / "packages"
+
+    def finish(export_dir):
+        command = [sys.executable, str(PROJECT / "Tools" / "HearthPackage" / "finish_package.py"), "--export", str(export_dir),
+                   "--target", target, "--name", name, "--display", display, "--version", version, "--out", str(out),
+                   "--icon", str(PROJECT / data.get("icon_path", "preview.png"))]
+        if leave_out:
+            command.append("--leave-out-editor")
+        done = subprocess.run(command, capture_output=True, text=True, timeout=1800)
+        if done.returncode != 0:
+            raise RuntimeError((done.stderr or done.stdout)[-600:])
+        return [line[8:] for line in done.stdout.splitlines() if line.startswith("PACKAGE ")]
+
+    def run():
+        started = time.time()
+        _package_state.update(running=True, step="starting", error=None, finished=None, result=None)
+        try:
+            if cloud:
+                if not shutil.which("gh"):
+                    raise RuntimeError("the GitHub app (gh) isn't installed on this computer")
+                branch = git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip() or "main"
+                start = subprocess.run(["gh", "workflow", "run", PACKAGE_WORKFLOW, "--ref", branch, "-f", f"target={target}",
+                                        "-f", f"version={version}", "-f", f"levels={','.join(levels)}",
+                                        "-f", f"leave_out_editor={'true' if leave_out else 'false'}"],
+                                       cwd=str(PROJECT), capture_output=True, text=True, timeout=120)
+                if start.returncode != 0:
+                    raise RuntimeError(start.stderr[-400:])
+                time.sleep(8)
+                listed = subprocess.run(["gh", "run", "list", "--workflow", PACKAGE_WORKFLOW, "-L", "1", "--json", "databaseId"],
+                                        cwd=str(PROJECT), capture_output=True, text=True, timeout=60)
+                run_id = json.loads(listed.stdout or "[]")[0]["databaseId"]
+                _package_state["step"] = "packaging on GitHub"
+                while True:
+                    view = subprocess.run(["gh", "run", "view", str(run_id), "--json", "status,conclusion"], cwd=str(PROJECT),
+                                          capture_output=True, text=True, timeout=60)
+                    info = json.loads(view.stdout or "{}")
+                    if info.get("status") == "completed":
+                        if info.get("conclusion") != "success":
+                            raise RuntimeError(f"packaging on GitHub ended: {info.get('conclusion')}")
+                        break
+                    time.sleep(20)
+                _package_state["step"] = "bringing the package home"
+                target_dir = HOME / "package-download"
+                shutil.rmtree(target_dir, ignore_errors=True)
+                got = subprocess.run(["gh", "run", "download", str(run_id), "-n", "package", "-D", str(target_dir)],
+                                     cwd=str(PROJECT), capture_output=True, text=True, timeout=3600)
+                if got.returncode != 0:
+                    raise RuntimeError(got.stderr[-400:])
+                (PROJECT / "build").mkdir(exist_ok=True)
+                subprocess.run(["tar", "--zstd", "-xf", str(target_dir / "package.tar.zst"), "-C", str(PROJECT / "build")], check=True)
+                results = [str(p) for p in out.glob(f"*{version}*")]
+                where = f"GitHub run {run_id}" + (" · draft release v" + version if target == "hearthos" else "")
+                save_stats(package_minutes=round((time.time() - started) / 60))
+            else:
+                engine = engine_info().get("engine_root") or "/opt/hearth-engine"
+                o3de = Path(engine) / "scripts" / "o3de.sh"
+                export_root = PROJECT / "build" / "export"
+                shutil.rmtree(export_root, ignore_errors=True)
+                command = [str(o3de), "export-project", "-es", str(Path(engine) / "scripts" / "o3de" / "ExportScripts" / "export_source_built_project.py"),
+                           "-pp", str(PROJECT), "-out", str(export_root), "-cfg", "release", "--fail-on-asset-errors"]
+                for level in levels:
+                    command += ["--level-name", level]
+                _package_state["step"] = "packaging on this laptop"
+                high, cap = build_caps()
+                with open(HOME / "package.log", "wb") as logfile:
+                    code = subprocess.call(limited(command, high, cap), cwd=str(PROJECT), stdout=logfile, stderr=subprocess.STDOUT)
+                if code != 0:
+                    raise RuntimeError("packaging failed: " + tail(HOME / "package.log", 20))
+                exported = next((p for p in export_root.iterdir() if p.is_dir()), export_root)
+                _package_state["step"] = "finishing"
+                results = finish(exported)
+                where = "this laptop"
+            _package_state.update(step="done", result={"files": results, "where": where})
+            save_stats(last_package={"version": version, "target": target, "when": time.time(), "where": where, "files": results})
+            log(f"packaged {version} for {target} ({where})")
+        except Exception as error:  # report, never die
+            _package_state.update(error=str(error))
+            log(f"packaging failed: {error}")
+        finally:
+            _package_state.update(running=False, finished=time.time())
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"ok": True, "started": True}
+
+
+def op_package_status(args):
+    return dict(_package_state)
+
+
 # ---------- Level Generator (Hearth Engine Hub) ----------
 
 def _levelgen_clean(values):
@@ -1321,7 +1492,8 @@ def op_levelgen_play(args):
                           "width": args.get("width", 1600), "height": args.get("height", 900), "extra": extra})
 
 
-OPS = {"project_parts": op_project_parts, "set_project_part": op_set_project_part, "cloud_build": op_cloud_build, "cloud_status": op_cloud_status,
+OPS = {"package_checks": op_package_checks, "package": op_package, "package_status": op_package_status,
+       "project_parts": op_project_parts, "set_project_part": op_set_project_part, "cloud_build": op_cloud_build, "cloud_status": op_cloud_status,
        "engine": op_engine, "new_project": op_new_project, "hub_info": op_hub_info, "set_part": op_set_part, "list_projects": op_list_projects, "switch_project": op_switch_project, "dismiss_crash": op_dismiss_crash, "coop_start": op_coop_start, "coop_status": op_coop_status, "coop_stop": op_coop_stop,
        "probe": op_probe, "parts": op_parts, "set_parts": op_set_parts, "status": op_status, "editor_start": op_editor_start, "editor_stop": op_editor_stop,
        "build": op_build, "game_start": op_game_start, "game_stop": op_game_stop,
@@ -1562,7 +1734,7 @@ def handle(path, token):
 # Hearth Settings › Claude switches, applied to requests from Claude (the file inbox its hearth_engine tool uses).
 CLAUDE_GATES = {
     "readLogs": ("logs", "crash_report"),
-    "buildAndPlay": ("build", "cloud_build", "game_start", "game_stop", "editor_start", "editor_stop", "coop_start", "coop_stop",
+    "buildAndPlay": ("build", "cloud_build", "package", "game_start", "game_stop", "editor_start", "editor_stop", "coop_start", "coop_stop",
                      "levelgen_play", "engine"),
     "editLevels": ("levelgen_apply", "levelgen_area", "set_project_part", "set_part", "set_parts"),
 }
@@ -1576,7 +1748,7 @@ def claude_refusal(op, args):
         if op in ops and not hearth_setting("claude", key, True, bool):
             return {"ok": False, "error": f"Hearth Settings › Claude: '{CLAUDE_GATE_NAMES[key]}' is off"}
     big = (op == "engine" and args.get("action") in ("build", "update", "setup")) or (op == "build" and args.get("reconfigure")) \
-        or op == "cloud_build"
+        or op in ("cloud_build", "package")
     if big and hearth_setting("claude", "askBigBuilds", True, bool) and not args.get("owner_ok"):
         return {"ok": False, "needs_owner": True,
                 "error": "Hearth Settings › Claude: 'Ask before big builds' is on. Ask the owner in chat, then send "
