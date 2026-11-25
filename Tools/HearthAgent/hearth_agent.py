@@ -158,7 +158,10 @@ def remember_editor_launch():
 
 
 def default_editor_launch():
-    candidates = sorted(glob.glob("/var/opt/O3DE/*/bin/Linux/profile/Default/Editor"), reverse=True)
+    # The installed Hearth Engine first, then other O3DE installs.
+    candidates = [c for c in ("/opt/hearth-engine/bin/Linux/profile/Default/Editor",
+                              "/var/opt/hearth-engine/bin/Linux/profile/Default/Editor") if os.path.exists(c)][:1]
+    candidates += sorted(glob.glob("/var/opt/O3DE/*/bin/Linux/profile/Default/Editor"), reverse=True)
     candidates += sorted(glob.glob(os.path.expanduser("~/O3DE/Engines/*/bin/Linux/profile/Default/Editor")), reverse=True)
     if not candidates:
         return None
@@ -366,7 +369,8 @@ def op_build(args):
         if code == 0 and args.get("reconfigure"):
             save_stats(pending_rebuild=False)
         save_stats(last_build={"ok": code == 0, "finished": _build_state["finished"], "steps": result["steps"],
-                               "seconds": result["seconds"]})
+                               "seconds": result["seconds"], "errors": (result.get("errors") or [])[:5],
+                               "log": str(BUILD_LOG)})
         if reopen and code == 0:
             result["editor"] = op_editor_start({"wait_seconds": args.get("wait_seconds", 240)})
         return result
@@ -528,6 +532,56 @@ def rss_mb(pid):
         return None
 
 
+_seen_editor = {"pid": None}
+CRASH_HINTS = ("Segmentation fault", "SIGSEGV", "SIGABRT", "Assert", "assert", "Exception", "Fatal", "fatal error",
+               "terminate called", "core dumped")
+
+
+def check_editor_exit():
+    """When the editor we saw goes away, decide whether it crashed and remember what we know for the Hub."""
+    editors = editor_processes()
+    pid = editors[0][0] if editors else None
+    old = _seen_editor["pid"]
+    _seen_editor["pid"] = pid
+    if not old or pid == old or pid:
+        return
+    crashed = False
+    dump = None
+    if shutil.which("coredumpctl"):
+        try:
+            listing = subprocess.run(["coredumpctl", "--no-pager", "list", str(old)], capture_output=True, text=True,
+                                     timeout=20)
+            if listing.returncode == 0 and str(old) in listing.stdout:
+                crashed, dump = True, listing.stdout.splitlines()[-1].strip()
+        except (OSError, subprocess.SubprocessError):
+            pass
+    text = tail(LOG_DIR / "Editor.log", 60)
+    lines = text.splitlines()
+    hints = [l.strip() for l in lines if any(h in l for h in CRASH_HINTS)]
+    if not shutil.which("coredumpctl") and hints and not any("shutdown" in l.lower() for l in lines[-5:]):
+        crashed = True  # no crash list on this system: go by the end of the editor's log
+    if not crashed:
+        return
+    during = None
+    for line in reversed(lines):
+        low = line.lower()
+        if "game mode" in low or "entering game" in low:
+            during = "while entering Play"
+            break
+        if "saving" in low:
+            during = "while saving"
+            break
+    level = last_level()
+    backup = None
+    if level:
+        folders = sorted(glob.glob(str(PROJECT / "Levels" / level / "_autobackup" / "*")), key=os.path.getmtime)
+        if folders:
+            backup = {"path": folders[-1], "when": os.path.getmtime(folders[-1])}
+    save_stats(last_crash={"when": time.time(), "pid": old, "during": during, "level": level, "dump": dump,
+                           "lines": (hints or lines[-6:])[-6:], "log": str(LOG_DIR / "Editor.log"), "backup": backup})
+    log(f"editor {old} closed unexpectedly ({during or 'no hint'})")
+
+
 def track_memory():
     """Remember the highest memory the editor and the game reach (per run), for the Hub's cards."""
     stats = load_stats()
@@ -611,6 +665,8 @@ def op_hub_info(args):
                    "editor_peak": stats.get("editor_memory"), "game_peak": stats.get("game_memory")},
         "parts": parts, "parts_on": sum(p["on"] for p in parts), "parts_total": len(parts),
         "pending_rebuild": stats.get("pending_rebuild", False),
+        "last_crash": stats.get("last_crash"),
+        "free_mb": meminfo().get("MemAvailable"),
     }
 
 
@@ -666,6 +722,15 @@ def op_switch_project(args):
 
     threading.Thread(target=restart, daemon=True).start()
     return {"ok": True, "project": str(target)}
+
+
+def op_dismiss_crash(args):
+    """Hub: the crash card was dealt with (reopened or handed to Claude)."""
+    stats = load_stats()
+    if stats.get("last_crash"):
+        stats["last_crash"]["dismissed"] = time.time()
+        STATS_FILE.write_text(json.dumps(stats, indent=2))
+    return {"ok": True}
 
 
 def op_list_projects(args):
@@ -950,7 +1015,7 @@ def op_levelgen_play(args):
                           "width": args.get("width", 1600), "height": args.get("height", 900), "extra": extra})
 
 
-OPS = {"engine": op_engine, "new_project": op_new_project, "hub_info": op_hub_info, "set_part": op_set_part, "list_projects": op_list_projects, "switch_project": op_switch_project,
+OPS = {"engine": op_engine, "new_project": op_new_project, "hub_info": op_hub_info, "set_part": op_set_part, "list_projects": op_list_projects, "switch_project": op_switch_project, "dismiss_crash": op_dismiss_crash,
        "probe": op_probe, "parts": op_parts, "set_parts": op_set_parts, "status": op_status, "editor_start": op_editor_start, "editor_stop": op_editor_stop,
        "build": op_build, "game_start": op_game_start, "game_stop": op_game_stop,
        "crash_report": op_crash_report, "logs": op_logs,
@@ -1228,6 +1293,10 @@ def main():
                 track_memory()
             except Exception as error:
                 log(f"memory tracking: {error}")
+            try:
+                check_editor_exit()
+            except Exception as error:
+                log(f"crash check: {error}")
             HEARTBEAT.write_text(json.dumps({"time": now, "pid": os.getpid(), "version": VERSION}))
             try:
                 changed = me.stat().st_mtime != my_mtime
