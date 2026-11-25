@@ -413,6 +413,121 @@ def op_game_start(args):
     return {"ok": True, "pid": _game_proc.pid, "command": cmd}
 
 
+_coop = {"host": None, "window2": None, "port": 33450, "started": None, "settings": {}}
+COOP_LOG = HOME / "coop_host.log"
+COOP_LOG2 = HOME / "coop_window2.log"
+
+
+def lan_address():
+    """This computer's address on the local network (for the co-op invite)."""
+    import socket
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        probe.connect(("192.168.1.1", 9))  # no packet is sent; this only picks the outgoing interface
+        address = probe.getsockname()[0]
+        probe.close()
+        return address
+    except OSError:
+        return "127.0.0.1"
+
+
+def _coop_cmd(role, args, port):
+    level = args.get("level", "levels/level0/level0.spawnable")
+    cmd = [str(LAUNCHER), f"--project-path={PROJECT}",
+           f"--regset=/O3DE/Autoexec/ConsoleCommands/LoadLevel={level}" if role == "host" else f"--regset=/O3DE/Autoexec/ConsoleCommands/connect=127.0.0.1:{port}",
+           f"--regset=/O3DE/Autoexec/ConsoleCommands/r_width={int(args.get('width', 1280))}",
+           f"--regset=/O3DE/Autoexec/ConsoleCommands/r_height={int(args.get('height', 720))}",
+           f"--regset=/O3DE/Autoexec/ConsoleCommands/net_FakeLatencyMs={int(args.get('lag_ms', 0))}",
+           f"--regset=/O3DE/Autoexec/ConsoleCommands/net_FakeLossPercent={int(args.get('loss_percent', 0))}"]
+    if role == "host":
+        cmd += [f"--regset=/O3DE/Autoexec/ConsoleCommands/sv_port={port}", "--regset=/O3DE/Autoexec/ConsoleCommands/host="]
+    seed = str(args.get("seed", "")).strip()
+    if seed.isdigit():
+        cmd.append(f"--regset=/NoclipProtocol/Level0/Override/seed={seed}")
+        cmd.append("--regset=/NoclipProtocol/Level0/Override/newSeedEachRun=false")
+    if args.get("monsters") is False:
+        cmd.append("--regset=/NoclipProtocol/Monsters/Enabled=false")
+    return cmd
+
+
+def op_coop_start(args):
+    """Co-op test: this computer hosts; optionally a second game window on this computer joins it."""
+    if not LAUNCHER.exists():
+        return {"ok": False, "error": f"no game launcher at {LAUNCHER}; build first"}
+    gems = set(json.loads(PROJECT_JSON.read_text()).get("gem_names", []))
+    if "Multiplayer" not in gems:
+        return {"ok": False, "error": "the Multiplayer engine part is off: turn it on in the Hub and rebuild"}
+    op_coop_stop({})
+    port = int(args.get("port", 33450))
+    launch = {}
+    if LAUNCH_FILE.exists():
+        try:
+            launch = json.loads(LAUNCH_FILE.read_text())
+        except ValueError:
+            launch = {}
+    env = session_env(launch.get("env", {}))
+    with open(COOP_LOG, "wb"):
+        pass
+    _coop["host"] = subprocess.Popen(own_scope(_coop_cmd("host", args, port)), cwd=str(PROJECT), env=env,
+                                     stdout=open(COOP_LOG, "ab"), stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                     start_new_session=True)
+    _coop.update(port=port, started=time.time(), settings=dict(args))
+    log(f"co-op host started, pid {_coop['host'].pid}, port {port}")
+    if args.get("second_window", True):
+        time.sleep(float(args.get("join_delay", 8)))
+        with open(COOP_LOG2, "wb"):
+            pass
+        _coop["window2"] = subprocess.Popen(own_scope(_coop_cmd("client", args, port)), cwd=str(PROJECT), env=env,
+                                            stdout=open(COOP_LOG2, "ab"), stderr=subprocess.STDOUT,
+                                            stdin=subprocess.DEVNULL, start_new_session=True)
+        log(f"co-op second window started, pid {_coop['window2'].pid}")
+    return {"ok": True, "invite": f"connect {lan_address()}:{port}", "port": port}
+
+
+def op_coop_status(args):
+    """Who is in the co-op test, and the join log."""
+    import re
+    def alive(proc):
+        return proc is not None and proc.poll() is None
+    players = []
+    if alive(_coop["host"]):
+        players.append({"name": "You", "where": "This computer · host", "state": "ready", "pid": _coop["host"].pid,
+                        "mb": rss_mb(_coop["host"].pid)})
+    if alive(_coop["window2"]):
+        players.append({"name": "Window 2", "where": "This computer · second game window", "state": "ready",
+                        "pid": _coop["window2"].pid, "mb": rss_mb(_coop["window2"].pid)})
+    lines = []
+    remote = {}
+    text = tail(COOP_LOG, 400) if COOP_LOG.exists() else ""
+    for line in text.splitlines():
+        low = line.lower()
+        if any(word in low for word in ("connect", "join", "accept", "host", "disconnect", "loading", "level")):
+            lines.append(line.strip()[-160:])
+            for address in re.findall(r"(\d+\.\d+\.\d+\.\d+)", line):
+                if not address.startswith("127.") and not address.startswith("0."):
+                    remote[address] = "left" if "disconnect" in low else "ready"
+    for address, state in remote.items():
+        players.append({"name": address, "where": "Another computer", "state": state})
+    return {"ok": True, "running": alive(_coop["host"]), "players": players, "log": lines[-30:],
+            "invite": f"connect {lan_address()}:{_coop['port']}", "started": _coop["started"],
+            "settings": _coop["settings"], "logs": [str(COOP_LOG), str(COOP_LOG2)]}
+
+
+def op_coop_stop(args):
+    stopped = []
+    for key in ("window2", "host"):
+        proc = _coop.get(key)
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            stopped.append(key)
+        _coop[key] = None
+    return {"ok": True, "stopped": stopped}
+
+
 def op_game_stop(args):
     procs = game_processes()
     for pid, _ in procs:
@@ -1015,7 +1130,7 @@ def op_levelgen_play(args):
                           "width": args.get("width", 1600), "height": args.get("height", 900), "extra": extra})
 
 
-OPS = {"engine": op_engine, "new_project": op_new_project, "hub_info": op_hub_info, "set_part": op_set_part, "list_projects": op_list_projects, "switch_project": op_switch_project, "dismiss_crash": op_dismiss_crash,
+OPS = {"engine": op_engine, "new_project": op_new_project, "hub_info": op_hub_info, "set_part": op_set_part, "list_projects": op_list_projects, "switch_project": op_switch_project, "dismiss_crash": op_dismiss_crash, "coop_start": op_coop_start, "coop_status": op_coop_status, "coop_stop": op_coop_stop,
        "probe": op_probe, "parts": op_parts, "set_parts": op_set_parts, "status": op_status, "editor_start": op_editor_start, "editor_stop": op_editor_stop,
        "build": op_build, "game_start": op_game_start, "game_stop": op_game_stop,
        "crash_report": op_crash_report, "logs": op_logs,
