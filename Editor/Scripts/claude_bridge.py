@@ -275,7 +275,16 @@ class _Bridge:
             what = str(request.get("command", ""))[:120]
         elif op == "screenshot":
             what = "screenshot"
-        entry = {"time": time.time(), "op": op, "what": what, "ok": bool(response.get("ok"))}
+        elif op in ("run_script", "save_script"):
+            what = f"{op.replace('_', ' ')}: {request.get('name', '')}"
+        entry = {"time": time.time(), "op": op, "what": what, "ok": bool(response.get("ok")), "who": "claude"}
+        # The whole command and what it printed, for the editor's Script console.
+        if op == "python":
+            entry["code"] = str(request.get("code", ""))[:2000]
+        elif op == "console":
+            entry["code"] = str(request.get("command", ""))[:500]
+        out = str(response.get("output") or "") + (("\n" + str(response.get("error"))) if response.get("error") else "")
+        entry["out"] = out.strip()[:1200]
         path = os.path.join(self.folder, "activity.jsonl")
         try:
             with open(path, "a", encoding="utf-8") as handle:
@@ -292,6 +301,15 @@ class _Bridge:
         op = request.get("op")
         if op == "ping":
             return {"ok": True, "output": "pong"}
+        # Script console › Pause Claude: everything waits until the owner lets Claude carry on.
+        if self._claude_setting("paused", False) and op != "screenshot":
+            return {"ok": False, "error": "the owner paused Claude in the Script console; ask them to carry on"}
+        if op == "save_script":
+            return self._save_script(str(request.get("name", "")), str(request.get("code", "")))
+        if op == "run_script":
+            return self._run_script(str(request.get("name", "")))
+        if op == "list_scripts":
+            return {"ok": True, "output": json.dumps(self._scripts_index(), indent=1)}
         if op == "python":
             return self._run_python(str(request.get("code", "")))
         if op == "console":
@@ -338,7 +356,60 @@ class _Bridge:
         except configparser.Error:
             return True
 
+    # Saved scripts: <bridge folder>/scripts/<slug>.py with titles and use counts in scripts.json (the Script console lists them).
+    def _scripts_index(self):
+        try:
+            with open(os.path.join(self.folder, "scripts", "scripts.json"), "r", encoding="utf-8") as handle:
+                return json.load(handle)
+        except (OSError, ValueError):
+            return {}
+
+    def _write_scripts_index(self, index):
+        os.makedirs(os.path.join(self.folder, "scripts"), exist_ok=True)
+        self._write_json(os.path.join(self.folder, "scripts", "scripts.json"), index)
+
+    @staticmethod
+    def _slug(name):
+        import re
+        return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:60] or "script"
+
+    def _save_script(self, name, code):
+        if not name.strip() or not code.strip():
+            return {"ok": False, "error": "a script needs a name and code"}
+        slug = self._slug(name)
+        os.makedirs(os.path.join(self.folder, "scripts"), exist_ok=True)
+        with open(os.path.join(self.folder, "scripts", slug + ".py"), "w", encoding="utf-8") as handle:
+            handle.write(code)
+        index = self._scripts_index()
+        entry = index.get(slug, {"uses": 0})
+        entry.update(title=name.strip(), saved=time.time())
+        index[slug] = entry
+        self._write_scripts_index(index)
+        return {"ok": True, "output": f"saved as {slug}"}
+
+    def _run_script(self, name):
+        slug = self._slug(name)
+        try:
+            with open(os.path.join(self.folder, "scripts", slug + ".py"), "r", encoding="utf-8") as handle:
+                code = handle.read()
+        except OSError:
+            return {"ok": False, "error": f"no saved script {name!r}"}
+        result = self._run_python(code)
+        index = self._scripts_index()
+        if slug in index:
+            index[slug]["uses"] = int(index[slug].get("uses", 0)) + 1
+            index[slug]["last"] = time.time()
+            self._write_scripts_index(index)
+        return result
+
+    # Script console › Claude may › Delete things: Asks first.
+    DELETE_WORDS = ("DeleteEntity", "DeleteEntities", "delete_entities", "DestroyEntity", "delete_entity", "remove_entity",
+                    "os.remove", "os.unlink", "shutil.rmtree", "DeleteSelected", "delete_level")
+
     def _run_python(self, code):
+        if self._claude_setting("deleteAsks", True) and any(word in code for word in self.DELETE_WORDS) and "# owner_ok" not in code:
+            return {"ok": False, "error": "Script console › Claude may › Delete things is 'Asks first': ask the owner in chat, "
+                                          "then send it again with a line '# owner_ok'"}
         if not self._claude_setting("editLevels"):
             return {"ok": False, "error": "Hearth Settings › Claude: 'Can edit levels' is off, so Claude can't run editor Python; screenshots still work"}
         if not self._drive_allowed():

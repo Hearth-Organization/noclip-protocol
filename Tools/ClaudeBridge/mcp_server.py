@@ -160,6 +160,20 @@ def tool_python(args):
     return _text(_format(response), is_error=not response.get("ok"))
 
 
+def tool_script(args):
+    action = args.get("action", "list")
+    try:
+        if action == "save":
+            response = _editor_request("save_script", timeout=30.0, name=args.get("name", ""), code=args.get("code", ""))
+        elif action == "run":
+            response = _editor_request("run_script", timeout=float(args.get("timeout_seconds", 120)), name=args.get("name", ""))
+        else:
+            response = _editor_request("list_scripts", timeout=30.0)
+    except BridgeError as error:
+        return _text(str(error), is_error=True)
+    return _text(_format(response), is_error=not response.get("ok"))
+
+
 def tool_console(args):
     try:
         response = _editor_request("console", timeout=30.0, command=args.get("command", ""))
@@ -285,6 +299,21 @@ def _text(text, is_error=False):
 
 
 TOOLS = [
+    {
+        "name": "o3de_script",
+        "description": "Saved editor scripts (the Script console lists them for the owner): action list, save (name, code) "
+                       "or run (name). Save the Python you run often, like 'Screenshot the spawn room'.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["list", "save", "run"]},
+                "name": {"type": "string"},
+                "code": {"type": "string"},
+                "timeout_seconds": {"type": "number"},
+            },
+        },
+        "handler": tool_script,
+    },
     {
         "name": "o3de_status",
         "description": "Check that the O3DE Editor for the Noclip Protocol project is open and reachable, "
