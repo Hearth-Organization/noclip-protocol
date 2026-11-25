@@ -32,6 +32,8 @@ namespace NoclipProtocol
 
         //! The seed actually in use (useful for co-op later and for bug reports).
         AZ::u64 GetSeed() const { return m_settings.m_seed; }
+        //! The layout settings in use (seed included), for monsters finding their way.
+        const Level0::Settings& GetSettings() const { return m_settings; }
 
     protected:
         void Activate() override;
@@ -40,8 +42,6 @@ namespace NoclipProtocol
         // AZ::TickBus
         void OnTick(float deltaTime, AZ::ScriptTimePoint time) override;
 
-        //! The layout settings in use (seed included), for monsters finding their way.
-        const Level0::Settings& GetSettings() const { return m_settings; }
 
     private:
         enum Piece : int
