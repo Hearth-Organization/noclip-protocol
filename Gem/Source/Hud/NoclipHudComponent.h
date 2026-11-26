@@ -42,7 +42,7 @@ namespace NoclipProtocol
 
     private:
         enum class Face { Mono, MonoMedium, MonoSemiBold, Oswald, OswaldLarge, OswaldMedium };
-        enum class Page { None, Pause, Settings, Terminal, MainMenu };
+        enum class Page { None, Pause, Settings, Terminal, MainMenu, Build };
 
         struct Button
         {
@@ -60,6 +60,11 @@ namespace NoclipProtocol
 
         bool m_show = true;
         int m_terminalFile = 0;
+        int m_buildTile = 0;        // build mode: the tile picked (Base::Kind)
+        float m_buildYaw = 0.0f;    // build mode: [R] turns the piece 90 degrees
+        bool m_demolish = false;    // build mode: [X] pressed, demolish what's aimed at
+        bool m_inBase = false;      // the camera is inside the forward base (Level 0's spawn room)
+        bool Pausing() const { return m_page != Page::None && m_page != Page::Build; } // build mode keeps playing
         bool m_inMenu = false;      // the main menu level is loaded (/NoclipProtocol/Menu/Active)
         int m_menuSelected = 0;     // main menu item with the highlight (keyboard / mouse)
         AZStd::string m_menuNotice; // a short line under the main menu (co-op not in yet...)

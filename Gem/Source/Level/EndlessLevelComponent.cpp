@@ -3,6 +3,7 @@
 #include "Level0Json.h"
 #include "../Render/RayTracing.h"
 #include "../Player/FirstPersonControllerComponent.h"
+#include "../Base/BaseBuilding.h"
 #include <AzCore/Component/ComponentApplicationBus.h>
 #include <AzCore/Component/Entity.h>
 #include <MiniAudio/MiniAudioPlaybackBus.h>
@@ -248,14 +249,15 @@ namespace NoclipProtocol
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
             static const char* const objectives[] = {
-                "Scout Level 0 and find a way deeper",
+                "Establish the forward base",
                 "Find a way through the warehouse",
                 "Get through the tunnels",
                 "Report to the briefing terminal",
             };
             registry->Set("/NoclipProtocol/Hud/game.objective", AZStd::string(objectives[AZStd::clamp(m_settings.m_style, 0, 3)]));
             registry->Set("/NoclipProtocol/Hud/game.progress",
-                AZStd::string(m_settings.m_style == 3 ? "Sublevel 4, briefing room" : "Look for a tear in the walls"));
+                AZStd::string(m_settings.m_style == 3 ? "Sublevel 4, briefing room"
+                    : (m_settings.m_style == 0 ? "Put up a Foundation beacon in the spawn room [TAB]" : "Look for a tear in the walls")));
             if (m_settings.m_style == 3)
             {
                 registry->Set("/NoclipProtocol/Intro/Accepted", false); // every run of the intro starts with the briefing
@@ -274,6 +276,7 @@ namespace NoclipProtocol
         m_noclipping = false;
         m_terminalPrompt = false;
         m_accepted = false;
+        StartBuilding();
         AZ::TickBus::Handler::BusConnect();
     }
 
@@ -287,6 +290,31 @@ namespace NoclipProtocol
         m_chunks.clear();
         m_pendingHums.clear();
         m_statsShown.clear();
+        if (m_buildEnabled)
+        {
+            if (auto* spawner = AzFramework::SpawnableEntitiesInterface::Get())
+            {
+                for (auto& tickets : m_buildTickets)
+                {
+                    for (auto& ticket : tickets)
+                    {
+                        if (ticket.IsValid())
+                        {
+                            spawner->DespawnAllEntities(ticket);
+                        }
+                    }
+                }
+            }
+            m_buildTickets.clear();
+            Base::Get().m_placed.clear();
+            Base::Get().m_requests.clear();
+            Base::Get().m_active = false;
+            for (auto& asset : m_buildAssets)
+            {
+                asset.Release();
+            }
+            m_buildEnabled = false;
+        }
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
             registry->Set("/Hearth/Viewport/Stats", AZStd::string_view{});
@@ -396,6 +424,7 @@ namespace NoclipProtocol
             m_announced = true;
             AZ_Printf("NoclipProtocol", "Endless Level 0: tile pieces loaded, generating around the player");
         }
+        DoBuildRequests();
 
         AZ::Vector3 position = AZ::Vector3::CreateZero();
         if (m_followEntity.IsValid())
@@ -805,6 +834,186 @@ namespace NoclipProtocol
                 m_accepted = true;
                 registry->Set("/NoclipProtocol/Hud/game.objective", AZStd::string("Enter Breach 4-A"));
                 registry->Set("/NoclipProtocol/Hud/game.progress", AZStd::string("Breach chamber, end of the corridor"));
+            }
+        }
+    }
+
+    void EndlessLevelComponent::StartBuilding()
+    {
+        // The forward base: Level 0's spawn room (not the main menu's backdrop).
+        m_buildEnabled = m_settings.m_style == 0 && !m_mainMenu && m_settings.m_spawnRoomRadius > 0;
+        Base::State& base = Base::Get();
+        base.m_placed.clear();
+        base.m_requests.clear();
+        base.m_beaconUp = false;
+        base.m_active = m_buildEnabled;
+        m_buildTickets.clear();
+        if (!m_buildEnabled)
+        {
+            return;
+        }
+        const float r = static_cast<float>(m_settings.m_spawnRoomRadius);
+        const float cell = m_settings.m_cellSize;
+        base.m_minX = -r * cell;
+        base.m_minY = -r * cell;
+        base.m_maxX = (r + 1.0f) * cell;
+        base.m_maxY = (r + 1.0f) * cell;
+        base.m_cell = cell;
+        base.m_breachX = Level0::Level0Breach::X;
+        base.m_breachY = Level0::Level0Breach::Y;
+        static const char* const paths[BuildPieceCount] = {
+            "prefabs/base/build_pole.spawnable", "prefabs/base/build_floodlight.spawnable", "prefabs/base/build_flare.spawnable",
+            "prefabs/base/build_beacon.spawnable", "prefabs/base/build_beaconlight.spawnable", "prefabs/base/build_uvlamp.spawnable",
+        };
+        for (int i = 0; i < BuildPieceCount; ++i)
+        {
+            AZ::Data::AssetId id;
+            AZ::Data::AssetCatalogRequestBus::BroadcastResult(id, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath, paths[i],
+                azrtti_typeid<AzFramework::Spawnable>(), false);
+            if (id.IsValid())
+            {
+                m_buildAssets[i] = AZ::Data::AssetManager::Instance().GetAsset<AzFramework::Spawnable>(id, AZ::Data::AssetLoadBehavior::PreLoad);
+            }
+            else
+            {
+                AZ_Warning("NoclipProtocol", false, "Base building: piece '%s' not found", paths[i]);
+            }
+        }
+    }
+
+    void EndlessLevelComponent::DoBuildRequests()
+    {
+        Base::State& base = Base::Get();
+        if (!m_buildEnabled || base.m_requests.empty())
+        {
+            return;
+        }
+        for (const auto& asset : m_buildAssets)
+        {
+            if (asset.GetId().IsValid() && !asset.IsReady())
+            {
+                return; // still loading: keep the requests for the next tick
+            }
+        }
+        auto* registry = AZ::SettingsRegistry::Get();
+        auto toast = [registry](const char* text)
+        {
+            if (registry)
+            {
+                double now = 0.0;
+                registry->Get(now, "/NoclipProtocol/Hud/time");
+                registry->Set("/NoclipProtocol/Hud/toast", AZStd::string(text));
+                registry->Set("/NoclipProtocol/Hud/toast.until", now + 3.0);
+            }
+        };
+        const AZStd::vector<Base::Request> requests = AZStd::move(base.m_requests);
+        base.m_requests.clear();
+        for (const Base::Request& request : requests)
+        {
+            if (!request.m_place)
+            {
+                // Demolish: the nearest piece within 1.5 m; half of what it cost comes back.
+                int best = -1;
+                float bestD = 1.5f * 1.5f;
+                for (int i = 0; i < static_cast<int>(base.m_placed.size()); ++i)
+                {
+                    const float dx = base.m_placed[i].m_x - request.m_x;
+                    const float dy = base.m_placed[i].m_y - request.m_y;
+                    if (dx * dx + dy * dy < bestD)
+                    {
+                        bestD = dx * dx + dy * dy;
+                        best = i;
+                    }
+                }
+                if (best < 0)
+                {
+                    continue;
+                }
+                if (auto* spawner = AzFramework::SpawnableEntitiesInterface::Get())
+                {
+                    for (auto& ticket : m_buildTickets[best])
+                    {
+                        if (ticket.IsValid())
+                        {
+                            spawner->DespawnAllEntities(ticket);
+                        }
+                    }
+                }
+                const Base::ItemInfo& info = Base::Info(base.m_placed[best].m_kind);
+                base.m_scrap += info.m_scrap / 2;
+                base.m_wire += info.m_wire / 2;
+                base.m_fuel += info.m_fuel / 2;
+                if (base.m_placed[best].m_kind == Base::Kind::Beacon)
+                {
+                    base.m_beaconUp = false;
+                }
+                base.m_placed.erase(base.m_placed.begin() + best);
+                m_buildTickets.erase(m_buildTickets.begin() + best);
+                continue;
+            }
+            if (base.Blocked(request.m_kind, request.m_x, request.m_y))
+            {
+                continue; // the HUD checks first; things may have changed since
+            }
+            const Base::ItemInfo& info = Base::Info(request.m_kind);
+            AZStd::vector<AzFramework::EntitySpawnTicket> tickets;
+            auto spawn = [&](BuildPiece piece, const Level0::Box& box, bool stretch)
+            {
+                if (!m_buildAssets[piece].IsReady())
+                {
+                    return;
+                }
+                tickets.emplace_back(m_buildAssets[piece]);
+                SpawnBox(tickets.back(), box, stretch, request.m_yaw);
+            };
+            const float x = request.m_x;
+            const float y = request.m_y;
+            switch (request.m_kind)
+            {
+            case Base::Kind::Floodlight:
+                spawn(BuildPole, Level0::Box{ x, y, 1.1f, 0.12f, 0.12f, 2.2f }, true);
+                spawn(BuildFloodlight, Level0::Box{ x, y, 2.3f, 1.0f, 1.0f, 1.0f }, false);
+                break;
+            case Base::Kind::CeilingPanel:
+                if (m_pieceAssets[PieceLight].IsReady())
+                {
+                    tickets.emplace_back(m_pieceAssets[PieceLight]);
+                    SpawnBox(tickets.back(), Level0::Box{ x, y, m_settings.m_ceilingHeight, 1.0f, 1.0f, 1.0f }, false, request.m_yaw);
+                }
+                break;
+            case Base::Kind::FlareStand:
+                spawn(BuildPole, Level0::Box{ x, y, 0.35f, 0.1f, 0.1f, 0.7f }, true);
+                spawn(BuildFlare, Level0::Box{ x, y, 0.78f, 1.0f, 1.0f, 1.0f }, false);
+                break;
+            case Base::Kind::Beacon:
+                spawn(BuildBeacon, Level0::Box{ x, y, 0.7f, 0.4f, 0.4f, 1.4f }, true);
+                spawn(BuildBeaconLight, Level0::Box{ x, y, 1.6f, 1.0f, 1.0f, 1.0f }, false);
+                break;
+            case Base::Kind::UvLamp:
+                spawn(BuildPole, Level0::Box{ x, y, 0.6f, 0.1f, 0.1f, 1.2f }, true);
+                spawn(BuildUvLamp, Level0::Box{ x, y, 1.3f, 1.0f, 1.0f, 1.0f }, false);
+                break;
+            default:
+                break;
+            }
+            if (tickets.empty())
+            {
+                continue;
+            }
+            base.m_scrap -= info.m_scrap;
+            base.m_wire -= info.m_wire;
+            base.m_fuel -= info.m_fuel;
+            base.m_placed.push_back(Base::Placed{ request.m_kind, x, y, request.m_yaw });
+            m_buildTickets.push_back(AZStd::move(tickets));
+            if (request.m_kind == Base::Kind::Beacon && !base.m_beaconUp)
+            {
+                base.m_beaconUp = true;
+                toast("FOUNDATION BEACON ONLINE \xc2\xb7 FORWARD BASE ESTABLISHED");
+                if (registry)
+                {
+                    registry->Set("/NoclipProtocol/Hud/game.objective", AZStd::string("Forward base established"));
+                    registry->Set("/NoclipProtocol/Hud/game.progress", AZStd::string("Scout Level 0 and find a way deeper"));
+                }
             }
         }
     }

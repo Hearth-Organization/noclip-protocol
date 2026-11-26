@@ -4,6 +4,8 @@
 #include <Atom/RPI.Public/AuxGeom/AuxGeomFeatureProcessorInterface.h>
 #include <Atom/RPI.Public/ViewportContext.h>
 #include <Atom/RPI.Public/ViewportContextBus.h>
+#include <Atom/RPI.Public/View.h>
+#include "../Base/BaseBuilding.h"
 #include <AzCore/Console/IConsole.h>
 #include <AzCore/IO/FileIO.h>
 #include <AzCore/Math/MathUtils.h>
@@ -41,7 +43,7 @@ namespace NoclipProtocol
             }
         }
         AZ_CONSOLEFREEFUNC("hud_key", HudKey, AZ::ConsoleFunctorFlags::Null,
-            "Press a HUD key without a keyboard (for testing): hud_key E | Y | N | Esc | Up | Down | Enter");
+            "Press a HUD key without a keyboard (for testing): hud_key E | Y | N | Esc | Up | Down | Enter | Tab | R | X | Click | 1..6");
     } // namespace
 } // namespace NoclipProtocol
 
@@ -481,7 +483,7 @@ namespace NoclipProtocol
         }
         if (registry)
         {
-            registry->Set("/NoclipProtocol/Paused", m_page != Page::None);
+            registry->Set("/NoclipProtocol/Paused", Pausing());
         }
     }
 
@@ -537,6 +539,54 @@ namespace NoclipProtocol
                 return true;
             }
         }
+        // Base building: TAB opens build mode in the forward base (Level 0's spawn room) and closes it.
+        if (id == InputDeviceKeyboard::Key::EditTab && (m_page == Page::None || m_page == Page::Build))
+        {
+            if (m_page == Page::Build)
+            {
+                m_page = Page::None;
+            }
+            else if (Base::Get().m_active && m_inBase)
+            {
+                m_page = Page::Build;
+            }
+            else if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Set("/NoclipProtocol/Hud/toast", AZStd::string(Base::Get().m_active ? "BUILD IN THE FORWARD BASE \xc2\xb7 THE SPAWN ROOM"
+                                                                                                 : "NOTHING TO BUILD HERE"));
+                registry->Set("/NoclipProtocol/Hud/toast.until", static_cast<double>(m_time) + 2.5);
+            }
+            return true;
+        }
+        if (m_page == Page::Build)
+        {
+            if (id == InputDeviceKeyboard::Key::AlphanumericR)
+            {
+                m_buildYaw = std::fmod(m_buildYaw + 1.5707963f, 6.2831853f);
+                return true;
+            }
+            if (id == InputDeviceKeyboard::Key::AlphanumericX)
+            {
+                m_demolish = true;
+                return true;
+            }
+            static const InputChannelId digits[6] = { InputDeviceKeyboard::Key::Alphanumeric1, InputDeviceKeyboard::Key::Alphanumeric2,
+                                                      InputDeviceKeyboard::Key::Alphanumeric3, InputDeviceKeyboard::Key::Alphanumeric4,
+                                                      InputDeviceKeyboard::Key::Alphanumeric5, InputDeviceKeyboard::Key::Alphanumeric6 };
+            for (int i = 0; i < 6; ++i)
+            {
+                if (id == digits[i])
+                {
+                    m_buildTile = i;
+                    return true;
+                }
+            }
+            if (id == InputDeviceKeyboard::Key::Escape || id == InputDeviceKeyboard::Key::AlphanumericP)
+            {
+                m_page = Page::None;
+                return id == InputDeviceKeyboard::Key::Escape;
+            }
+        }
         // The main menu: up / down to move, Enter to choose.
         if (m_page == Page::MainMenu)
         {
@@ -572,7 +622,7 @@ namespace NoclipProtocol
             m_page = m_page == Page::None ? Page::Pause : (m_page == Page::Settings ? Page::Pause : Page::None);
             if (auto* registry = AZ::SettingsRegistry::Get())
             {
-                registry->Set("/NoclipProtocol/Paused", m_page != Page::None);
+                registry->Set("/NoclipProtocol/Paused", Pausing());
             }
             return m_page != Page::None || id == InputDeviceKeyboard::Key::AlphanumericP;
         }
@@ -598,6 +648,11 @@ namespace NoclipProtocol
             else if (key == "Y" || key == "y") { HandleKey(InputDeviceKeyboard::Key::AlphanumericY); }
             else if (key == "N" || key == "n") { HandleKey(InputDeviceKeyboard::Key::AlphanumericN); }
             else if (key == "Esc" || key == "esc") { HandleKey(InputDeviceKeyboard::Key::Escape); }
+            else if (key == "Tab") { HandleKey(InputDeviceKeyboard::Key::EditTab); }
+            else if (key == "R") { HandleKey(InputDeviceKeyboard::Key::AlphanumericR); }
+            else if (key == "X") { HandleKey(InputDeviceKeyboard::Key::AlphanumericX); }
+            else if (key == "Click") { HandleKey(InputDeviceMouse::Button::Left); }
+            else if (key.size() == 1 && key[0] >= '1' && key[0] <= '6') { m_buildTile = key[0] - '1'; }
             else if (key == "Up") { HandleKey(InputDeviceKeyboard::Key::NavigationArrowUp); }
             else if (key == "Down") { HandleKey(InputDeviceKeyboard::Key::NavigationArrowDown); }
             else if (key == "Enter") { HandleKey(InputDeviceKeyboard::Key::EditEnter); }
@@ -610,7 +665,7 @@ namespace NoclipProtocol
             hud_page = -1;
             if (registry)
             {
-                registry->Set("/NoclipProtocol/Paused", m_page != Page::None);
+                registry->Set("/NoclipProtocol/Paused", Pausing());
             }
         }
         if (registry)
@@ -622,7 +677,7 @@ namespace NoclipProtocol
             {
                 m_inMenu = menu;
                 m_page = menu ? Page::MainMenu : Page::None;
-                registry->Set("/NoclipProtocol/Paused", m_page != Page::None);
+                registry->Set("/NoclipProtocol/Paused", Pausing());
             }
             // The level being played, for CONTINUE: saved with the settings whenever it changes.
             AZStd::string level;
@@ -657,6 +712,17 @@ namespace NoclipProtocol
             return;
         }
         m_viewportId = viewport->GetId();
+        AZ::RPI::ViewPtr cameraView = viewport->GetDefaultView();
+        const AZ::Transform camera = cameraView ? cameraView->GetCameraTransform() : AZ::Transform::CreateIdentity();
+        {
+            const Base::State& base = Base::Get();
+            const AZ::Vector3 at = camera.GetTranslation();
+            m_inBase = base.m_active && at.GetX() > base.m_minX && at.GetX() < base.m_maxX && at.GetY() > base.m_minY && at.GetY() < base.m_maxY;
+            if (m_page == Page::Build && !m_inBase)
+            {
+                m_page = Page::None; // walked out of the base
+            }
+        }
         const AzFramework::WindowSize size = viewport->GetViewportSize();
         const float W = static_cast<float>(size.m_width);
         const float H = static_cast<float>(size.m_height);
@@ -829,7 +895,7 @@ namespace NoclipProtocol
         };
 
         // The HUD itself; the terminal covers the whole screen (and text always draws over shapes), so not under it.
-        if (m_page != Page::Terminal && !m_inMenu)
+        if (m_page != Page::Terminal && !m_inMenu && m_page != Page::Build)
         {
             // ---- vignette: radial-gradient(ellipse at center, transparent 55%, rgba(8,7,4,0.55) 100%) ----
             {
@@ -1121,7 +1187,8 @@ namespace NoclipProtocol
             }
             for (AZ::Color& c : lc)
             {
-                c.SetA(1.0f - std::pow(AZStd::max(0.0f, 1.0f - c.GetA()), 1.0f / static_cast<float>(layers)));
+                // At most half alpha a layer (solid shapes too: they come out 1 - 0.5^layers, nearly solid).
+                c.SetA(AZStd::min(0.5f, 1.0f - std::pow(AZStd::max(0.0f, 1.0f - c.GetA()), 1.0f / static_cast<float>(layers))));
             }
             for (int layer = 0; layer < layers; ++layer)
             {
@@ -1452,6 +1519,313 @@ namespace NoclipProtocol
                 draw->DrawTriangles(args);
             }
             m_click = false;
+        }
+        // ---- build mode: Build.dc.html (the game keeps running; aim at the floor to place) ----
+        else if (m_page == Page::Build)
+        {
+            Base::State& base = Base::Get();
+            const Base::Kind kind = static_cast<Base::Kind>(AZStd::clamp(m_buildTile, 0, static_cast<int>(Base::Kind::Count) - 1));
+            const Base::ItemInfo& info = Base::Info(kind);
+            const AZ::Color cream = Hex(0xf3ead0);
+            const AZ::Color soft = Hex(0xc9bf9a);
+            const AZ::Color gold = Hex(0xf0cf5a);
+            const AZ::Color ok = Hex(0x7fe0a0);
+            const AZ::Color okText = Hex(0xb8f5cc);
+            const AZ::Color bad = Hex(0xff8a78);
+            auto textIn = [&](Face face, const AZStd::string& value, float x, float top, float size, float lineHeight,
+                              const AZ::Color& c, int align = 0, float spacing = 0.0f)
+            { return text(face, value, x, Y(top + (lineHeight - 1.2f) * size * 0.5f), size, c, align, spacing, true); };
+            auto lline = [&](float x0, float y0, float x1, float y1, float t, const AZ::Color& c)
+            {
+                const float dx = x1 - x0;
+                const float dy = y1 - y0;
+                const float len = std::sqrt(dx * dx + dy * dy);
+                if (len <= 0.0f)
+                {
+                    return;
+                }
+                const float nx = -dy / len * t * 0.5f;
+                const float ny = dx / len * t * 0.5f;
+                const AZ::Vector3 a = P(x0 + nx, y0 + ny), b = P(x1 + nx, y1 + ny), c2 = P(x1 - nx, y1 - ny), d = P(x0 - nx, y0 - ny);
+                for (const AZ::Vector3& v : { a, b, c2, a, c2, d })
+                {
+                    lv.push_back(v);
+                    lc.push_back(c);
+                }
+            };
+
+            // Aim: where the view meets the floor, within 8 m, on a half-metre grid.
+            const AZ::Vector3 eye = camera.GetTranslation();
+            const AZ::Vector3 forward = camera.GetBasisY().GetNormalized();
+            bool aimed = false;
+            float ax = 0.0f, ay = 0.0f;
+            if (forward.GetZ() < -0.05f)
+            {
+                const float t = -eye.GetZ() / forward.GetZ();
+                if (t < 8.0f)
+                {
+                    ax = std::round((eye.GetX() + forward.GetX() * t) * 2.0f) * 0.5f;
+                    ay = std::round((eye.GetY() + forward.GetY() * t) * 2.0f) * 0.5f;
+                    aimed = true;
+                }
+            }
+            const char* blocked = aimed ? base.Blocked(kind, ax, ay) : "aim at the floor";
+            if (m_demolish)
+            {
+                m_demolish = false;
+                if (aimed)
+                {
+                    base.m_requests.push_back(Base::Request{ false, kind, ax, ay, 0.0f });
+                }
+            }
+            if (m_click)
+            {
+                m_click = false;
+                if (!blocked)
+                {
+                    base.m_requests.push_back(Base::Request{ true, kind, ax, ay, m_buildYaw });
+                }
+            }
+
+            // The footprint on the floor (in the world): dashed 2 px outline, see-through fill; green when it fits.
+            if (aimed)
+            {
+                const AZ::Color edge = blocked ? bad : ok;
+                AZ::Color fill = edge;
+                fill.SetA(0.28f); // the mockup's 0.16 over a dark floor; Level 0's carpet is bright
+                const float c0 = std::cos(m_buildYaw), s0 = std::sin(m_buildYaw);
+                const float hx = info.m_sizeX * 0.5f, hy = info.m_sizeY * 0.5f;
+                auto corner = [&](float px, float py) { return AZ::Vector3(ax + px * c0 - py * s0, ay + px * s0 + py * c0, 0.02f); };
+                const AZ::Vector3 k[4] = { corner(-hx, -hy), corner(hx, -hy), corner(hx, hy), corner(-hx, hy) };
+                const AZ::Vector3 tri[6] = { k[0], k[1], k[2], k[0], k[2], k[3] };
+                AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments args;
+                args.m_verts = tri;
+                args.m_vertCount = 6;
+                args.m_colors = &fill;
+                args.m_colorCount = 1;
+                args.m_opacityType = AZ::RPI::AuxGeomDraw::OpacityType::Translucent;
+                args.m_depthTest = AZ::RPI::AuxGeomDraw::DepthTest::On;
+                args.m_depthWrite = AZ::RPI::AuxGeomDraw::DepthWrite::Off;
+                draw->DrawTriangles(args);
+                AZStd::vector<AZ::Vector3> dashes;
+                for (int e = 0; e < 4; ++e)
+                {
+                    const AZ::Vector3 a = k[e];
+                    const AZ::Vector3 b = k[(e + 1) % 4];
+                    const float len = (b - a).GetLength();
+                    for (float d = 0.0f; d < len; d += 0.16f)
+                    {
+                        dashes.push_back(a + (b - a) * (d / len));
+                        dashes.push_back(a + (b - a) * (AZStd::min(len, d + 0.09f) / len));
+                    }
+                }
+                AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments lines;
+                lines.m_verts = dashes.data();
+                lines.m_vertCount = static_cast<uint32_t>(dashes.size());
+                lines.m_colors = &edge;
+                lines.m_colorCount = 1;
+                lines.m_size = static_cast<uint8_t>(AZStd::max(1.0f, std::round(2.0f * s)));
+                lines.m_opacityType = AZ::RPI::AuxGeomDraw::OpacityType::Opaque;
+                lines.m_depthTest = AZ::RPI::AuxGeomDraw::DepthTest::Off;
+                draw->DrawLines(lines);
+
+                // The label above it: a check mark and "FLOODLIGHT · placement OK · [R] rotate" (or what's in the way).
+                if (cameraView)
+                {
+                    // Just above the footprint's far edge, like the mockup (42 px over its top-left).
+                    const AZ::Vector4 clip = cameraView->GetWorldToClipMatrix() * AZ::Vector4(ax, ay, 0.35f, 1.0f);
+                    if (clip.GetW() > 0.01f)
+                    {
+                        const float sx = (clip.GetX() / clip.GetW() * 0.5f + 0.5f) * W;
+                        const float sy = (1.0f - (clip.GetY() / clip.GetW() * 0.5f + 0.5f)) * H;
+                        const float lx = sx - 110.0f * s;
+                        const AZ::Color tc = blocked ? bad : okText;
+                        if (blocked)
+                        {
+                            lline(lx + 2.0f * s, sy + 2.0f * s, lx + 10.0f * s, sy + 10.0f * s, 2.0f * s, tc);
+                            lline(lx + 10.0f * s, sy + 2.0f * s, lx + 2.0f * s, sy + 10.0f * s, 2.0f * s, tc);
+                        }
+                        else
+                        {
+                            lline(lx + 2.0f * s, sy + 6.0f * s, lx + 5.0f * s, sy + 9.0f * s, 2.0f * s, tc);
+                            lline(lx + 5.0f * s, sy + 9.0f * s, lx + 10.0f * s, sy + 3.0f * s, 2.0f * s, tc);
+                        }
+                        const AZStd::string label = AZStd::string(info.m_upper) + " \xc2\xb7 " +
+                            (blocked ? AZStd::string(blocked) : AZStd::string("placement OK")) + " \xc2\xb7 [R] rotate";
+                        text(Face::Mono, label, lx + 20.0f * s, sy - 1.2f * s, 12.0f, tc, 0, 1.0f); // centred on the 12 px icon
+                    }
+                }
+            }
+
+            // linear-gradient(180deg, rgba(8,7,4,.35) 0%, 0 30%, 0 55%, .85 100%)
+            {
+                const float stops[4][2] = { { 0.0f, 0.35f }, { 0.30f, 0.0f }, { 0.55f, 0.0f }, { 1.0f, 0.85f } };
+                for (int k2 = 0; k2 < 3; ++k2)
+                {
+                    const float y0 = H * stops[k2][0], y1 = H * stops[k2 + 1][0];
+                    const AZ::Color a = Hex(0x080704, stops[k2][1]), b = Hex(0x080704, stops[k2 + 1][1]);
+                    const AZ::Vector3 verts[6] = { P(0, y0), P(W, y0), P(W, y1), P(0, y0), P(W, y1), P(0, y1) };
+                    const AZ::Color colours[6] = { a, a, b, a, b, b };
+                    for (int v = 0; v < 6; ++v)
+                    {
+                        lv.push_back(verts[v]);
+                        lc.push_back(colours[v]);
+                    }
+                }
+            }
+
+            // Top left: FORWARD BASE / SPAWN ROOM · 28 × 28 m · STABLE
+            textIn(Face::Oswald, "FORWARD BASE", L(40.0f), 32.0f, 22.0f, 32.0f / 22.0f, Hex(0xfff3c0), 0, 3.0f);
+            {
+                const int size = static_cast<int>(std::round(base.m_maxX - base.m_minX));
+                textIn(Face::Mono, AZStd::string::format("SPAWN ROOM \xc2\xb7 %d \xc3\x97 %d m \xc2\xb7 %s", size, size, base.m_beaconUp ? "SECURED" : "STABLE"),
+                    L(40.0f), 64.0f, 12.0f, 1.25f, Hex(0xe3d9b4), 0, 2.0f);
+            }
+
+            // Top right: SCRAP / WIRE / FUEL / ALMOND WATER / POWER, right-aligned, 10 px apart.
+            {
+                struct Stock { const char* label; AZStd::string value; bool power; };
+                const Stock stocks[5] = { { "SCRAP", AZStd::string::format("%d", base.m_scrap), false },
+                                          { "WIRE", AZStd::string::format("%d", base.m_wire), false },
+                                          { "FUEL", AZStd::string::format("%d", base.m_fuel), false },
+                                          { "ALMOND WATER", AZStd::string::format("%d", base.m_almondWater), false },
+                                          { "POWER", AZStd::string::format("%g / %g kW", base.PowerUsed(), base.m_powerMax), true } };
+                float right = R(1240.0f);
+                for (int i = 4; i >= 0; --i)
+                {
+                    const float labelW = measure(Face::Mono, stocks[i].label, 10.0f, 2.0f) + 2.0f * s; // CSS spacing after the last letter too
+                    const float valueW = measure(Face::MonoSemiBold, stocks[i].value, 16.0f, 0.0f);
+                    const float inner = AZStd::max(labelW, valueW);
+                    const float w = inner + 24.0f * s + (stocks[i].power ? 2.0f * s : 0.0f);
+                    const float x = right - w;
+                    lrect(x, Y(32.0f), w, 49.0f * s, Hex(0x0a0906, 0.72f));
+                    const float tx = x + (stocks[i].power ? 14.0f : 12.0f) * s;
+                    if (stocks[i].power)
+                    {
+                        lrect(x, Y(32.0f), 2.0f * s, 49.0f * s, gold);
+                    }
+                    textIn(Face::Mono, stocks[i].label, tx, 40.0f, 10.0f, 1.3f, soft, 0, 2.0f);
+                    textIn(Face::MonoSemiBold, stocks[i].value, tx, 53.0f, 16.0f, 1.25f, cream);
+                    right = x - 10.0f * s;
+                }
+            }
+
+            // Bottom: category tabs, the tile panel, the key hints.
+            {
+                static const char* const tabs[6] = { "LIGHTING", "DEFENSES", "POWER", "STORAGE", "RESEARCH", "CONTAINMENT \xc2\xb7 LOCKED" };
+                float x = L(40.0f);
+                for (int i = 0; i < 6; ++i)
+                {
+                    const float w = measure(Face::Mono, tabs[i], 12.0f, 2.0f) + 2.0f * s + 32.0f * s;
+                    lrect(x, Y(510.0f), w, 31.0f * s, i == 0 ? gold : Hex(0x0a0906, 0.75f));
+                    textIn(i == 0 ? Face::MonoSemiBold : Face::Mono, tabs[i], x + 16.0f * s, 518.0f, 12.0f, 1.25f,
+                        i == 0 ? Hex(0x0b0a07) : (i == 5 ? Hex(0xa59b78) : cream), 0, 2.0f);
+                    x += w + 4.0f * s;
+                }
+                const float panelX = L(40.0f);
+                const float panelW = R(1240.0f) - panelX;
+                lrect(panelX, Y(545.0f), panelW, 125.0f * s, Hex(0x0a0906, 0.82f));
+                const float tileW = (panelW - 28.0f * s - 50.0f * s) / 6.0f;
+                for (int i = 0; i < 6; ++i)
+                {
+                    const Base::ItemInfo& tile = Base::Info(static_cast<Base::Kind>(i));
+                    const float tx = panelX + 14.0f * s + i * (tileW + 10.0f * s);
+                    const float ty = Y(559.0f);
+                    const float th = 97.0f * s;
+                    const bool selected = i == m_buildTile && !tile.m_locked;
+                    const AZ::Color stroke = tile.m_locked ? Hex(0x8a8168) : (selected ? gold : cream);
+                    const float bw = AZStd::max(1.0f, 1.5f * s);
+                    if (selected)
+                    {
+                        lrect(tx, ty, tileW, th, AZ::Color(240 / 255.0f, 207 / 255.0f, 90 / 255.0f, 0.12f));
+                        loutline(tx, ty, tileW, th, bw, gold);
+                    }
+                    else if (tile.m_locked)
+                    {
+                        // 1.5 px dashed border, rgba(243,234,208,.2)
+                        const AZ::Color dash(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.2f);
+                        for (float d = 0.0f; d < tileW; d += 6.0f * s)
+                        {
+                            lrect(tx + d, ty, AZStd::min(3.0f * s, tileW - d), bw, dash);
+                            lrect(tx + d, ty + th - bw, AZStd::min(3.0f * s, tileW - d), bw, dash);
+                        }
+                        for (float d = 0.0f; d < th; d += 6.0f * s)
+                        {
+                            lrect(tx, ty + d, bw, AZStd::min(3.0f * s, th - d), dash);
+                            lrect(tx + tileW - bw, ty + d, bw, AZStd::min(3.0f * s, th - d), dash);
+                        }
+                    }
+                    else
+                    {
+                        loutline(tx, ty, tileW, th, bw, AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.25f));
+                    }
+                    // The 28 x 28 icon (the mockup's SVGs, 1.6 px strokes), 13 px in from the tile's corner.
+                    const float ix = tx + 13.0f * s;
+                    const float iy = Y(572.0f);
+                    auto il = [&](float x0, float y0, float x1, float y1) { lline(ix + x0 * s, iy + y0 * s, ix + x1 * s, iy + y1 * s, 1.6f * s, stroke); };
+                    auto irect = [&](float x0, float y0, float w, float h) { il(x0, y0, x0 + w, y0); il(x0 + w, y0, x0 + w, y0 + h); il(x0 + w, y0 + h, x0, y0 + h); il(x0, y0 + h, x0, y0); };
+                    auto icircle = [&](float cx, float cy, float r, float from = 0.0f, float to = 6.2831853f)
+                    {
+                        const int n = 20;
+                        for (int k3 = 0; k3 < n; ++k3)
+                        {
+                            const float a0 = from + (to - from) * k3 / n, a1 = from + (to - from) * (k3 + 1) / n;
+                            il(cx + std::cos(a0) * r, cy + std::sin(a0) * r, cx + std::cos(a1) * r, cy + std::sin(a1) * r);
+                        }
+                    };
+                    switch (i)
+                    {
+                    case 0: irect(6, 4, 16, 10); il(14, 14, 14, 24); il(9, 24, 19, 24); break;
+                    case 1: irect(5, 5, 18, 6); il(8, 11, 8, 23); il(20, 11, 20, 23); break;
+                    case 2: icircle(14, 14, 5); il(14, 3, 14, 7); il(14, 21, 14, 25); il(3, 14, 7, 14); il(21, 14, 25, 14); break;
+                    case 3:
+                        il(14, 4, 22, 14); il(22, 14, 14, 24); il(14, 24, 6, 14); il(6, 14, 14, 4);
+                        for (float r = 0.4f; r <= 2.5f; r += 0.7f) { icircle(14, 14, r); }
+                        break;
+                    case 4: il(5, 22, 23, 22); il(8, 22, 8, 12); il(8, 12, 20, 12); il(20, 12, 20, 22); il(11, 12, 11, 7); il(11, 7, 17, 7); il(17, 7, 17, 12); break;
+                    default: irect(7, 12, 14, 11); il(10, 12, 10, 9); icircle(14, 9, 4, 3.1415927f, 6.2831853f); il(18, 9, 18, 12); break;
+                    }
+                    textIn(Face::MonoSemiBold, tile.m_name, tx + 13.0f * s, 606.0f, 13.0f, 17.0f / 13.0f, tile.m_locked ? Hex(0x8a8168) : cream);
+                    AZStd::string cost;
+                    if (tile.m_locked)
+                    {
+                        cost = tile.m_lockNote;
+                    }
+                    else
+                    {
+                        auto add = [&](const char* name, int n)
+                        {
+                            if (n > 0)
+                            {
+                                cost += (cost.empty() ? "" : " \xc2\xb7 ") + AZStd::string::format("%s %d", name, n);
+                            }
+                        };
+                        add("Scrap", tile.m_scrap);
+                        add("Wire", tile.m_wire);
+                        add("Fuel", tile.m_fuel);
+                    }
+                    textIn(Face::Mono, cost, tx + 13.0f * s, 629.0f, 11.0f, 14.0f / 11.0f, tile.m_locked ? Hex(0x8a8168) : soft);
+                }
+                static const char* const hints[4] = { "[LMB] place", "[R] rotate", "[X] demolish", "[TAB] close" };
+                float hx = L(40.0f);
+                for (const char* hint : hints)
+                {
+                    textIn(Face::Mono, hint, hx, 678.0f, 11.0f, 14.0f / 11.0f, soft, 0, 1.0f);
+                    hx += measure(Face::Mono, hint, 11.0f, 1.0f) + 1.0f * s + 22.0f * s;
+                }
+            }
+            lflush(4);
+            // The toast (the beacon going up, refunds...) shows in build mode too.
+            {
+                const AZStd::string toast = RegString("/NoclipProtocol/Hud/toast", "");
+                const double until = RegNumber("/NoclipProtocol/Hud/toast.until", 0.0);
+                if (!toast.empty() && until > m_time)
+                {
+                    AZ::Color c = Bright;
+                    c.SetA(AZStd::min(1.0f, static_cast<float>(until - m_time)));
+                    text(Face::Mono, toast, C(640), Y(470), 14.0f, c, 1, 2.0f);
+                }
+            }
         }
         // ---- main menu: Main.dc.html (the live Level 0 behind it instead of the mockup's still) ----
         else if (m_page == Page::MainMenu)

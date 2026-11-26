@@ -1,0 +1,369 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Build_BeaconLight",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 2219724388333390735,
+                "Child Entity Order": [
+                    "Entity_[31508905070634]"
+                ]
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 5082513832886728665
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 545198181100374566
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 5215389816265151663
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 8738681121152269347
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 5816497446257569881
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 5377197318101497525
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 570576685538020777
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 5400666402170143951
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 457380681191578132,
+                "Parent Entity": ""
+            }
+        }
+    },
+    "Entities": {
+        "Entity_[31508905070634]": {
+            "Id": "Entity_[31508905070634]",
+            "Name": "Build_BeaconLightRoot",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 13138468182787764503
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 2457468900769196959
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 7395069922794049259,
+                    "Child Entity Order": [
+                        "Entity_[31513200037930]",
+                        "Entity_[31517495005226]",
+                        "Entity_[16693947110294]"
+                    ]
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 15340285011425075275
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 14223232787529286168
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 12569776913006971720
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 9016691735945648362
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 5087657538435854632
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 1905704917917163980,
+                    "Parent Entity": "ContainerEntity"
+                }
+            }
+        },
+        "Entity_[31513200037930]": {
+            "Id": "Entity_[31513200037930]",
+            "Name": "Build_BeaconLightPanel",
+            "Components": {
+                "AZ::Render::EditorMeshComponent": {
+                    "$type": "AZ::Render::EditorMeshComponent",
+                    "Id": 14973301358780997168,
+                    "Controller": {
+                        "Configuration": {
+                            "ModelAsset": {
+                                "assetId": {
+                                    "guid": "{C15CD465-9589-56ED-945F-8416FA4798A3}",
+                                    "subId": 284301017
+                                },
+                                "assetHint": "objects/_primitives/_box_1x1.fbx.azmodel"
+                            }
+                        }
+                    }
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 13986768155982791510
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 10335391870591371868
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 1785644564824561207
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 9139665487415573133
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 16549054097032586805
+                },
+                "EditorMaterialComponent": {
+                    "$type": "EditorMaterialComponent",
+                    "Id": 8055763456585702091,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": {
+                                "{}": {
+                                    "MaterialAsset": {
+                                        "assetId": {
+                                            "guid": "{261309E4-D5DB-59AE-8B65-DF9A343FB51F}"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "EditorNonUniformScaleComponent": {
+                    "$type": "EditorNonUniformScaleComponent",
+                    "Id": 15464374242616566718,
+                    "NonUniformScale": [
+                        0.2,
+                        0.2,
+                        0.2
+                    ]
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 6864556825880307808
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 5004348220254686536
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 76968730172533435
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 6379167346366473673,
+                    "Parent Entity": "Entity_[31508905070634]",
+                    "Transform Data": {
+                        "Translate": [
+                            0.25,
+                            0.0,
+                            -0.019999999552965164
+                        ]
+                    }
+                }
+            }
+        },
+        "Entity_[31517495005226]": {
+            "Id": "Entity_[31517495005226]",
+            "Name": "Build_BeaconLightBulb",
+            "Components": {
+                "AZ::Render::EditorAreaLightComponent": {
+                    "$type": "AZ::Render::EditorAreaLightComponent",
+                    "Id": 2363869611206914442,
+                    "Controller": {
+                        "Configuration": {
+                            "LightType": 2,
+                            "Color": [
+                                1.0,
+                                0.8,
+                                0.4
+                            ],
+                            "Intensity": 144.0,
+                            "AttenuationRadiusMode": 0,
+                            "AttenuationRadius": 7.0
+                        }
+                    }
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 7254728086412177853
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 10146779651993886092
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 176097130006129619
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 2472212697418948596
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 9298132505229883057
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 9991651313604583666
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 14730143351888300003
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 14917685192815109563
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 2623600431294287967,
+                    "Parent Entity": "Entity_[31508905070634]",
+                    "Transform Data": {
+                        "Translate": [
+                            0.25,
+                            0.0,
+                            -0.05
+                        ],
+                        "Rotate": [
+                            180.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 2948635165277221748,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{28F5FEAC-4AB6-5C01-A47D-95F9B46111AB}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/level0/level0_hum.wav.miniaudio"
+                            },
+                            "Volume": 10.0,
+                            "Loop": true,
+                            "Spatialization": true,
+                            "Min Distance": 0.800000011920929,
+                            "Max Distance": 7.0,
+                            "Auto-follow": true
+                        }
+                    }
+                },
+                "EditorDiskShapeComponent": {
+                    "$type": "EditorDiskShapeComponent",
+                    "Id": 591297584828595400,
+                    "ShapeColor": [
+                        1.0,
+                        0.96,
+                        0.85,
+                        1.0
+                    ],
+                    "DiskShape": {
+                        "Configuration": {
+                            "Radius": 0.3
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[16693947110294]": {
+            "Id": "Entity_[16693947110294]",
+            "Name": "Build_BeaconLightFill",
+            "Components": {
+                "AZ::Render::EditorAreaLightComponent": {
+                    "$type": "AZ::Render::EditorAreaLightComponent",
+                    "Id": 1215249526330943336,
+                    "Controller": {
+                        "Configuration": {
+                            "LightType": 6,
+                            "Color": [
+                                1.0,
+                                0.8,
+                                0.4
+                            ],
+                            "Intensity": 30.0,
+                            "AttenuationRadiusMode": 0,
+                            "AttenuationRadius": 4.5
+                        }
+                    }
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 5686999761925215857
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 3495196524045423630
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 2537481811025219469
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 4755051525050877522
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 220808613019509633
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 4327340362085229835
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 1437281591914802511
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 7038772851610222958
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 4394289139160384286,
+                    "Parent Entity": "Entity_[31508905070634]",
+                    "Transform Data": {
+                        "Translate": [
+                            0.25,
+                            0.0,
+                            -0.8
+                        ]
+                    }
+                }
+            }
+        }
+    }
+}

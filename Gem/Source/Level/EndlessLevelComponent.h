@@ -83,6 +83,14 @@ namespace NoclipProtocol
             bool hum = false);
         void UpdateHums(float deltaTime);
 
+        // Base building (Base::State): the placed pieces' own spawns, so each can be removed again.
+        enum BuildPiece : int { BuildPole = 0, BuildFloodlight, BuildFlare, BuildBeacon, BuildBeaconLight, BuildUvLamp, BuildPieceCount };
+        AZ::Data::Asset<AzFramework::Spawnable> m_buildAssets[BuildPieceCount];
+        AZStd::vector<AZStd::vector<AzFramework::EntitySpawnTicket>> m_buildTickets; // one list per Base::State::m_placed entry
+        bool m_buildEnabled = false;
+        void StartBuilding();
+        void DoBuildRequests();
+
         // Settings (editable in the Editor)
         AZ::EntityId m_followEntity;
         AZ::u64 m_seed = 1;
