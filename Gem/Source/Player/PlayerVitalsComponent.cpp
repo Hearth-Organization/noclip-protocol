@@ -1,9 +1,17 @@
 #include "PlayerVitalsComponent.h"
 
+#include <cmath>
+
 #include <AzCore/Serialization/EditContext.h>
 #include <AzCore/Serialization/SerializeContext.h>
 #include <AzCore/Settings/SettingsRegistry.h>
 #include <AzCore/std/algorithm.h>
+#include "../Render/FilmGrainBus.h"
+
+#include <AzCore/Console/IConsole.h>
+
+AZ_CVAR(float, player_sanity_set, -1.0f, nullptr, AZ::ConsoleFunctorFlags::Null,
+    "Set the player's sanity once (0..1, for testing; goes back to -1 after)");
 
 namespace NoclipProtocol
 {
@@ -36,6 +44,7 @@ namespace NoclipProtocol
         m_health = 1.0f;
         m_stamina = 1.0f;
         m_sanity = 1.0f;
+        m_grainSet = -1.0f;
         m_exhausted = false;
         AZ::TickBus::Handler::BusConnect();
     }
@@ -51,6 +60,11 @@ namespace NoclipProtocol
         if (!registry || deltaTime <= 0.0f)
         {
             return;
+        }
+        if (static_cast<float>(player_sanity_set) >= 0.0f)
+        {
+            m_sanity = AZStd::clamp(static_cast<float>(player_sanity_set), 0.0f, 1.0f);
+            player_sanity_set = -1.0f;
         }
         bool paused = false;
         registry->Get(paused, "/NoclipProtocol/Paused");
@@ -106,5 +120,13 @@ namespace NoclipProtocol
         registry->Set("/NoclipProtocol/Hud/player.health", static_cast<double>(m_health));
         registry->Set("/NoclipProtocol/Hud/player.stamina", static_cast<double>(m_stamina));
         registry->Set("/NoclipProtocol/Hud/player.sanity", static_cast<double>(m_sanity));
+
+        // Film grain only creeps in as sanity goes: none above 60%, up to 0.3 at none left.
+        const float grain = 0.3f * AZStd::clamp((0.6f - m_sanity) / 0.6f, 0.0f, 1.0f);
+        if (std::fabs(grain - m_grainSet) > 0.005f || m_grainSet < 0.0f)
+        {
+            m_grainSet = grain;
+            AZ::Render::FilmGrainRequestBus::Broadcast(&AZ::Render::FilmGrainRequests::SetIntensity, grain);
+        }
     }
 } // namespace NoclipProtocol

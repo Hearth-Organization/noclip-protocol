@@ -28,6 +28,7 @@ namespace NoclipProtocol
         float m_health = 1.0f;
         float m_stamina = 1.0f;
         float m_sanity = 1.0f;
+        float m_grainSet = -1.0f; // film grain intensity last sent (follows sanity)
         bool m_exhausted = false;
 
         float m_staminaDrain = 0.12f;   // per second while sprinting (about 8 s from full)
