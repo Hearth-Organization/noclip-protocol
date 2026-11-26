@@ -3,6 +3,7 @@
 #include <AzCore/std/containers/unordered_set.h>
 
 #include "Level0Layout.h"
+#include "../Base/BaseCatalog.h"
 
 #include <AzCore/Asset/AssetCommon.h>
 #include <AzCore/Component/Component.h>
@@ -95,16 +96,33 @@ namespace NoclipProtocol
             bool hum = false);
         void UpdateHums(float deltaTime);
 
-        // Base building (Base::State): the placed pieces' own spawns, so each can be removed again.
+        // Base building (Base::State): the placed pieces' own spawns, so each can be removed again, and their lights
+        // (switched off in a blackout).
         enum BuildPiece : int { BuildPole = 0, BuildFloodlight, BuildFlare, BuildBeacon, BuildBeaconLight, BuildUvLamp, BuildPieceCount };
         AZ::Data::Asset<AzFramework::Spawnable> m_buildAssets[BuildPieceCount];
-        AZStd::vector<AZStd::vector<AzFramework::EntitySpawnTicket>> m_buildTickets; // one list per Base::State::m_placed entry
+        AZ::Data::Asset<AzFramework::Spawnable> m_kindAssets[Base::KindCount]; // the pieces with their own prefab (BaseCatalog.h)
+        struct BuiltPiece
+        {
+            AZStd::vector<AzFramework::EntitySpawnTicket> m_body;
+            AZStd::vector<AzFramework::EntitySpawnTicket> m_light;
+            bool m_lightOn = false;
+        };
+        AZStd::vector<BuiltPiece> m_built; // one per Base::State::m_placed entry
         bool m_buildEnabled = false;
         void StartBuilding();
         void DoBuildRequests();
+        void SpawnPieceLight(int index); // the piece's light (again, when the power comes back)
+        void UpdateBase(float deltaTime, const AZ::Vector3& at); // the base ticking over, the breach seam, delivered crates
+        // Breach 4-A sealed: a glowing seam that opens a crack for a delivery.
+        AzFramework::EntitySpawnTicket m_seamTicket;
+        AZStd::vector<AZ::EntityId> m_seamEntities;
+        float m_seamShown = -1.0f;
+        AzFramework::EntitySpawnTicket m_crateTicket; // a delivered Foundation crate waiting in front of the breach
+        bool m_crateUp = false;
+        int m_useTarget = -1;                         // what [E] is at: a placed piece, -2 the crate, -1 nothing
 
-        // Supplies to gather (scrap, wire, fuel, Almond Water): [E] picks one up.
-        AZ::Data::Asset<AzFramework::Spawnable> m_pickupAssets[4];
+        // Supplies to gather (scrap, wire, fuel, Almond Water, documents, samples): [E] picks one up.
+        AZ::Data::Asset<AzFramework::Spawnable> m_pickupAssets[6]; // + Foundation documents, odd samples
         // Clutter (ClutterCatalog.h): everything that has ended up in the Backrooms.
         AZStd::vector<AZ::Data::Asset<AzFramework::Spawnable>> m_clutterAssets;
         void LoadClutterAssets();

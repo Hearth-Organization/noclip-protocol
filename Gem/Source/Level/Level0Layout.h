@@ -113,7 +113,7 @@ namespace NoclipProtocol::Level0
         struct Pickup
         {
             Point m_at;  // on the floor
-            int m_kind;  // 0 scrap, 1 wire, 2 fuel, 3 Almond Water
+            int m_kind;  // 0 scrap, 1 wire, 2 fuel, 3 Almond Water, 4 Foundation document, 5 odd sample
             int m_index; // its number in this chunk (with the chunk, a lasting id: collected ones stay gone)
         };
         std::vector<Pickup> m_pickups;    // supplies to gather for the forward base

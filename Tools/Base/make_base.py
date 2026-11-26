@@ -11,7 +11,7 @@ Builds the base-building pieces (the approved Build mockup's LIGHTING tab):
   Prefabs/Base/Build_BeaconLight its gold light
   Prefabs/Base/Build_UvLamp     a violet UV lamp (on a 1.2 m stand)
   (Ceiling panel fix puts up Level 0's own ceiling light.)
-  Prefabs/Base/Pickup_Scrap / _Wire / _Fuel / _Water: supplies lying about in Levels 0-2 (no colliders; [E] picks
+  Prefabs/Base/Pickup_Scrap / _Wire / _Fuel / _Water / _Document / _Sample: supplies lying about in Levels 0-2 (no colliders; [E] picks
   one up). The game stretches each to its size.
 
 Copies of the Level 0 pieces with materials and lights swapped, like the level tools.
@@ -120,6 +120,11 @@ def pickups():
         # Almond Water: a pale bottle with a faint glow, so it's findable in the dark.
         "Water": material("pickup_water", {"baseColor.color": [0.9, 0.88, 0.78, 1.0], "roughness.factor": 0.1,
                                             "emissive.enable": True, "emissive.color": [1.0, 0.95, 0.8, 1.0], "emissive.intensity": 0.8}),
+        # A Foundation document: a manila folder with the Foundation's mark (research).
+        "Document": material("pickup_document", {"baseColor.color": [0.78, 0.66, 0.38, 1.0], "roughness.factor": 0.85}),
+        # An odd sample: a jar with something faintly green in it (research).
+        "Sample": material("pickup_sample", {"baseColor.color": [0.3, 0.7, 0.4, 1.0], "roughness.factor": 0.1,
+                                              "emissive.enable": True, "emissive.color": [0.4, 1.0, 0.5, 1.0], "emissive.intensity": 1.2}),
     }
     for name, guid in kinds.items():
         copy_piece("L0_Pillar.prefab", f"Pickup_{name}.prefab", {pillar: guid})

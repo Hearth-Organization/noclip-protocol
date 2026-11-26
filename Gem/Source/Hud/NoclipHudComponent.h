@@ -42,7 +42,7 @@ namespace NoclipProtocol
 
     private:
         enum class Face { Mono, MonoMedium, MonoSemiBold, Oswald, OswaldLarge, OswaldMedium };
-        enum class Page { None, Pause, Settings, Terminal, MainMenu, Build };
+        enum class Page { None, Pause, Settings, Terminal, MainMenu, Build, Orders };
 
         struct Button
         {
@@ -60,7 +60,13 @@ namespace NoclipProtocol
 
         bool m_show = true;
         int m_terminalFile = 0;
-        int m_buildTile = 0;        // build mode: the tile picked (Base::Kind)
+        int m_buildTab = 0;         // build mode: the tab (LIGHTING, DEFENSES, POWER, STORAGE, RESEARCH, CONTAINMENT)
+        int m_buildTile = 0;        // build mode: the tile picked in the tab (0-5)
+        int m_orderSection = 0;     // Foundation requisitions: 0-4 the catalog's sections, 5 open orders, 6 completed, 7 on the way
+        int m_orderItem = 0;        // the card picked in the section
+        bool m_orderRequest = false; // [E] pressed: request the picked card
+        AZStd::string m_orderNotice; // what the last request did
+        float m_orderNoticeUntil = 0.0f;
         float m_buildYaw = 0.0f;    // build mode: [R] turns the piece 90 degrees
         bool m_demolish = false;    // build mode: [X] pressed, demolish what's aimed at
         bool m_inBase = false;      // the camera is inside the forward base (Level 0's spawn room)

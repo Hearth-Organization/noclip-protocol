@@ -516,7 +516,7 @@ namespace NoclipProtocol::Level0
             Level0Breach::Y >= originY && Level0Breach::Y < originY + chunkSize)
         {
             AddBreachFrame(layout, Level0Breach::X, Level0Breach::Y);
-            layout.m_voids.push_back(Box{ Level0Breach::X, Level0Breach::Y - 0.24f, 1.35f, 3.0f, 0.1f, 2.7f });
+            // Sealed: the generator draws its glowing seam (it opens a crack for a Foundation delivery).
         }
 
         // 7. Lights, decided per global cell (independent of chunk generation order).
@@ -678,7 +678,7 @@ namespace NoclipProtocol::Level0
             }
         }
 
-        // 11. Supplies lying about: scrap (most), wire, fuel, Almond Water (rarest), never inside the spawn room.
+        // 11. Supplies lying about: scrap, wire, fuel, Almond Water, Foundation documents, odd samples; never inside the spawn room.
         if (settings.m_pickupChance > 0.0f && settings.m_style <= 2)
         {
             const int r = settings.m_spawnRoomRadius;
@@ -699,7 +699,8 @@ namespace NoclipProtocol::Level0
                         continue;
                     }
                     const float roll = Unit(Mix(hp ^ 3));
-                    const int kind = roll < 0.45f ? 0 : (roll < 0.70f ? 1 : (roll < 0.85f ? 2 : 3));
+                    // Scrap (most), wire, fuel, Almond Water, a Foundation document, an odd sample (rarest).
+                    const int kind = roll < 0.42f ? 0 : (roll < 0.64f ? 1 : (roll < 0.77f ? 2 : (roll < 0.87f ? 3 : (roll < 0.96f ? 4 : 5))));
                     const float jx = (Unit(Mix(hp ^ 4)) - 0.5f) * 0.4f * cell;
                     const float jy = (Unit(Mix(hp ^ 5)) - 0.5f) * 0.4f * cell;
                     layout.m_pickups.push_back(ChunkLayout::Pickup{

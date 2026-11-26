@@ -13,6 +13,7 @@
 #include <AzCore/Asset/AssetManager.h>
 #include <AzCore/Console/IConsole.h>
 #include <AzCore/Asset/AssetManagerBus.h>
+#include <AzCore/Component/NonUniformScaleBus.h>
 #include <AzCore/Component/TransformBus.h>
 #include <AzCore/Math/MathUtils.h>
 #include <AzCore/Math/Quaternion.h>
@@ -323,22 +324,41 @@ namespace NoclipProtocol
         {
             if (auto* spawner = AzFramework::SpawnableEntitiesInterface::Get())
             {
-                for (auto& tickets : m_buildTickets)
+                for (auto& piece : m_built)
                 {
-                    for (auto& ticket : tickets)
+                    for (auto* list : { &piece.m_body, &piece.m_light })
                     {
-                        if (ticket.IsValid())
+                        for (auto& ticket : *list)
                         {
-                            spawner->DespawnAllEntities(ticket);
+                            if (ticket.IsValid())
+                            {
+                                spawner->DespawnAllEntities(ticket);
+                            }
                         }
                     }
                 }
+                for (auto* ticket : { &m_seamTicket, &m_crateTicket })
+                {
+                    if (ticket->IsValid())
+                    {
+                        spawner->DespawnAllEntities(*ticket);
+                    }
+                }
             }
-            m_buildTickets.clear();
+            m_built.clear();
+            m_seamTicket = AzFramework::EntitySpawnTicket();
+            m_crateTicket = AzFramework::EntitySpawnTicket();
+            m_seamEntities.clear();
+            m_seamShown = -1.0f;
+            m_crateUp = false;
             // The base stays in Base::State (and the save) while other levels play.
             Base::Get().m_requests.clear();
             Base::Get().m_active = false;
             for (auto& asset : m_buildAssets)
+            {
+                asset.Release();
+            }
+            for (auto& asset : m_kindAssets)
             {
                 asset.Release();
             }
@@ -518,6 +538,10 @@ namespace NoclipProtocol
         int playerX = 0;
         int playerY = 0;
         Level0::WorldToChunk(m_settings, position.GetX(), position.GetY(), playerX, playerY);
+        if (!m_mainMenu && m_settings.m_style <= 2)
+        {
+            UpdateBase(deltaTime, position);
+        }
 
         // For the debug overlay: the seed and the chunk the player is in (0, 0 is the forward base).
         if (auto* registry = AZ::SettingsRegistry::Get())
@@ -928,13 +952,14 @@ namespace NoclipProtocol
         for (const auto& pickup : layout.m_pickups)
         {
             const AZ::u64 id = Key(chunkX, chunkY) ^ (static_cast<AZ::u64>(pickup.m_index + 1) << 48);
-            const int kind = AZStd::clamp(pickup.m_kind, 0, 3);
+            const int kind = AZStd::clamp(pickup.m_kind, 0, 5);
             if (m_collected.find(id) != m_collected.end() || !m_pickupAssets[kind].IsReady())
             {
                 continue;
             }
-            // Scrap: a bent plate; wire: a coil; fuel: a jerry can; Almond Water: a bottle.
-            static const float sizes[4][3] = { { 0.5f, 0.34f, 0.12f }, { 0.3f, 0.3f, 0.16f }, { 0.36f, 0.18f, 0.46f }, { 0.09f, 0.09f, 0.28f } };
+            // Scrap: a bent plate; wire: a coil; fuel: a jerry can; Almond Water: a bottle; a Foundation document folder; a sample jar.
+            static const float sizes[6][3] = { { 0.5f, 0.34f, 0.12f }, { 0.3f, 0.3f, 0.16f }, { 0.36f, 0.18f, 0.46f }, { 0.09f, 0.09f, 0.28f },
+                                               { 0.32f, 0.24f, 0.03f }, { 0.1f, 0.1f, 0.16f } };
             Chunk::LivePickup live{ AZ::Vector3(pickup.m_at.m_x, pickup.m_at.m_y, 0.0f), kind, pickup.m_index,
                                     AzFramework::EntitySpawnTicket(m_pickupAssets[kind]) };
             SpawnBox(live.m_ticket, Level0::Box{ pickup.m_at.m_x, pickup.m_at.m_y, sizes[kind][2] * 0.5f, sizes[kind][0], sizes[kind][1], sizes[kind][2] },
@@ -1059,6 +1084,20 @@ namespace NoclipProtocol
                 light = AZStd::max(light, lit);
             }
         }
+        // The base's own lights that are on.
+        if (m_buildEnabled)
+        {
+            for (const Base::Placed& p : Base::Get().m_placed)
+            {
+                const float r = Base::State::LightRadius(p.m_kind);
+                if (r > 0.0f && (p.m_powered || Base::Info(p.m_kind).m_power <= 0.0f))
+                {
+                    const float dx = p.m_x - at.GetX();
+                    const float dy = p.m_y - at.GetY();
+                    light = AZStd::max(light, AZStd::clamp(1.0f - (std::sqrt(dx * dx + dy * dy) - 1.0f) / r, 0.0f, 1.0f));
+                }
+            }
+        }
         registry->Set("/NoclipProtocol/Player/Light", static_cast<double>(light));
         UpdatePickups(at);
         // The forward base is the arrival room around the spawn point.
@@ -1107,25 +1146,35 @@ namespace NoclipProtocol
         base.LoadOnce(); // the expedition's stockpile and base (CONTINUE), once per run
         base.m_requests.clear();
         base.m_pickRequested = false;
+        base.m_useRequested = false;
         base.m_active = m_buildEnabled;
-        m_buildTickets.clear();
+        m_built.clear();
         m_collected.clear();
         m_promptPickup = 0;
         m_pickupPrompt = false;
+        m_useTarget = -1;
+        auto load = [](const char* path, AZ::Data::Asset<AzFramework::Spawnable>& asset)
+        {
+            AZ::Data::AssetId id;
+            AZ::Data::AssetCatalogRequestBus::BroadcastResult(id, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath, path,
+                azrtti_typeid<AzFramework::Spawnable>(), false);
+            if (id.IsValid())
+            {
+                asset = AZ::Data::AssetManager::Instance().GetAsset<AzFramework::Spawnable>(id, AZ::Data::AssetLoadBehavior::PreLoad);
+                return true;
+            }
+            AZ_Warning("NoclipProtocol", false, "Base building: '%s' not found", path);
+            return false;
+        };
         // Supplies' pieces (every level with supplies, not the menu or the intro).
         if (!m_mainMenu && m_settings.m_style <= 2)
         {
-            static const char* const pickups[4] = { "prefabs/base/pickup_scrap.spawnable", "prefabs/base/pickup_wire.spawnable",
-                                                    "prefabs/base/pickup_fuel.spawnable", "prefabs/base/pickup_water.spawnable" };
-            for (int i = 0; i < 4; ++i)
+            static const char* const pickups[6] = { "prefabs/base/pickup_scrap.spawnable", "prefabs/base/pickup_wire.spawnable",
+                                                    "prefabs/base/pickup_fuel.spawnable", "prefabs/base/pickup_water.spawnable",
+                                                    "prefabs/base/pickup_document.spawnable", "prefabs/base/pickup_sample.spawnable" };
+            for (int i = 0; i < 6; ++i)
             {
-                AZ::Data::AssetId id;
-                AZ::Data::AssetCatalogRequestBus::BroadcastResult(id, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath, pickups[i],
-                    azrtti_typeid<AzFramework::Spawnable>(), false);
-                if (id.IsValid())
-                {
-                    m_pickupAssets[i] = AZ::Data::AssetManager::Instance().GetAsset<AzFramework::Spawnable>(id, AZ::Data::AssetLoadBehavior::PreLoad);
-                }
+                load(pickups[i], m_pickupAssets[i]);
             }
         }
         if (!m_buildEnabled)
@@ -1150,24 +1199,99 @@ namespace NoclipProtocol
         base.m_cell = cell;
         base.m_breachX = Level0::Level0Breach::X;
         base.m_breachY = Level0::Level0Breach::Y;
+        // The room's two doorways (Level0Layout: north wall, one cell in from each side).
+        {
+            const int door = AZStd::max(1, m_settings.m_spawnRoomRadius - 1);
+            base.m_doorways[0] = Base::Doorway{ (static_cast<float>(-door) + 0.5f) * cell, base.m_maxY, "north-west doorway" };
+            base.m_doorways[1] = Base::Doorway{ (static_cast<float>(door) + 0.5f) * cell, base.m_maxY, "north doorway" };
+        }
+        // The room's own ceiling lights that work (for "light inside" and dark corners).
+        base.m_roomLights.clear();
+        base.m_pillars.clear();
+        {
+            int cx0 = 0, cy0 = 0, cx1 = 0, cy1 = 0;
+            Level0::WorldToChunk(m_settings, base.m_minX + 0.1f, base.m_minY + 0.1f, cx0, cy0);
+            Level0::WorldToChunk(m_settings, base.m_maxX - 0.1f, base.m_maxY - 0.1f, cx1, cy1);
+            for (int cx = cx0; cx <= cx1; ++cx)
+            {
+                for (int cy = cy0; cy <= cy1; ++cy)
+                {
+                    const Level0::ChunkLayout layout = Level0::GenerateChunk(m_settings, cx, cy);
+                    for (const Level0::Box& pillar : layout.m_pillars)
+                    {
+                        if (pillar.m_cx > base.m_minX && pillar.m_cx < base.m_maxX && pillar.m_cy > base.m_minY && pillar.m_cy < base.m_maxY)
+                        {
+                            base.m_pillars.push_back({ pillar.m_cx, pillar.m_cy });
+                        }
+                    }
+                    for (const Level0::Light& light : layout.m_lights)
+                    {
+                        const float x = light.m_position.m_x, y = light.m_position.m_y;
+                        if (light.m_state != Level0::LightState::Dead && x > base.m_minX && x < base.m_maxX && y > base.m_minY && y < base.m_maxY)
+                        {
+                            base.m_roomLights.push_back({ x, y });
+                        }
+                    }
+                }
+            }
+        }
         static const char* const paths[BuildPieceCount] = {
             "prefabs/base/build_pole.spawnable", "prefabs/base/build_floodlight.spawnable", "prefabs/base/build_flare.spawnable",
             "prefabs/base/build_beacon.spawnable", "prefabs/base/build_beaconlight.spawnable", "prefabs/base/build_uvlamp.spawnable",
         };
         for (int i = 0; i < BuildPieceCount; ++i)
         {
-            AZ::Data::AssetId id;
-            AZ::Data::AssetCatalogRequestBus::BroadcastResult(id, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath, paths[i],
-                azrtti_typeid<AzFramework::Spawnable>(), false);
-            if (id.IsValid())
+            load(paths[i], m_buildAssets[i]);
+        }
+        for (int k = 0; k < Base::KindCount; ++k)
+        {
+            if (const char* prefab = Base::Info(static_cast<Base::Kind>(k)).m_prefab)
             {
-                m_buildAssets[i] = AZ::Data::AssetManager::Instance().GetAsset<AzFramework::Spawnable>(id, AZ::Data::AssetLoadBehavior::PreLoad);
-            }
-            else
-            {
-                AZ_Warning("NoclipProtocol", false, "Base building: piece '%s' not found", paths[i]);
+                load(prefab, m_kindAssets[k]);
             }
         }
+        m_seamShown = -1.0f;
+        m_crateUp = false;
+    }
+
+    void EndlessLevelComponent::SpawnPieceLight(int index)
+    {
+        Base::State& base = Base::Get();
+        if (index < 0 || index >= static_cast<int>(base.m_placed.size()) || index >= static_cast<int>(m_built.size()))
+        {
+            return;
+        }
+        const Base::Placed& p = base.m_placed[index];
+        const Base::ItemInfo& info = Base::Info(p.m_kind);
+        BuiltPiece& built = m_built[index];
+        auto spawn = [&](const AZ::Data::Asset<AzFramework::Spawnable>& asset, float z, float yaw)
+        {
+            if (!asset.IsReady())
+            {
+                return;
+            }
+            built.m_light.emplace_back(asset);
+            SpawnBox(built.m_light.back(), Level0::Box{ p.m_x, p.m_y, z, 1.0f, 1.0f, 1.0f }, false, yaw);
+        };
+        switch (p.m_kind)
+        {
+        case Base::Kind::Floodlight: spawn(m_buildAssets[BuildFloodlight], 2.3f, p.m_yaw); break;
+        case Base::Kind::CeilingPanel: spawn(m_pieceAssets[PieceLight], m_settings.m_ceilingHeight, p.m_yaw); break;
+        case Base::Kind::FlareStand: spawn(m_buildAssets[BuildFlare], 0.78f, p.m_yaw); break;
+        case Base::Kind::Beacon: spawn(m_buildAssets[BuildBeaconLight], 1.6f, p.m_yaw); break;
+        case Base::Kind::UvLamp: spawn(m_buildAssets[BuildUvLamp], 1.3f, p.m_yaw); break;
+        default:
+            switch (info.m_light)
+            {
+            case Base::Light::Warm: spawn(m_buildAssets[BuildFloodlight], info.m_lightZ, p.m_yaw); break;
+            case Base::Light::Uv: spawn(m_buildAssets[BuildUvLamp], info.m_lightZ, p.m_yaw + 1.5707963f); break;
+            case Base::Light::Red: spawn(m_buildAssets[BuildFlare], info.m_lightZ, p.m_yaw); break;
+            case Base::Light::Gold: spawn(m_buildAssets[BuildBeaconLight], info.m_lightZ, p.m_yaw); break;
+            default: break;
+            }
+            break;
+        }
+        built.m_lightOn = true;
     }
 
     void EndlessLevelComponent::DoBuildRequests()
@@ -1184,6 +1308,13 @@ namespace NoclipProtocol
                 return; // still loading: keep the requests for the next tick
             }
         }
+        for (const auto& asset : m_kindAssets)
+        {
+            if (asset.GetId().IsValid() && !asset.IsReady())
+            {
+                return;
+            }
+        }
         auto* registry = AZ::SettingsRegistry::Get();
         auto toast = [registry](const char* text)
         {
@@ -1195,22 +1326,40 @@ namespace NoclipProtocol
                 registry->Set("/NoclipProtocol/Hud/toast.until", now + 3.0);
             }
         };
+        auto despawn = [](AZStd::vector<AzFramework::EntitySpawnTicket>& tickets)
+        {
+            if (auto* spawner = AzFramework::SpawnableEntitiesInterface::Get())
+            {
+                for (auto& ticket : tickets)
+                {
+                    if (ticket.IsValid())
+                    {
+                        spawner->DespawnAllEntities(ticket);
+                    }
+                }
+            }
+            tickets.clear();
+        };
         const AZStd::vector<Base::Request> requests = AZStd::move(base.m_requests);
         base.m_requests.clear();
         for (const Base::Request& request : requests)
         {
             if (!request.m_place)
             {
-                // Demolish: the nearest piece within 1.5 m; half of what it cost comes back.
+                // Demolish: the piece whose footprint is aimed at (or the nearest within 1.5 m); half of what it cost comes back.
                 int best = -1;
                 float bestD = 1.5f * 1.5f;
                 for (int i = 0; i < static_cast<int>(base.m_placed.size()); ++i)
                 {
-                    const float dx = base.m_placed[i].m_x - request.m_x;
-                    const float dy = base.m_placed[i].m_y - request.m_y;
-                    if (dx * dx + dy * dy < bestD)
+                    const Base::Placed& p = base.m_placed[i];
+                    const Base::ItemInfo& pi = Base::Info(p.m_kind);
+                    const float dx = p.m_x - request.m_x;
+                    const float dy = p.m_y - request.m_y;
+                    const float reach = 0.5f * AZStd::max(pi.m_sizeX, pi.m_sizeY);
+                    const float d = AZStd::max(0.0f, std::sqrt(dx * dx + dy * dy) - reach);
+                    if (d * d < bestD)
                     {
-                        bestD = dx * dx + dy * dy;
+                        bestD = d * d;
                         best = i;
                     }
                 }
@@ -1218,75 +1367,62 @@ namespace NoclipProtocol
                 {
                     continue;
                 }
-                if (auto* spawner = AzFramework::SpawnableEntitiesInterface::Get())
-                {
-                    for (auto& ticket : m_buildTickets[best])
-                    {
-                        if (ticket.IsValid())
-                        {
-                            spawner->DespawnAllEntities(ticket);
-                        }
-                    }
-                }
+                despawn(m_built[best].m_body);
+                despawn(m_built[best].m_light);
                 const Base::ItemInfo& info = Base::Info(base.m_placed[best].m_kind);
                 base.m_scrap += info.m_scrap / 2;
                 base.m_wire += info.m_wire / 2;
                 base.m_fuel += info.m_fuel / 2;
                 if (base.m_placed[best].m_kind == Base::Kind::Beacon)
                 {
-                    base.m_beaconUp = false;
+                    base.m_beaconUp = base.Count(Base::Kind::Beacon) > 1;
                 }
                 base.m_placed.erase(base.m_placed.begin() + best);
-                m_buildTickets.erase(m_buildTickets.begin() + best);
+                m_built.erase(m_built.begin() + best);
                 base.Save();
                 continue;
             }
-            if (!request.m_restore && base.Blocked(request.m_kind, request.m_x, request.m_y))
+            const Base::ItemInfo& info = Base::Info(request.m_kind);
+            if (info.m_project)
+            {
+                continue;
+            }
+            if (!request.m_restore && base.Blocked(request.m_kind, request.m_x, request.m_y, request.m_yaw))
             {
                 continue; // the HUD checks first; things may have changed since
             }
-            const Base::ItemInfo& info = Base::Info(request.m_kind);
-            AZStd::vector<AzFramework::EntitySpawnTicket> tickets;
+            BuiltPiece built;
             auto spawn = [&](BuildPiece piece, const Level0::Box& box, bool stretch)
             {
                 if (!m_buildAssets[piece].IsReady())
                 {
                     return;
                 }
-                tickets.emplace_back(m_buildAssets[piece]);
-                SpawnBox(tickets.back(), box, stretch, request.m_yaw);
+                built.m_body.emplace_back(m_buildAssets[piece]);
+                SpawnBox(built.m_body.back(), box, stretch, request.m_yaw);
             };
             const float x = request.m_x;
             const float y = request.m_y;
             switch (request.m_kind)
             {
-            case Base::Kind::Floodlight:
-                spawn(BuildPole, Level0::Box{ x, y, 1.1f, 0.12f, 0.12f, 2.2f }, true);
-                spawn(BuildFloodlight, Level0::Box{ x, y, 2.3f, 1.0f, 1.0f, 1.0f }, false);
-                break;
-            case Base::Kind::CeilingPanel:
-                if (m_pieceAssets[PieceLight].IsReady())
+            case Base::Kind::Floodlight: spawn(BuildPole, Level0::Box{ x, y, 1.1f, 0.12f, 0.12f, 2.2f }, true); break;
+            case Base::Kind::CeilingPanel: break; // all light
+            case Base::Kind::FlareStand: spawn(BuildPole, Level0::Box{ x, y, 0.35f, 0.1f, 0.1f, 0.7f }, true); break;
+            case Base::Kind::Beacon: spawn(BuildBeacon, Level0::Box{ x, y, 0.7f, 0.4f, 0.4f, 1.4f }, true); break;
+            case Base::Kind::UvLamp: spawn(BuildPole, Level0::Box{ x, y, 0.6f, 0.1f, 0.1f, 1.2f }, true); break;
+            default:
+            {
+                const auto& asset = m_kindAssets[static_cast<int>(request.m_kind)];
+                if (asset.IsReady())
                 {
-                    tickets.emplace_back(m_pieceAssets[PieceLight]);
-                    SpawnBox(tickets.back(), Level0::Box{ x, y, m_settings.m_ceilingHeight, 1.0f, 1.0f, 1.0f }, false, request.m_yaw);
+                    built.m_body.emplace_back(asset);
+                    SpawnBox(built.m_body.back(), Level0::Box{ x, y, 0.0f, 1.0f, 1.0f, 1.0f }, false, request.m_yaw);
                 }
                 break;
-            case Base::Kind::FlareStand:
-                spawn(BuildPole, Level0::Box{ x, y, 0.35f, 0.1f, 0.1f, 0.7f }, true);
-                spawn(BuildFlare, Level0::Box{ x, y, 0.78f, 1.0f, 1.0f, 1.0f }, false);
-                break;
-            case Base::Kind::Beacon:
-                spawn(BuildBeacon, Level0::Box{ x, y, 0.7f, 0.4f, 0.4f, 1.4f }, true);
-                spawn(BuildBeaconLight, Level0::Box{ x, y, 1.6f, 1.0f, 1.0f, 1.0f }, false);
-                break;
-            case Base::Kind::UvLamp:
-                spawn(BuildPole, Level0::Box{ x, y, 0.6f, 0.1f, 0.1f, 1.2f }, true);
-                spawn(BuildUvLamp, Level0::Box{ x, y, 1.3f, 1.0f, 1.0f, 1.0f }, false);
-                break;
-            default:
-                break;
             }
-            if (tickets.empty())
+            }
+            const bool lightOnly = request.m_kind == Base::Kind::CeilingPanel;
+            if (built.m_body.empty() && !lightOnly)
             {
                 continue;
             }
@@ -1297,7 +1433,8 @@ namespace NoclipProtocol
                 base.m_fuel -= info.m_fuel;
             }
             base.m_placed.push_back(Base::Placed{ request.m_kind, x, y, request.m_yaw });
-            m_buildTickets.push_back(AZStd::move(tickets));
+            m_built.push_back(AZStd::move(built));
+            SpawnPieceLight(static_cast<int>(m_built.size()) - 1);
             if (!request.m_restore)
             {
                 base.Save();
@@ -1305,22 +1442,142 @@ namespace NoclipProtocol
             if (request.m_kind == Base::Kind::Beacon && !base.m_beaconUp)
             {
                 base.m_beaconUp = true;
-                if (request.m_restore)
+                if (!request.m_restore)
                 {
-                    if (registry)
-                    {
-                        registry->Set("/NoclipProtocol/Hud/game.objective", AZStd::string("Forward base established"));
-                        registry->Set("/NoclipProtocol/Hud/game.progress", AZStd::string("Scout Level 0 and find a way deeper"));
-                    }
-                    continue;
+                    toast("FOUNDATION BEACON ONLINE \xc2\xb7 FORWARD BASE ESTABLISHED");
                 }
-                toast("FOUNDATION BEACON ONLINE \xc2\xb7 FORWARD BASE ESTABLISHED");
                 if (registry)
                 {
                     registry->Set("/NoclipProtocol/Hud/game.objective", AZStd::string("Forward base established"));
                     registry->Set("/NoclipProtocol/Hud/game.progress", AZStd::string("Scout Level 0 and find a way deeper"));
                 }
             }
+        }
+    }
+
+    void EndlessLevelComponent::UpdateBase(float deltaTime, const AZ::Vector3& at)
+    {
+        Base::State& base = Base::Get();
+        auto* registry = AZ::SettingsRegistry::Get();
+        const bool inBase = m_buildEnabled && at.GetX() > base.m_minX && at.GetX() < base.m_maxX && at.GetY() > base.m_minY && at.GetY() < base.m_maxY;
+        base.Simulate(AZStd::min(deltaTime, 0.25f), inBase);
+        if (!base.m_toast.empty() && registry)
+        {
+            double now = 0.0;
+            registry->Get(now, "/NoclipProtocol/Hud/time");
+            registry->Set("/NoclipProtocol/Hud/toast", base.m_toast);
+            registry->Set("/NoclipProtocol/Hud/toast.until", now + 3.5);
+            base.m_toast.clear();
+        }
+        if (!m_buildEnabled)
+        {
+            return;
+        }
+        // A comfortable base steadies you: a little sanity back each second you spend in it.
+        if (inBase && registry && base.m_comfort > 0)
+        {
+            double add = 0.0;
+            registry->Get(add, "/NoclipProtocol/Player/SanityAdd");
+            registry->Set("/NoclipProtocol/Player/SanityAdd", add + base.m_comfort * 0.0004 * deltaTime);
+        }
+        auto* spawner = AzFramework::SpawnableEntitiesInterface::Get();
+        // Lights follow the power (a blackout, the breaker, a piece out of the cables' reach).
+        for (int i = 0; i < static_cast<int>(base.m_placed.size()) && i < static_cast<int>(m_built.size()); ++i)
+        {
+            const bool want = base.m_placed[i].m_powered;
+            if (want == m_built[i].m_lightOn)
+            {
+                continue;
+            }
+            if (want)
+            {
+                SpawnPieceLight(i);
+            }
+            else
+            {
+                if (spawner)
+                {
+                    for (auto& ticket : m_built[i].m_light)
+                    {
+                        if (ticket.IsValid())
+                        {
+                            spawner->DespawnAllEntities(ticket);
+                        }
+                    }
+                }
+                m_built[i].m_light.clear();
+                m_built[i].m_lightOn = false;
+            }
+        }
+        // Breach 4-A: sealed, a glowing seam down the middle; a delivery opens it a crack.
+        const auto& tear = m_pieceAssets[PieceNoclip];
+        const float width = 0.05f + 0.85f * AZStd::clamp(base.m_breachOpen, 0.0f, 1.0f);
+        if (tear.IsReady() && !m_seamTicket.IsValid())
+        {
+            m_seamTicket = AzFramework::EntitySpawnTicket(tear);
+            m_seamEntities.clear();
+            AzFramework::SpawnAllEntitiesOptionalArgs args;
+            const AZ::Vector3 place(base.m_breachX, base.m_breachY - 0.24f, 1.35f);
+            const AZ::Vector3 scale(width, 0.1f, 2.7f);
+            args.m_preInsertionCallback = [place, scale](AzFramework::EntitySpawnTicket::Id, AzFramework::SpawnableEntityContainerView view)
+            {
+                if (view.empty())
+                {
+                    return;
+                }
+                if (auto* transform = (*view.begin())->FindComponent<AzFramework::TransformComponent>())
+                {
+                    AzFramework::TransformComponentConfiguration config;
+                    config.m_localTransform = AZ::Transform::CreateTranslation(place);
+                    config.m_worldTransform = config.m_localTransform;
+                    transform->SetConfiguration(config);
+                }
+                for (AZ::Entity* entity : view)
+                {
+                    if (auto* nonUniformScale = entity->FindComponent<AzFramework::NonUniformScaleComponent>())
+                    {
+                        nonUniformScale->SetScale(scale);
+                    }
+                }
+            };
+            args.m_completionCallback = [this](AzFramework::EntitySpawnTicket::Id, AzFramework::SpawnableConstEntityContainerView view)
+            {
+                for (const AZ::Entity* entity : view)
+                {
+                    m_seamEntities.push_back(entity->GetId());
+                }
+            };
+            if (spawner)
+            {
+                spawner->SpawnAllEntities(m_seamTicket, AZStd::move(args));
+            }
+            m_seamShown = width;
+        }
+        else if (std::fabs(width - m_seamShown) > 0.005f && !m_seamEntities.empty())
+        {
+            for (const AZ::EntityId& id : m_seamEntities)
+            {
+                AZ::NonUniformScaleRequestBus::Event(id, &AZ::NonUniformScaleRequests::SetScale, AZ::Vector3(width, 0.1f, 2.7f));
+            }
+            m_seamShown = width;
+        }
+        // A delivered Foundation crate waits in front of the breach until it's opened.
+        const auto& crate = m_kindAssets[static_cast<int>(Base::Kind::SupplyCrate)];
+        const bool wantCrate = !base.m_waiting.empty() && (base.m_breachOpen > 0.5f || base.m_breachTimer <= 0.0f);
+        if (wantCrate && !m_crateUp && crate.IsReady())
+        {
+            m_crateTicket = AzFramework::EntitySpawnTicket(crate);
+            SpawnBox(m_crateTicket, Level0::Box{ base.m_breachX + 0.4f, base.m_breachY + 1.5f, 0.0f, 1.0f, 1.0f, 1.0f }, false, 0.2f);
+            m_crateUp = true;
+        }
+        else if (base.m_waiting.empty() && m_crateUp)
+        {
+            if (spawner && m_crateTicket.IsValid())
+            {
+                spawner->DespawnAllEntities(m_crateTicket);
+            }
+            m_crateTicket = AzFramework::EntitySpawnTicket();
+            m_crateUp = false;
         }
     }
 
@@ -1476,15 +1733,147 @@ namespace NoclipProtocol
             }
         }
         Base::State& base = Base::Get();
-        const bool near = best >= 0;
-        const AZ::u64 nearId = near ? (Key(bestChunk->m_x, bestChunk->m_y) ^ (static_cast<AZ::u64>(bestChunk->m_pickups[best].m_index + 1) << 48)) : 0;
-        if (near != m_pickupPrompt || nearId != m_promptPickup)
+        // In the base: the pieces you can use ([E]) and a delivered crate, if nearer than any supply.
+        int use = -1;
+        if (m_buildEnabled)
+        {
+            float useD = 1.9f * 1.9f;
+            for (int i = 0; i < static_cast<int>(base.m_placed.size()); ++i)
+            {
+                const Base::Placed& p = base.m_placed[i];
+                const Base::ItemInfo& info = Base::Info(p.m_kind);
+                if (info.m_use == Base::Use::None)
+                {
+                    continue;
+                }
+                const float dx = p.m_x - at.GetX();
+                const float dy = p.m_y - at.GetY();
+                const float d = AZStd::max(0.0f, std::sqrt(dx * dx + dy * dy) - 0.5f * AZStd::max(info.m_sizeX, info.m_sizeY));
+                if (d * d < useD)
+                {
+                    useD = d * d;
+                    use = i;
+                }
+            }
+            if (m_crateUp)
+            {
+                const float dx = base.m_breachX + 0.4f - at.GetX();
+                const float dy = base.m_breachY + 1.5f - at.GetY();
+                if (dx * dx + dy * dy < 2.0f * 2.0f && dx * dx + dy * dy < useD + 0.01f)
+                {
+                    use = -2;
+                    useD = dx * dx + dy * dy;
+                }
+            }
+            if (use != -1 && best >= 0 && bestD < useD)
+            {
+                use = -1;
+            }
+        }
+        const bool near = best >= 0 && use == -1;
+        AZ::u64 nearId = near ? (Key(bestChunk->m_x, bestChunk->m_y) ^ (static_cast<AZ::u64>(bestChunk->m_pickups[best].m_index + 1) << 48)) : 0;
+        if (use != -1)
+        {
+            nearId = 0xB0000000ull + static_cast<AZ::u64>(use + 8);
+        }
+        if (near != m_pickupPrompt || nearId != m_promptPickup || use != m_useTarget)
         {
             m_pickupPrompt = near;
             m_promptPickup = nearId;
-            registry->Set("/NoclipProtocol/Hud/interact.verb", AZStd::string(near ? "Pick up" : ""));
-            registry->Set("/NoclipProtocol/Hud/interact.item", AZStd::string(near ? Base::SupplyName(bestChunk->m_pickups[best].m_kind) : ""));
-            registry->Set("/NoclipProtocol/Hud/interact.target", AZStd::string(near ? "pickup" : ""));
+            m_useTarget = use;
+            AZStd::string verb, item, target;
+            if (near)
+            {
+                verb = "Pick up";
+                item = Base::SupplyName(bestChunk->m_pickups[best].m_kind);
+                target = "pickup";
+            }
+            else if (use == -2)
+            {
+                verb = "Open";
+                item = "Foundation crate";
+                target = "use";
+            }
+            else if (use >= 0)
+            {
+                const Base::Placed& p = base.m_placed[use];
+                target = "use";
+                switch (Base::Info(p.m_kind).m_use)
+                {
+                case Base::Use::Rest: verb = "Rest"; item = "Army cot"; break;
+                case Base::Use::Craft: verb = "Make"; item = "Flashlight battery \xc2\xb7 Scrap 2 \xc2\xb7 Wire 1"; break;
+                case Base::Use::Study: verb = "Study"; item = "Research desk"; break;
+                case Base::Use::Radio: verb = "Call"; item = "Foundation requisitions"; target = "radio"; break;
+                case Base::Use::Store: verb = "Check"; item = Base::Info(p.m_kind).m_name; break;
+                default: break;
+                }
+            }
+            registry->Set("/NoclipProtocol/Hud/interact.verb", verb);
+            registry->Set("/NoclipProtocol/Hud/interact.item", item);
+            registry->Set("/NoclipProtocol/Hud/interact.target", target);
+        }
+        double now = 0.0;
+        registry->Get(now, "/NoclipProtocol/Hud/time");
+        auto say = [&](const AZStd::string& text)
+        {
+            registry->Set("/NoclipProtocol/Hud/toast", text);
+            registry->Set("/NoclipProtocol/Hud/toast.until", now + 3.0);
+        };
+        if (base.m_useRequested)
+        {
+            base.m_useRequested = false;
+            if (m_useTarget == -2)
+            {
+                say(base.OpenCrate());
+            }
+            else if (m_useTarget >= 0 && m_useTarget < static_cast<int>(base.m_placed.size()))
+            {
+                const Base::Placed& p = base.m_placed[m_useTarget];
+                switch (Base::Info(p.m_kind).m_use)
+                {
+                case Base::Use::Rest:
+                    if (base.m_restReady > 0.0f)
+                    {
+                        say(AZStd::string::format("YOU CAN'T SLEEP YET \xc2\xb7 %d:%02d", static_cast<int>(base.m_restReady) / 60, static_cast<int>(base.m_restReady) % 60));
+                    }
+                    else
+                    {
+                        double add = 0.0;
+                        registry->Get(add, "/NoclipProtocol/Player/SanityAdd");
+                        registry->Set("/NoclipProtocol/Player/SanityAdd", add + 0.4);
+                        base.m_restReady = 120.0f;
+                        say("YOU REST A WHILE \xc2\xb7 SANITY +40%");
+                    }
+                    break;
+                case Base::Use::Craft:
+                    if (base.m_scrap < 2 || base.m_wire < 1)
+                    {
+                        say("NOT ENOUGH \xc2\xb7 A BATTERY TAKES SCRAP 2 \xc2\xb7 WIRE 1");
+                    }
+                    else
+                    {
+                        base.m_scrap -= 2;
+                        base.m_wire -= 1;
+                        if (base.m_craftQueue == 0)
+                        {
+                            base.m_craftLeft = 45.0f;
+                        }
+                        base.m_craftQueue += 1;
+                        base.Save();
+                        say(AZStd::string::format("WORKBENCH \xc2\xb7 FLASHLIGHT BATTERY \xc3\x97%d QUEUED", base.m_craftQueue));
+                    }
+                    break;
+                case Base::Use::Study:
+                    say(base.Study(base.ResearchDone(0) ? 1 : 0));
+                    break;
+                case Base::Use::Store:
+                    say(AZStd::string::format("BASE STORAGE %d / %d", base.Stored(), base.m_storageMax));
+                    break;
+                default:
+                    break;
+                }
+            }
+            m_promptPickup = ~0ull; // refresh the prompt
         }
         if (!base.m_pickRequested)
         {
@@ -1496,31 +1885,54 @@ namespace NoclipProtocol
             return;
         }
         Chunk::LivePickup& pickup = bestChunk->m_pickups[best];
+        // How much: scrap 2-4, wire 1-2, fuel 1, Almond Water 1, a document, a sample. Into the backpack (20 per trip),
+        // Almond Water into your pocket.
+        int amount = 1;
+        switch (pickup.m_kind)
+        {
+        case 0: amount = 2 + pickup.m_index % 3; break;
+        case 1: amount = 1 + pickup.m_index % 2; break;
+        default: break;
+        }
+        AZStd::string text;
+        if (pickup.m_kind != 3)
+        {
+            const int room = Base::State::PackMax - base.Carried();
+            if (room <= 0)
+            {
+                say("BACKPACK FULL \xc2\xb7 20 / 20 \xc2\xb7 TAKE IT BACK TO THE BASE");
+                return;
+            }
+            amount = AZStd::min(amount, room);
+            base.m_pack[AZStd::clamp(pickup.m_kind, 0, 5)] += amount;
+            static const char* const names[6] = { "SCRAP", "WIRE", "FUEL", "", "FOUNDATION DOCUMENT", "ODD SAMPLE" };
+            if (pickup.m_kind == 4)
+            {
+                base.m_docsFound += 1;
+            }
+            if (pickup.m_kind == 5)
+            {
+                base.m_samplesFound += 1;
+            }
+            text = AZStd::string::format("+%d %s \xc2\xb7 BACKPACK %d / 20", amount, names[AZStd::clamp(pickup.m_kind, 0, 5)], base.Carried());
+        }
+        else
+        {
+            base.m_almondWater += 1;
+            text = "+1 ALMOND WATER \xc2\xb7 [Q] DRINK";
+        }
         if (auto* spawner = AzFramework::SpawnableEntitiesInterface::Get(); spawner && pickup.m_ticket.IsValid())
         {
             spawner->DespawnAllEntities(pickup.m_ticket);
         }
         m_collected.insert(Key(bestChunk->m_x, bestChunk->m_y) ^ (static_cast<AZ::u64>(pickup.m_index + 1) << 48));
-        // How much: scrap 2-4, wire 1-2, fuel 1, Almond Water 1.
-        int amount = 1;
-        AZStd::string text;
-        switch (pickup.m_kind)
-        {
-        case 0: amount = 2 + pickup.m_index % 3; base.m_scrap += amount; text = AZStd::string::format("+%d SCRAP", amount); break;
-        case 1: amount = 1 + pickup.m_index % 2; base.m_wire += amount; text = AZStd::string::format("+%d WIRE", amount); break;
-        case 2: base.m_fuel += 1; text = "+1 FUEL"; break;
-        default: base.m_almondWater += 1; text = "+1 ALMOND WATER \xc2\xb7 [Q] DRINK"; break;
-        }
         bestChunk->m_pickups.erase(bestChunk->m_pickups.begin() + best);
         m_pickupPrompt = false;
         m_promptPickup = 0;
         registry->Set("/NoclipProtocol/Hud/interact.verb", AZStd::string());
         registry->Set("/NoclipProtocol/Hud/interact.item", AZStd::string());
         registry->Set("/NoclipProtocol/Hud/interact.target", AZStd::string());
-        double now = 0.0;
-        registry->Get(now, "/NoclipProtocol/Hud/time");
-        registry->Set("/NoclipProtocol/Hud/toast", text);
-        registry->Set("/NoclipProtocol/Hud/toast.until", now + 2.5);
+        say(text);
         base.Save();
     }
 } // namespace NoclipProtocol

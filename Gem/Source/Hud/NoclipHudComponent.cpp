@@ -6,6 +6,7 @@
 #include <Atom/RPI.Public/ViewportContextBus.h>
 #include <Atom/RPI.Public/View.h>
 #include "../Base/BaseBuilding.h"
+#include "BuildIcons.h"
 #include <AzCore/Console/IConsole.h>
 #include <AzCore/IO/FileIO.h>
 #include <AzCore/Math/MathUtils.h>
@@ -13,6 +14,7 @@
 #include <AzCore/Serialization/SerializeContext.h>
 #include <AzCore/Settings/SettingsRegistry.h>
 #include <AzCore/std/algorithm.h>
+#include <AzCore/std/sort.h>
 #include <AzFramework/Input/Devices/Keyboard/InputDeviceKeyboard.h>
 #include <AzFramework/Input/Devices/Mouse/InputDeviceMouse.h>
 #include <CrySystemBus.h>
@@ -522,6 +524,69 @@ namespace NoclipProtocol
             Base::Get().m_pickRequested = true;
             return true;
         }
+        // In the base: E at a piece uses it (rest, make, study...) or opens a delivered crate; at the field radio it
+        // opens the Foundation's requisitions.
+        if (m_page == Page::None && id == InputDeviceKeyboard::Key::AlphanumericE)
+        {
+            const AZStd::string target = RegString("/NoclipProtocol/Hud/interact.target", "");
+            if (target == "use")
+            {
+                Base::Get().m_useRequested = true;
+                return true;
+            }
+            if (target == "radio")
+            {
+                m_page = Page::Orders;
+                m_orderRequest = false;
+                if (auto* registry = AZ::SettingsRegistry::Get())
+                {
+                    registry->Set("/NoclipProtocol/Paused", true);
+                }
+                return true;
+            }
+        }
+        // The Foundation's requisitions: TAB through the sections, arrows / WASD between the cards, E requests, Esc closes.
+        if (m_page == Page::Orders)
+        {
+            auto move = [&](int by)
+            {
+                m_orderItem = AZStd::max(0, m_orderItem + by);
+            };
+            if (id == InputDeviceKeyboard::Key::EditTab) { m_orderSection = (m_orderSection + 1) % 8; m_orderItem = 0; return true; }
+            if (id == InputDeviceKeyboard::Key::AlphanumericE || id == InputDeviceKeyboard::Key::EditEnter) { m_orderRequest = true; return true; }
+            if (id == InputDeviceKeyboard::Key::NavigationArrowRight || id == InputDeviceKeyboard::Key::AlphanumericD) { move(1); return true; }
+            if (id == InputDeviceKeyboard::Key::NavigationArrowLeft || id == InputDeviceKeyboard::Key::AlphanumericA) { move(-1); return true; }
+            if (id == InputDeviceKeyboard::Key::NavigationArrowDown || id == InputDeviceKeyboard::Key::AlphanumericS) { move(3); return true; }
+            if (id == InputDeviceKeyboard::Key::NavigationArrowUp || id == InputDeviceKeyboard::Key::AlphanumericW) { move(-3); return true; }
+            if (id == InputDeviceKeyboard::Key::Escape || id == InputDeviceKeyboard::Key::AlphanumericP)
+            {
+                m_page = Page::None;
+                if (auto* registry = AZ::SettingsRegistry::Get())
+                {
+                    registry->Set("/NoclipProtocol/Paused", false);
+                }
+                return true;
+            }
+        }
+        // B: a fresh flashlight battery (from the workbench or the Foundation).
+        if (m_page == Page::None && id == InputDeviceKeyboard::Key::AlphanumericB && !m_inMenu)
+        {
+            Base::State& base = Base::Get();
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                const char* text = "NO SPARE BATTERIES \xc2\xb7 MAKE ONE AT THE WORKBENCH";
+                if (base.m_batteries > 0)
+                {
+                    base.m_batteries -= 1;
+                    registry->Set("/NoclipProtocol/Player/FlashlightRefill", true);
+                    base.Save();
+                    text = "FRESH BATTERY IN";
+                }
+                registry->Set("/NoclipProtocol/Hud/toast", AZStd::string(text));
+                registry->Set("/NoclipProtocol/Hud/toast.until", static_cast<double>(m_time) + 2.5);
+            }
+            return true;
+        }
         if (m_page == Page::None && id == InputDeviceKeyboard::Key::AlphanumericQ && !m_inMenu)
         {
             Base::State& base = Base::Get();
@@ -621,6 +686,13 @@ namespace NoclipProtocol
                     return true;
                 }
             }
+            // Q / E: the tab before / after.
+            if (id == InputDeviceKeyboard::Key::AlphanumericQ || id == InputDeviceKeyboard::Key::AlphanumericE)
+            {
+                m_buildTab = (m_buildTab + (id == InputDeviceKeyboard::Key::AlphanumericE ? 1 : Base::TabCount - 1)) % Base::TabCount;
+                m_buildTile = 0;
+                return true;
+            }
             if (id == InputDeviceKeyboard::Key::Escape || id == InputDeviceKeyboard::Key::AlphanumericP)
             {
                 m_page = Page::None;
@@ -694,6 +766,11 @@ namespace NoclipProtocol
             else if (key == "X") { HandleKey(InputDeviceKeyboard::Key::AlphanumericX); }
             else if (key == "Click") { HandleKey(InputDeviceMouse::Button::Left); }
             else if (key.size() == 1 && key[0] >= '1' && key[0] <= '6') { m_buildTile = key[0] - '1'; }
+            else if (key.size() == 2 && key[0] == 'T' && key[1] >= '1' && key[1] <= '6') { m_buildTab = key[1] - '1'; m_buildTile = 0; }
+            else if (key == "B") { HandleKey(InputDeviceKeyboard::Key::AlphanumericB); }
+            else if (key == "Left") { HandleKey(InputDeviceKeyboard::Key::NavigationArrowLeft); }
+            else if (key == "Right") { HandleKey(InputDeviceKeyboard::Key::NavigationArrowRight); }
+            else if (key == "Orders") { m_page = Page::Orders; }
             else if (key == "Up") { HandleKey(InputDeviceKeyboard::Key::NavigationArrowUp); }
             else if (key == "Down") { HandleKey(InputDeviceKeyboard::Key::NavigationArrowDown); }
             else if (key == "Enter") { HandleKey(InputDeviceKeyboard::Key::EditEnter); }
@@ -937,7 +1014,7 @@ namespace NoclipProtocol
         };
 
         // The HUD itself; the terminal covers the whole screen (and text always draws over shapes), so not under it.
-        if (m_page != Page::Terminal && !m_inMenu && m_page != Page::Build)
+        if (m_page != Page::Terminal && !m_inMenu && m_page != Page::Build && m_page != Page::Orders)
         {
             // ---- vignette: radial-gradient(ellipse at center, transparent 55%, rgba(8,7,4,0.55) 100%) ----
             {
@@ -1184,6 +1261,19 @@ namespace NoclipProtocol
                 const int water = Base::Get().m_almondWater;
                 text(Face::Mono, AZStd::string::format("ALMOND WATER  %d  [Q]", water), R(right), Y(labelY - 22.0f), 11.0f,
                     water > 0 ? Cream : Muted, 2, 2.0f);
+                // Carried supplies and spare batteries, once there are any.
+                const Base::State& carry = Base::Get();
+                float extraY = labelY - 40.0f;
+                if (carry.m_batteries > 0)
+                {
+                    text(Face::Mono, AZStd::string::format("BATTERIES  %d  [B]", carry.m_batteries), R(right), Y(extraY), 11.0f, Cream, 2, 2.0f);
+                    extraY -= 18.0f;
+                }
+                if (carry.Carried() > 0)
+                {
+                    text(Face::Mono, AZStd::string::format("BACKPACK  %d / %d", carry.Carried(), Base::State::PackMax), R(right), Y(extraY), 11.0f,
+                        carry.Carried() >= Base::State::PackMax ? Gold : Cream, 2, 2.0f);
+                }
             }
 
             // ---- toast (noclip, arrivals) ----
@@ -1566,18 +1656,23 @@ namespace NoclipProtocol
             }
             m_click = false;
         }
-        // ---- build mode: Build.dc.html (the game keeps running; aim at the floor to place) ----
+        // ---- build mode: Build*.dc.html, six tabs (the game keeps running; aim at the floor to place) ----
         else if (m_page == Page::Build)
         {
             Base::State& base = Base::Get();
-            const Base::Kind kind = static_cast<Base::Kind>(AZStd::clamp(m_buildTile, 0, static_cast<int>(Base::Kind::Count) - 1));
+            m_buildTab = AZStd::clamp(m_buildTab, 0, Base::TabCount - 1);
+            m_buildTile = AZStd::clamp(m_buildTile, 0, 5);
+            const Base::Kind kind = Base::KindAt(m_buildTab, m_buildTile);
             const Base::ItemInfo& info = Base::Info(kind);
+            const bool locked = base.Locked(kind);
             const AZ::Color cream = Hex(0xf3ead0);
             const AZ::Color soft = Hex(0xc9bf9a);
             const AZ::Color gold = Hex(0xf0cf5a);
             const AZ::Color ok = Hex(0x7fe0a0);
             const AZ::Color okText = Hex(0xb8f5cc);
-            const AZ::Color bad = Hex(0xff8a78);
+            const AZ::Color bad = Hex(0xf08a6a);
+            const AZ::Color badText = Hex(0xffc4b0);
+            const AZ::Color grey = Hex(0x8a8168);
             auto textIn = [&](Face face, const AZStd::string& value, float x, float top, float size, float lineHeight,
                               const AZ::Color& c, int align = 0, float spacing = 0.0f)
             { return text(face, value, x, Y(top + (lineHeight - 1.2f) * size * 0.5f), size, c, align, spacing, true); };
@@ -1599,6 +1694,14 @@ namespace NoclipProtocol
                     lc.push_back(c);
                 }
             };
+            auto say = [&](const AZStd::string& message)
+            {
+                if (auto* registry = AZ::SettingsRegistry::Get())
+                {
+                    registry->Set("/NoclipProtocol/Hud/toast", message);
+                    registry->Set("/NoclipProtocol/Hud/toast.until", static_cast<double>(m_time) + 3.0);
+                }
+            };
 
             // Aim: where the view meets the floor, within 8 m, on a half-metre grid.
             const AZ::Vector3 eye = camera.GetTranslation();
@@ -1615,7 +1718,8 @@ namespace NoclipProtocol
                     aimed = true;
                 }
             }
-            const char* blocked = aimed ? base.Blocked(kind, ax, ay) : "aim at the floor";
+            const bool project = info.m_project;
+            const char* blocked = project ? nullptr : (aimed ? base.Blocked(kind, ax, ay, m_buildYaw) : "aim at the floor");
             if (m_demolish)
             {
                 m_demolish = false;
@@ -1627,32 +1731,113 @@ namespace NoclipProtocol
             if (m_click)
             {
                 m_click = false;
-                if (!blocked)
+                if (locked)
+                {
+                    say(AZStd::string(info.m_upper) + " \xc2\xb7 LOCKED \xc2\xb7 " + info.m_lockNote);
+                }
+                else if (project)
+                {
+                    say(base.Study(kind == Base::Kind::StudyPowerII ? 0 : 1));
+                }
+                else if (!blocked)
                 {
                     base.m_requests.push_back(Base::Request{ true, kind, ax, ay, m_buildYaw });
                 }
             }
 
-            // The footprint on the floor (in the world): dashed 2 px outline, see-through fill; green when it fits.
-            if (aimed)
+            // The piece itself, see-through (green when it fits, red when it doesn't), and its footprint on the floor.
+            if (aimed && !project)
             {
                 const AZ::Color edge = blocked ? bad : ok;
-                AZ::Color fill = edge;
-                fill.SetA(0.28f); // the mockup's 0.16 over a dark floor; Level 0's carpet is bright
                 const float c0 = std::cos(m_buildYaw), s0 = std::sin(m_buildYaw);
+                const AZ::Quaternion turn = AZ::Quaternion::CreateRotationZ(m_buildYaw);
+                const AZ::Vector3 origin(ax, ay, 0.0f);
+                AZStd::vector<AZ::Vector3> faces;
+                AZStd::vector<AZ::Vector3> edges;
+                for (int k = 0; k < info.m_parts; ++k)
+                {
+                    const Base::Part& part = Base::Parts[info.m_firstPart + k];
+                    const AZ::Quaternion rot = turn * AZ::Quaternion::CreateRotationZ(AZ::DegToRad(part.m_rz)) *
+                        AZ::Quaternion::CreateRotationY(AZ::DegToRad(part.m_ry)) * AZ::Quaternion::CreateRotationX(AZ::DegToRad(part.m_rx));
+                    const AZ::Vector3 centre = origin + turn.TransformVector(AZ::Vector3(part.m_x, part.m_y, part.m_z));
+                    auto at = [&](float lx, float ly, float lz) { return centre + rot.TransformVector(AZ::Vector3(lx, ly, lz)); };
+                    const float hx = part.m_sx * 0.5f, hy = part.m_sy * 0.5f, hz = part.m_sz * 0.5f;
+                    if (!part.m_cylinder)
+                    {
+                        AZ::Vector3 v[8];
+                        for (int c = 0; c < 8; ++c)
+                        {
+                            v[c] = at((c & 1) ? hx : -hx, (c & 2) ? hy : -hy, (c & 4) ? hz : -hz);
+                        }
+                        static const int quads[6][4] = { { 0, 1, 3, 2 }, { 4, 5, 7, 6 }, { 0, 1, 5, 4 }, { 2, 3, 7, 6 }, { 0, 2, 6, 4 }, { 1, 3, 7, 5 } };
+                        for (const auto& q : quads)
+                        {
+                            for (int idx : { q[0], q[1], q[2], q[0], q[2], q[3] })
+                            {
+                                faces.push_back(v[idx]);
+                            }
+                        }
+                        static const int lines[12][2] = { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 }, { 0, 2 }, { 1, 3 }, { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } };
+                        for (const auto& l : lines)
+                        {
+                            edges.push_back(v[l[0]]);
+                            edges.push_back(v[l[1]]);
+                        }
+                    }
+                    else
+                    {
+                        const int n = 12;
+                        for (int k2 = 0; k2 < n; ++k2)
+                        {
+                            const float a0 = 6.2831853f * k2 / n, a1 = 6.2831853f * (k2 + 1) / n;
+                            const AZ::Vector3 b0 = at(std::cos(a0) * hx, std::sin(a0) * hy, -hz), b1 = at(std::cos(a1) * hx, std::sin(a1) * hy, -hz);
+                            const AZ::Vector3 t0 = at(std::cos(a0) * hx, std::sin(a0) * hy, hz), t1 = at(std::cos(a1) * hx, std::sin(a1) * hy, hz);
+                            const AZ::Vector3 bc = at(0.0f, 0.0f, -hz), tc2 = at(0.0f, 0.0f, hz);
+                            for (const AZ::Vector3& p : { b0, b1, t1, b0, t1, t0, bc, b0, b1, tc2, t1, t0 })
+                            {
+                                faces.push_back(p);
+                            }
+                            edges.push_back(b0); edges.push_back(b1);
+                            edges.push_back(t0); edges.push_back(t1);
+                            if (k2 % 3 == 0)
+                            {
+                                edges.push_back(b0); edges.push_back(t0);
+                            }
+                        }
+                    }
+                }
+                // The footprint (its size turned with the piece).
                 const float hx = info.m_sizeX * 0.5f, hy = info.m_sizeY * 0.5f;
                 auto corner = [&](float px, float py) { return AZ::Vector3(ax + px * c0 - py * s0, ay + px * s0 + py * c0, 0.02f); };
                 const AZ::Vector3 k[4] = { corner(-hx, -hy), corner(hx, -hy), corner(hx, hy), corner(-hx, hy) };
-                const AZ::Vector3 tri[6] = { k[0], k[1], k[2], k[0], k[2], k[3] };
-                AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments args;
-                args.m_verts = tri;
-                args.m_vertCount = 6;
-                args.m_colors = &fill;
-                args.m_colorCount = 1;
-                args.m_opacityType = AZ::RPI::AuxGeomDraw::OpacityType::Translucent;
-                args.m_depthTest = AZ::RPI::AuxGeomDraw::DepthTest::On;
-                args.m_depthWrite = AZ::RPI::AuxGeomDraw::DepthWrite::Off;
-                draw->DrawTriangles(args);
+                AZ::Color fill = edge;
+                fill.SetA(0.22f);
+                {
+                    const AZ::Vector3 tri[6] = { k[0], k[1], k[2], k[0], k[2], k[3] };
+                    AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments args;
+                    args.m_verts = tri;
+                    args.m_vertCount = 6;
+                    args.m_colors = &fill;
+                    args.m_colorCount = 1;
+                    args.m_opacityType = AZ::RPI::AuxGeomDraw::OpacityType::Translucent;
+                    args.m_depthTest = AZ::RPI::AuxGeomDraw::DepthTest::On;
+                    args.m_depthWrite = AZ::RPI::AuxGeomDraw::DepthWrite::Off;
+                    draw->DrawTriangles(args);
+                }
+                if (!faces.empty())
+                {
+                    AZ::Color body = edge;
+                    body.SetA(0.16f); // the mockup's fill-opacity .13 over a dark room
+                    AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments args;
+                    args.m_verts = faces.data();
+                    args.m_vertCount = static_cast<uint32_t>(faces.size());
+                    args.m_colors = &body;
+                    args.m_colorCount = 1;
+                    args.m_opacityType = AZ::RPI::AuxGeomDraw::OpacityType::Translucent;
+                    args.m_depthTest = AZ::RPI::AuxGeomDraw::DepthTest::On;
+                    args.m_depthWrite = AZ::RPI::AuxGeomDraw::DepthWrite::Off;
+                    draw->DrawTriangles(args);
+                }
                 AZStd::vector<AZ::Vector3> dashes;
                 for (int e = 0; e < 4; ++e)
                 {
@@ -1665,40 +1850,65 @@ namespace NoclipProtocol
                         dashes.push_back(a + (b - a) * (AZStd::min(len, d + 0.09f) / len));
                     }
                 }
-                AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments lines;
-                lines.m_verts = dashes.data();
-                lines.m_vertCount = static_cast<uint32_t>(dashes.size());
-                lines.m_colors = &edge;
-                lines.m_colorCount = 1;
-                lines.m_size = static_cast<uint8_t>(AZStd::max(1.0f, std::round(2.0f * s)));
-                lines.m_opacityType = AZ::RPI::AuxGeomDraw::OpacityType::Opaque;
-                lines.m_depthTest = AZ::RPI::AuxGeomDraw::DepthTest::Off;
-                draw->DrawLines(lines);
+                for (const AZStd::vector<AZ::Vector3>* list : { &dashes, &edges })
+                {
+                    if (list->empty())
+                    {
+                        continue;
+                    }
+                    AZ::Color lineColour = edge;
+                    lineColour.SetA(list == &edges ? 0.85f : 1.0f);
+                    AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments lines;
+                    lines.m_verts = list->data();
+                    lines.m_vertCount = static_cast<uint32_t>(list->size());
+                    lines.m_colors = &lineColour;
+                    lines.m_colorCount = 1;
+                    lines.m_size = static_cast<uint8_t>(AZStd::max(1.0f, std::round((list == &edges ? 1.2f : 1.5f) * s)));
+                    lines.m_opacityType = list == &edges ? AZ::RPI::AuxGeomDraw::OpacityType::Translucent : AZ::RPI::AuxGeomDraw::OpacityType::Opaque;
+                    lines.m_depthTest = list == &edges ? AZ::RPI::AuxGeomDraw::DepthTest::On : AZ::RPI::AuxGeomDraw::DepthTest::Off;
+                    draw->DrawLines(lines);
+                }
 
-                // The label above it: a check mark and "FLOODLIGHT · placement OK · [R] rotate" (or what's in the way).
+                // The label just under the footprint's near edge: a check mark (or a cross) and "BARRICADE · north doorway · covers it".
                 if (cameraView)
                 {
-                    // Just above the footprint's far edge, like the mockup (42 px over its top-left).
-                    const AZ::Vector4 clip = cameraView->GetWorldToClipMatrix() * AZ::Vector4(ax, ay, 0.35f, 1.0f);
-                    if (clip.GetW() > 0.01f)
+                    float sx[4], sy[4];
+                    bool visible = true;
+                    for (int c = 0; c < 4; ++c)
                     {
-                        const float sx = (clip.GetX() / clip.GetW() * 0.5f + 0.5f) * W;
-                        const float sy = (1.0f - (clip.GetY() / clip.GetW() * 0.5f + 0.5f)) * H;
-                        const float lx = sx - 110.0f * s;
-                        const AZ::Color tc = blocked ? bad : okText;
+                        const AZ::Vector4 clip = cameraView->GetWorldToClipMatrix() * AZ::Vector4(k[c].GetX(), k[c].GetY(), 0.0f, 1.0f);
+                        if (clip.GetW() <= 0.01f)
+                        {
+                            visible = false;
+                            break;
+                        }
+                        sx[c] = (clip.GetX() / clip.GetW() * 0.5f + 0.5f) * W;
+                        sy[c] = (1.0f - (clip.GetY() / clip.GetW() * 0.5f + 0.5f)) * H;
+                    }
+                    if (visible)
+                    {
+                        // The two nearest corners (lowest on screen): the label starts at the left one.
+                        int n0 = 0;
+                        for (int c = 1; c < 4; ++c) { n0 = sy[c] > sy[n0] ? c : n0; }
+                        int n1 = n0 == 0 ? 1 : 0;
+                        for (int c = 0; c < 4; ++c) { n1 = c != n0 && sy[c] > sy[n1] ? c : n1; }
+                        const float lx = AZStd::clamp(AZStd::min(sx[n0], sx[n1]), 20.0f * s, W - 420.0f * s);
+                        const float ly = AZStd::min(AZStd::max(sy[n0], sy[n1]) + 14.0f * s, Y(486.0f));
+                        const AZ::Color tc = blocked ? badText : okText;
                         if (blocked)
                         {
-                            lline(lx + 2.0f * s, sy + 2.0f * s, lx + 10.0f * s, sy + 10.0f * s, 2.0f * s, tc);
-                            lline(lx + 10.0f * s, sy + 2.0f * s, lx + 2.0f * s, sy + 10.0f * s, 2.0f * s, tc);
+                            lline(lx + 3.0f * s, ly + 3.0f * s, lx + 9.0f * s, ly + 9.0f * s, 2.0f * s, tc);
+                            lline(lx + 9.0f * s, ly + 3.0f * s, lx + 3.0f * s, ly + 9.0f * s, 2.0f * s, tc);
                         }
                         else
                         {
-                            lline(lx + 2.0f * s, sy + 6.0f * s, lx + 5.0f * s, sy + 9.0f * s, 2.0f * s, tc);
-                            lline(lx + 5.0f * s, sy + 9.0f * s, lx + 10.0f * s, sy + 3.0f * s, 2.0f * s, tc);
+                            lline(lx + 2.0f * s, ly + 6.0f * s, lx + 5.0f * s, ly + 9.0f * s, 2.0f * s, tc);
+                            lline(lx + 5.0f * s, ly + 9.0f * s, lx + 10.0f * s, ly + 3.0f * s, 2.0f * s, tc);
                         }
+                        const char* note = blocked ? nullptr : base.PlaceNote(kind, ax, ay, m_buildYaw);
                         const AZStd::string label = AZStd::string(info.m_upper) + " \xc2\xb7 " +
-                            (blocked ? AZStd::string(blocked) : AZStd::string("placement OK")) + " \xc2\xb7 [R] rotate";
-                        text(Face::Mono, label, lx + 20.0f * s, sy - 1.2f * s, 12.0f, tc, 0, 1.0f); // centred on the 12 px icon
+                            (blocked ? AZStd::string(blocked) : (note ? AZStd::string(note) : AZStd::string("placement OK \xc2\xb7 [R] rotate")));
+                        text(Face::Mono, label, lx + 20.0f * s, ly - 1.2f * s, 12.0f, tc, 0, 1.0f);
                     }
                 }
             }
@@ -1720,11 +1930,13 @@ namespace NoclipProtocol
                 }
             }
 
-            // Top left: FORWARD BASE / SPAWN ROOM · 28 × 28 m · STABLE
-            textIn(Face::Oswald, "FORWARD BASE", L(40.0f), 32.0f, 22.0f, 32.0f / 22.0f, Hex(0xfff3c0), 0, 3.0f);
+            // Top left: FORWARD BASE · TIER 1 / SPAWN ROOM · 28 × 28 m · STABLE · COMFORT 3 / 10
+            textIn(Face::Oswald, AZStd::string::format("FORWARD BASE \xc2\xb7 TIER %d", base.m_tier), L(40.0f), 32.0f, 22.0f, 32.0f / 22.0f,
+                Hex(0xfff3c0), 0, 3.0f);
             {
                 const int size = static_cast<int>(std::round(base.m_maxX - base.m_minX));
-                textIn(Face::Mono, AZStd::string::format("SPAWN ROOM \xc2\xb7 %d \xc3\x97 %d m \xc2\xb7 %s", size, size, base.m_beaconUp ? "SECURED" : "STABLE"),
+                const char* state = base.m_blackout ? "POWER OUT" : (base.m_beaconUp ? "SECURED" : "STABLE");
+                textIn(Face::Mono, AZStd::string::format("SPAWN ROOM \xc2\xb7 %d \xc3\x97 %d m \xc2\xb7 %s \xc2\xb7 COMFORT %d / 10", size, size, state, base.m_comfort),
                     L(40.0f), 64.0f, 12.0f, 1.25f, Hex(0xe3d9b4), 0, 2.0f);
             }
 
@@ -1735,7 +1947,7 @@ namespace NoclipProtocol
                                           { "WIRE", AZStd::string::format("%d", base.m_wire), false },
                                           { "FUEL", AZStd::string::format("%d", base.m_fuel), false },
                                           { "ALMOND WATER", AZStd::string::format("%d", base.m_almondWater), false },
-                                          { "POWER", AZStd::string::format("%g / %g kW", base.PowerUsed(), base.m_powerMax), true } };
+                                          { "POWER", AZStd::string::format("%g / %g kW", base.m_demand, base.m_capacity), true } };
                 float right = R(1240.0f);
                 for (int i = 4; i >= 0; --i)
                 {
@@ -1751,21 +1963,294 @@ namespace NoclipProtocol
                         lrect(x, Y(32.0f), 2.0f * s, 49.0f * s, gold);
                     }
                     textIn(Face::Mono, stocks[i].label, tx, 40.0f, 10.0f, 1.3f, soft, 0, 2.0f);
-                    textIn(Face::MonoSemiBold, stocks[i].value, tx, 53.0f, 16.0f, 1.25f, cream);
+                    textIn(Face::MonoSemiBold, stocks[i].value, tx, 53.0f, 16.0f, 1.25f, base.m_blackout && stocks[i].power ? bad : cream);
                     right = x - 10.0f * s;
+                }
+            }
+
+            // The tab's side panel (right: 40 px, top: 118 px): BASE SAFETY, POWER, CARRYING, the research tree, CONTAINED.
+            {
+                struct Line { int type; AZStd::string label, value; float frac; AZ::Color colour; }; // 0 row, 1 meter, 2 note
+                AZStd::vector<Line> lines;
+                const char* title = nullptr;
+                float width = 300.0f;
+                auto row = [&](const AZStd::string& l, const AZStd::string& v, const AZ::Color& c) { lines.push_back({ 0, l, v, 0.0f, c }); };
+                auto meter = [&](const AZStd::string& l, const AZStd::string& v, float f, const AZ::Color& c) { lines.push_back({ 1, l, v, f, c }); };
+                auto note = [&](const AZStd::string& t) { lines.push_back({ 2, t, AZStd::string(), 0.0f, soft }); };
+                auto plural = [](const char* name, int n)
+                {
+                    AZStd::string out(name);
+                    if (n > 1)
+                    {
+                        out += (out.back() == 's' || out.back() == 'x') ? "es" : "s";
+                        out += AZStd::string::format(" \xc3\x97%d", n);
+                    }
+                    return out;
+                };
+                switch (m_buildTab)
+                {
+                case 1:
+                    title = "BASE SAFETY";
+                    meter("Doorways covered", AZStd::string::format("%d / 2", base.m_covered), base.m_covered / 2.0f, gold);
+                    meter("Light inside", AZStd::string::format("%d%%", static_cast<int>(std::round(base.m_lit * 100.0f))), base.m_lit, gold);
+                    row("Dark corners", AZStd::string::format("%d", base.m_darkCorners), base.m_darkCorners > 0 ? gold : ok);
+                    row("Last breach", "never", cream);
+                    note("Lit, powered rooms keep monsters out. Block or shutter every doorway; a tripwire rings an alarm when something crosses it.");
+                    break;
+                case 2:
+                {
+                    title = "POWER";
+                    meter("In use", AZStd::string::format("%g / %g kW", base.m_demand, base.m_capacity),
+                        base.m_capacity > 0.0f ? base.m_demand / base.m_capacity : 0.0f, base.m_blackout ? bad : gold);
+                    // What draws the most, kind by kind (up to four rows).
+                    struct Use { int kind; int n; float kw; };
+                    AZStd::vector<Use> uses;
+                    for (const Base::Placed& p : base.m_placed)
+                    {
+                        const float kw = Base::Info(p.m_kind).m_power;
+                        if (kw <= 0.0f)
+                        {
+                            continue;
+                        }
+                        auto it = AZStd::find_if(uses.begin(), uses.end(), [&](const Use& u) { return u.kind == static_cast<int>(p.m_kind); });
+                        if (it == uses.end())
+                        {
+                            uses.push_back({ static_cast<int>(p.m_kind), 1, kw });
+                        }
+                        else
+                        {
+                            it->n += 1;
+                            it->kw += kw;
+                        }
+                    }
+                    AZStd::sort(uses.begin(), uses.end(), [](const Use& a, const Use& b) { return a.kw > b.kw; });
+                    if (uses.empty())
+                    {
+                        row("Nothing drawing power", "0 kW", cream);
+                    }
+                    float rest = 0.0f;
+                    for (size_t i = 0; i < uses.size(); ++i)
+                    {
+                        if (i < 3 || uses.size() == 4)
+                        {
+                            row(plural(Base::Info(static_cast<Base::Kind>(uses[i].kind)).m_name, uses[i].n), AZStd::string::format("%g kW", uses[i].kw), cream);
+                        }
+                        else
+                        {
+                            rest += uses[i].kw;
+                        }
+                    }
+                    if (rest > 0.0f)
+                    {
+                        row(AZStd::string::format("%d more", static_cast<int>(uses.size()) - 3), AZStd::string::format("%g kW", rest), cream);
+                    }
+                    float burn = 0.0f;
+                    for (const Base::Placed& p : base.m_placed)
+                    {
+                        const float m = Base::Info(p.m_kind).m_fuelMinutes;
+                        burn = m > 0.0f ? (burn > 0.0f ? AZStd::min(burn, m) : m) : burn;
+                    }
+                    if (burn > 0.0f)
+                    {
+                        const int minutes = static_cast<int>(base.m_fuel * burn + base.m_canMinutes);
+                        row("Generator fuel", AZStd::string::format("%d can%s \xc2\xb7 %d min", base.m_fuel, base.m_fuel == 1 ? "" : "s", minutes),
+                            minutes > 0 ? gold : bad);
+                    }
+                    else
+                    {
+                        row("Generator fuel", "no generator", grey);
+                    }
+                    meter("Battery", AZStd::string::format("%d / %d kWh", static_cast<int>(base.m_batteryKwh), static_cast<int>(base.m_batteryMax)),
+                        base.m_batteryMax > 0.0f ? base.m_batteryKwh / base.m_batteryMax : 0.0f, ok);
+                    if (base.m_blackout)
+                    {
+                        row("Status", "POWER OUT", bad);
+                    }
+                    else if (base.m_off > 0)
+                    {
+                        row("Status", AZStd::string::format("%d off \xc2\xb7 breaker", base.m_off), bad);
+                    }
+                    note("When the fuel runs out the battery takes over; when that runs out the base goes dark.");
+                    break;
+                }
+                case 3:
+                {
+                    title = "CARRYING";
+                    meter("Backpack", AZStd::string::format("%d / %d", base.Carried(), Base::State::PackMax), base.Carried() / static_cast<float>(Base::State::PackMax), gold);
+                    meter("Base storage", AZStd::string::format("%d / %d", base.Stored(), base.m_storageMax),
+                        AZStd::min(1.0f, base.Stored() / static_cast<float>(AZStd::max(1, base.m_storageMax))), ok);
+                    const int stills = base.Count(Base::Kind::Still), stillsOn = base.Count(Base::Kind::Still, true);
+                    row("Still", stills == 0 ? AZStd::string("none built") : (stillsOn == 0 ? AZStd::string("off \xc2\xb7 no power")
+                        : AZStd::string::format("%d Almond Water / %d min", stillsOn, 8)), stills == 0 ? grey : (stillsOn ? cream : bad));
+                    row("Workbench queue", base.Count(Base::Kind::Workbench) == 0 ? AZStd::string("none built")
+                        : (base.m_craftQueue > 0 ? AZStd::string::format("Flashlight battery \xc3\x97%d", base.m_craftQueue) : AZStd::string("empty")),
+                        base.Count(Base::Kind::Workbench) == 0 ? grey : cream);
+                    note("You only carry 20 per trip. Bring supplies back and drop them in a crate; the workbench makes batteries, flares and tools from them.");
+                    break;
+                }
+                case 5:
+                {
+                    title = "CONTAINED";
+                    width = 320.0f;
+                    int number[3] = { 0, 0, 0 };
+                    float used = 0.0f, needed = 0.0f;
+                    for (const Base::Placed& p : base.m_placed)
+                    {
+                        const int which = p.m_kind == Base::Kind::ContainmentCell ? 0 : (p.m_kind == Base::Kind::LightCage ? 1 : (p.m_kind == Base::Kind::Pen999 ? 2 : -1));
+                        if (which < 0)
+                        {
+                            if (p.m_kind == Base::Kind::Camera)
+                            {
+                                needed += Base::Info(p.m_kind).m_power;
+                                used += p.m_powered ? Base::Info(p.m_kind).m_power : 0.0f;
+                            }
+                            continue;
+                        }
+                        ++number[which];
+                        needed += Base::Info(p.m_kind).m_power;
+                        used += p.m_powered ? Base::Info(p.m_kind).m_power : 0.0f;
+                        static const char* const names[3] = { "Cell", "Light cage", "SCP-999 pen" };
+                        row(AZStd::string::format("%s %d", names[which], number[which]), p.m_powered ? "empty" : "no power \xc2\xb7 OPEN", p.m_powered ? cream : bad);
+                    }
+                    if (number[0] + number[1] + number[2] == 0)
+                    {
+                        row("Nothing contained", "build a cell", grey);
+                    }
+                    meter("Research from them", "+0 samples / 10 min", 0.0f, ok);
+                    meter("Cell power", AZStd::string::format("%g / %g kW", used, needed), needed > 0.0f ? used / needed : 0.0f, bad);
+                    note("Lose power and the cells open. A contained monster slowly gives research; SCP-173 only stays put while a light or a camera watches it.");
+                    break;
+                }
+                default:
+                    break;
+                }
+                const float lineH = 12.0f * 1.3f;
+                if (title)
+                {
+                    const float innerW = width - 32.0f;
+                    // Heights first (the panel's background goes under its text).
+                    float h = 14.0f + 10.0f * 1.3f;
+                    AZStd::vector<AZStd::vector<AZStd::string>> wrapped(lines.size());
+                    for (size_t i = 0; i < lines.size(); ++i)
+                    {
+                        h += 9.0f;
+                        if (lines[i].type == 0) { h += lineH; }
+                        else if (lines[i].type == 1) { h += lineH + 5.0f + 6.0f; }
+                        else
+                        {
+                            wrapped[i] = wrap(Face::Mono, lines[i].label, 11.0f, innerW * s);
+                            h += wrapped[i].size() * 11.0f * 1.5f;
+                        }
+                    }
+                    h += 14.0f;
+                    const float px = R(1240.0f - width);
+                    lrect(px, Y(118.0f), width * s, h * s, Hex(0x0a0906, 0.8f));
+                    float y = 118.0f + 14.0f;
+                    textIn(Face::Mono, title, px + 16.0f * s, y, 10.0f, 1.3f, soft, 0, 2.0f);
+                    y += 10.0f * 1.3f;
+                    const float right = px + (width - 16.0f) * s;
+                    for (size_t i = 0; i < lines.size(); ++i)
+                    {
+                        y += 9.0f;
+                        const Line& line = lines[i];
+                        if (line.type == 2)
+                        {
+                            for (const AZStd::string& w2 : wrapped[i])
+                            {
+                                textIn(Face::Mono, w2, px + 16.0f * s, y, 11.0f, 1.5f, soft);
+                                y += 11.0f * 1.5f;
+                            }
+                            continue;
+                        }
+                        textIn(Face::Mono, line.label, px + 16.0f * s, y, 12.0f, 1.3f, soft);
+                        textIn(Face::MonoSemiBold, line.value, right, y, 12.0f, 1.3f, line.type == 0 ? line.colour : cream, 2);
+                        y += lineH;
+                        if (line.type == 1)
+                        {
+                            y += 5.0f;
+                            lrect(px + 16.0f * s, Y(y), innerW * s, 6.0f * s, AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.15f));
+                            lrect(px + 16.0f * s, Y(y), innerW * s * AZStd::clamp(line.frac, 0.0f, 1.0f), 6.0f * s, line.colour);
+                            y += 6.0f;
+                        }
+                    }
+                }
+                else if (m_buildTab == 4)
+                {
+                    // RESEARCH: the tree (420 px wide), DOCUMENTS / SAMPLES at the top right.
+                    width = 420.0f;
+                    const float px = R(1240.0f - width);
+                    const float innerW = width - 32.0f;
+                    const AZStd::vector<AZStd::string> noteLines = wrap(Face::Mono,
+                        "Foundation documents and odd samples turn up in the levels and on fallen MTF soldiers. Studying them at the desk unlocks new pieces, gear and outposts.",
+                        11.0f, innerW * s);
+                    const float cellH = 7.0f + lineH + 3.0f + 10.0f * 1.3f + 7.0f;
+                    const float tierH = 2.0f + 10.0f * 1.3f + 10.0f + cellH;
+                    const float h = 14.0f + lineH + 3.0f * (10.0f + tierH) + 10.0f + noteLines.size() * 16.5f + 14.0f;
+                    lrect(px, Y(118.0f), width * s, h * s, Hex(0x0a0906, 0.8f));
+                    float y = 118.0f + 14.0f;
+                    textIn(Face::Mono, "RESEARCH", px + 16.0f * s, y + 1.0f, 10.0f, 1.3f, soft, 0, 2.0f);
+                    textIn(Face::Mono, AZStd::string::format("DOCUMENTS %d \xc2\xb7 SAMPLES %d", base.m_docs, base.m_samples), px + (width - 16.0f) * s, y,
+                        11.0f, 1.3f, soft, 2);
+                    y += lineH;
+                    const bool p2 = base.ResearchDone(0), s2 = base.ResearchDone(1);
+                    const auto& st = base.m_studied;
+                    struct Cell { const char* name; AZStd::string status; AZ::Color colour; };
+                    const Cell tiers[3][3] = {
+                        { { "Lighting I", "done", ok }, { "Storage I", "done", ok }, { "Defenses I", "done", ok } },
+                        { { "Power II", p2 ? AZStd::string("done") : AZStd::string::format("%d / 12", st[0][0]), p2 ? ok : gold },
+                          { "Storage II", s2 ? AZStd::string("done") : (p2 ? AZStd::string::format("%d / 8 \xc2\xb7 %d / 2", st[1][0], st[1][1]) : AZStd::string("locked")),
+                            s2 ? ok : (p2 ? gold : grey) },
+                          { "Light tower", p2 ? AZStd::string("unlocked") : AZStd::string("after Power II"), p2 ? ok : grey } },
+                        { { "Level 1 outpost", "locked", grey }, { "Containment", "locked", grey }, { "SCP-914", "locked", grey } },
+                    };
+                    static const char* const tierNames[3] = { "TIER I", "TIER II", "TIER III" };
+                    const float cellW = (innerW - 12.0f) / 3.0f;
+                    for (int t = 0; t < 3; ++t)
+                    {
+                        y += 10.0f + 2.0f;
+                        textIn(Face::Mono, tierNames[t], px + 16.0f * s, y, 10.0f, 1.3f, Hex(0xa59b78), 0, 2.0f);
+                        y += 10.0f * 1.3f + 10.0f;
+                        for (int c = 0; c < 3; ++c)
+                        {
+                            const float cx = px + (16.0f + c * (cellW + 6.0f)) * s;
+                            loutline(cx, Y(y), cellW * s, cellH * s, AZStd::max(1.0f, s), tiers[t][c].colour);
+                            textIn(Face::MonoSemiBold, tiers[t][c].name, cx + 8.0f * s, y + 7.0f, 12.0f, 1.3f, cream);
+                            textIn(Face::Mono, tiers[t][c].status, cx + 8.0f * s, y + 7.0f + lineH + 3.0f, 10.0f, 1.3f, tiers[t][c].colour);
+                        }
+                        y += cellH;
+                    }
+                    y += 10.0f;
+                    for (const AZStd::string& w2 : noteLines)
+                    {
+                        textIn(Face::Mono, w2, px + 16.0f * s, y, 11.0f, 1.5f, soft);
+                        y += 16.5f;
+                    }
+                }
+                // A research project picked: what studying it takes (there's nothing to place).
+                if (project && !locked)
+                {
+                    const int which = kind == Base::Kind::StudyPowerII ? 0 : 1;
+                    const AZStd::string label = base.ResearchDone(which) ? AZStd::string(info.m_upper) + " \xc2\xb7 done"
+                        : AZStd::string::format("%s \xc2\xb7 %d / %d documents%s \xc2\xb7 [LMB] study at the research desk", info.m_upper,
+                              base.m_studied[which][0], info.m_docs,
+                              info.m_samples > 0 ? AZStd::string::format(" \xc2\xb7 %d / %d samples", base.m_studied[which][1], info.m_samples).c_str() : "");
+                    text(Face::Mono, label, C(640.0f), Y(470.0f), 12.0f, okText, 1, 1.0f);
+                }
+                else if (locked)
+                {
+                    text(Face::Mono, AZStd::string(info.m_upper) + " \xc2\xb7 locked \xc2\xb7 " + info.m_lockNote, C(640.0f), Y(470.0f), 12.0f, badText, 1, 1.0f);
                 }
             }
 
             // Bottom: category tabs, the tile panel, the key hints.
             {
-                static const char* const tabs[6] = { "LIGHTING", "DEFENSES", "POWER", "STORAGE", "RESEARCH", "CONTAINMENT \xc2\xb7 LOCKED" };
                 float x = L(40.0f);
-                for (int i = 0; i < 6; ++i)
+                for (int i = 0; i < Base::TabCount; ++i)
                 {
-                    const float w = measure(Face::Mono, tabs[i], 12.0f, 2.0f) + 2.0f * s + 32.0f * s;
-                    lrect(x, Y(510.0f), w, 31.0f * s, i == 0 ? gold : Hex(0x0a0906, 0.75f));
-                    textIn(i == 0 ? Face::MonoSemiBold : Face::Mono, tabs[i], x + 16.0f * s, 518.0f, 12.0f, 1.25f,
-                        i == 0 ? Hex(0x0b0a07) : (i == 5 ? Hex(0xa59b78) : cream), 0, 2.0f);
+                    const bool on = i == m_buildTab;
+                    const float w = measure(Face::Mono, Base::TabNames[i], 12.0f, 2.0f) + 2.0f * s + 32.0f * s;
+                    lrect(x, Y(510.0f), w, 31.0f * s, on ? gold : Hex(0x0a0906, 0.75f));
+                    textIn(on ? Face::MonoSemiBold : Face::Mono, Base::TabNames[i], x + 16.0f * s, 518.0f, 12.0f, 1.25f, on ? Hex(0x0b0a07) : cream, 0, 2.0f);
                     x += w + 4.0f * s;
                 }
                 const float panelX = L(40.0f);
@@ -1774,22 +2259,24 @@ namespace NoclipProtocol
                 const float tileW = (panelW - 28.0f * s - 50.0f * s) / 6.0f;
                 for (int i = 0; i < 6; ++i)
                 {
-                    const Base::ItemInfo& tile = Base::Info(static_cast<Base::Kind>(i));
+                    const Base::Kind tileKind = Base::KindAt(m_buildTab, i);
+                    const Base::ItemInfo& tile = Base::Info(tileKind);
+                    const bool tileLocked = base.Locked(tileKind);
                     const float tx = panelX + 14.0f * s + i * (tileW + 10.0f * s);
                     const float ty = Y(559.0f);
                     const float th = 97.0f * s;
-                    const bool selected = i == m_buildTile && !tile.m_locked;
-                    const AZ::Color stroke = tile.m_locked ? Hex(0x8a8168) : (selected ? gold : cream);
+                    const bool selected = i == m_buildTile && !tileLocked;
+                    const AZ::Color stroke = tileLocked ? grey : (selected ? gold : cream);
                     const float bw = AZStd::max(1.0f, 1.5f * s);
                     if (selected)
                     {
                         lrect(tx, ty, tileW, th, AZ::Color(240 / 255.0f, 207 / 255.0f, 90 / 255.0f, 0.12f));
                         loutline(tx, ty, tileW, th, bw, gold);
                     }
-                    else if (tile.m_locked)
+                    else if (tileLocked)
                     {
-                        // 1.5 px dashed border, rgba(243,234,208,.2)
-                        const AZ::Color dash(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.2f);
+                        // 1.5 px dashed border, rgba(243,234,208,.2); a picked locked tile gets a dashed gold one
+                        const AZ::Color dash = i == m_buildTile ? AZ::Color(240 / 255.0f, 207 / 255.0f, 90 / 255.0f, 0.6f) : AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.2f);
                         for (float d = 0.0f; d < tileW; d += 6.0f * s)
                         {
                             lrect(tx + d, ty, AZStd::min(3.0f * s, tileW - d), bw, dash);
@@ -1805,10 +2292,10 @@ namespace NoclipProtocol
                     {
                         loutline(tx, ty, tileW, th, bw, AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.25f));
                     }
-                    // The 28 x 28 icon (the mockup's SVGs, 1.6 px strokes), 13 px in from the tile's corner.
+                    // The 28 x 28 icon (the mockups' SVGs, 1.6 px strokes), 13 px in from the tile's corner.
                     const float ix = tx + 13.0f * s;
                     const float iy = Y(572.0f);
-                    auto il = [&](float x0, float y0, float x1, float y1) { lline(ix + x0 * s, iy + y0 * s, ix + x1 * s, iy + y1 * s, 1.6f * s, stroke); };
+                    auto il = [&](float x0, float y0, float x1, float y1, float w = 1.6f) { lline(ix + x0 * s, iy + y0 * s, ix + x1 * s, iy + y1 * s, w * s, stroke); };
                     auto irect = [&](float x0, float y0, float w, float h) { il(x0, y0, x0 + w, y0); il(x0 + w, y0, x0 + w, y0 + h); il(x0 + w, y0 + h, x0, y0 + h); il(x0, y0 + h, x0, y0); };
                     auto icircle = [&](float cx, float cy, float r, float from = 0.0f, float to = 6.2831853f)
                     {
@@ -1819,23 +2306,82 @@ namespace NoclipProtocol
                             il(cx + std::cos(a0) * r, cy + std::sin(a0) * r, cx + std::cos(a1) * r, cy + std::sin(a1) * r);
                         }
                     };
-                    switch (i)
+                    auto traced = [&](int icon)
                     {
-                    case 0: irect(6, 4, 16, 10); il(14, 14, 14, 24); il(9, 24, 19, 24); break;
-                    case 1: irect(5, 5, 18, 6); il(8, 11, 8, 23); il(20, 11, 20, 23); break;
-                    case 2: icircle(14, 14, 5); il(14, 3, 14, 7); il(14, 21, 14, 25); il(3, 14, 7, 14); il(21, 14, 25, 14); break;
-                    case 3:
-                        il(14, 4, 22, 14); il(22, 14, 14, 24); il(14, 24, 6, 14); il(6, 14, 14, 4);
-                        for (float r = 0.4f; r <= 2.5f; r += 0.7f) { icircle(14, 14, r); }
-                        break;
-                    case 4: il(5, 22, 23, 22); il(8, 22, 8, 12); il(8, 12, 20, 12); il(20, 12, 20, 22); il(11, 12, 11, 7); il(11, 7, 17, 7); il(17, 7, 17, 12); break;
-                    default: irect(7, 12, 14, 11); il(10, 12, 10, 9); icircle(14, 9, 4, 3.1415927f, 6.2831853f); il(18, 9, 18, 12); break;
+                        const BuildIcons::Icon& ic = BuildIcons::Icons[icon];
+                        for (int k3 = 0; k3 < ic.m_strokes; ++k3)
+                        {
+                            const BuildIcons::Stroke& st = BuildIcons::Strokes[ic.m_firstStroke + k3];
+                            for (int p = 0; p + 1 < st.m_count; ++p)
+                            {
+                                const float* a = BuildIcons::Points[st.m_first + p];
+                                const float* b = BuildIcons::Points[st.m_first + p + 1];
+                                if (!st.m_dashed)
+                                {
+                                    il(a[0], a[1], b[0], b[1], st.m_width);
+                                    continue;
+                                }
+                                // stroke-dasharray="2 2"
+                                const float len = std::sqrt((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]));
+                                for (float d = 0.0f; d < len; d += 4.0f)
+                                {
+                                    const float e = AZStd::min(len, d + 2.0f);
+                                    il(a[0] + (b[0] - a[0]) * d / len, a[1] + (b[1] - a[1]) * d / len, a[0] + (b[0] - a[0]) * e / len,
+                                        a[1] + (b[1] - a[1]) * e / len, st.m_width);
+                                }
+                            }
+                        }
+                        for (int k3 = 0; k3 < ic.m_fills; ++k3)
+                        {
+                            const BuildIcons::Fill& f = BuildIcons::Fills[ic.m_firstFill + k3];
+                            for (int q = 0; q < 12; ++q)
+                            {
+                                const float a0 = 6.2831853f * q / 12, a1 = 6.2831853f * (q + 1) / 12;
+                                for (const AZ::Vector3& v : { P(ix + f.m_x * s, iy + f.m_y * s), P(ix + (f.m_x + std::cos(a0) * f.m_r) * s, iy + (f.m_y + std::sin(a0) * f.m_r) * s),
+                                                              P(ix + (f.m_x + std::cos(a1) * f.m_r) * s, iy + (f.m_y + std::sin(a1) * f.m_r) * s) })
+                                {
+                                    lv.push_back(v);
+                                    lc.push_back(stroke);
+                                }
+                            }
+                        }
+                    };
+                    if (tileLocked)
+                    {
+                        traced(BuildIcons::Icon_lock);
                     }
-                    textIn(Face::MonoSemiBold, tile.m_name, tx + 13.0f * s, 606.0f, 13.0f, 17.0f / 13.0f, tile.m_locked ? Hex(0x8a8168) : cream);
+                    else if (tile.m_icon >= 0)
+                    {
+                        traced(tile.m_icon);
+                    }
+                    else
+                    {
+                        switch (i)
+                        {
+                        case 0: irect(6, 4, 16, 10); il(14, 14, 14, 24); il(9, 24, 19, 24); break;
+                        case 1: irect(5, 5, 18, 6); il(8, 11, 8, 23); il(20, 11, 20, 23); break;
+                        case 2: icircle(14, 14, 5); il(14, 3, 14, 7); il(14, 21, 14, 25); il(3, 14, 7, 14); il(21, 14, 25, 14); break;
+                        case 3:
+                            il(14, 4, 22, 14); il(22, 14, 14, 24); il(14, 24, 6, 14); il(6, 14, 14, 4);
+                            for (float r = 0.4f; r <= 2.5f; r += 0.7f) { icircle(14, 14, r); }
+                            break;
+                        case 4: il(5, 22, 23, 22); il(8, 22, 8, 12); il(8, 12, 20, 12); il(20, 12, 20, 22); il(11, 12, 11, 7); il(11, 7, 17, 7); il(17, 7, 17, 12); break;
+                        default: irect(5, 22, 18, 1); il(9, 22, 14, 4); il(19, 22, 14, 4); il(10, 16, 18, 16); break; // the light tower, once unlocked
+                        }
+                    }
+                    textIn(Face::MonoSemiBold, tile.m_name, tx + 13.0f * s, 606.0f, 13.0f, 17.0f / 13.0f, tileLocked ? grey : cream);
                     AZStd::string cost;
-                    if (tile.m_locked)
+                    if (tileLocked)
                     {
                         cost = tile.m_lockNote;
+                    }
+                    else if (tile.m_project && base.ResearchDone(tileKind == Base::Kind::StudyPowerII ? 0 : 1))
+                    {
+                        cost = "done";
+                    }
+                    else if (tile.m_costText)
+                    {
+                        cost = tile.m_costText;
                     }
                     else
                     {
@@ -1850,7 +2396,7 @@ namespace NoclipProtocol
                         add("Wire", tile.m_wire);
                         add("Fuel", tile.m_fuel);
                     }
-                    textIn(Face::Mono, cost, tx + 13.0f * s, 629.0f, 11.0f, 14.0f / 11.0f, tile.m_locked ? Hex(0x8a8168) : soft);
+                    textIn(Face::Mono, cost, tx + 13.0f * s, 629.0f, 11.0f, 14.0f / 11.0f, tileLocked ? grey : soft);
                 }
                 static const char* const hints[4] = { "[LMB] place", "[R] rotate", "[X] demolish", "[TAB] close" };
                 float hx = L(40.0f);
@@ -1869,9 +2415,356 @@ namespace NoclipProtocol
                 {
                     AZ::Color c = Bright;
                     c.SetA(AZStd::min(1.0f, static_cast<float>(until - m_time)));
-                    text(Face::Mono, toast, C(640), Y(470), 14.0f, c, 1, 2.0f);
+                    text(Face::Mono, toast, C(640), Y(440), 14.0f, c, 1, 2.0f);
                 }
             }
+        }
+        // ---- the Foundation's requisitions: FoundationOrders.dc.html, the whole screen (the field radio's [E]) ----
+        else if (m_page == Page::Orders)
+        {
+            Base::State& base = Base::Get();
+            AZStd::vector<AZ::Vector3> tv;
+            AZStd::vector<AZ::Color> tc;
+            auto solid = [&](const AZ::Color& c)
+            {
+                const float a = c.GetA();
+                return AZ::Color(TermBg.GetR() + (c.GetR() - TermBg.GetR()) * a, TermBg.GetG() + (c.GetG() - TermBg.GetG()) * a,
+                                 TermBg.GetB() + (c.GetB() - TermBg.GetB()) * a, static_cast<float>(hud_term_alpha));
+            };
+            auto trect = [&](float x, float y, float w, float h, const AZ::Color& c)
+            {
+                const AZ::Color col = solid(c);
+                for (const AZ::Vector3& v : { P(x, y), P(x + w, y), P(x + w, y + h), P(x, y), P(x + w, y + h), P(x, y + h) })
+                {
+                    tv.push_back(v);
+                    tc.push_back(col);
+                }
+            };
+            auto toutline = [&](float x, float y, float w, float h, float t, const AZ::Color& c)
+            {
+                trect(x, y, w, t, c);
+                trect(x, y + h - t, w, t, c);
+                trect(x, y, t, h, c);
+                trect(x + w - t, y, t, h, c);
+            };
+            auto tdashed = [&](float x, float y, float w, float h, float t, const AZ::Color& c)
+            {
+                for (float d = 0.0f; d < w; d += 6.0f * s)
+                {
+                    trect(x + d, y, AZStd::min(3.0f * s, w - d), t, c);
+                    trect(x + d, y + h - t, AZStd::min(3.0f * s, w - d), t, c);
+                }
+                for (float d = 0.0f; d < h; d += 6.0f * s)
+                {
+                    trect(x, y + d, t, AZStd::min(3.0f * s, h - d), c);
+                    trect(x + w - t, y + d, t, AZStd::min(3.0f * s, h - d), c);
+                }
+            };
+            const AZ::Vector2 cursor(m_cursor.GetX() * W, m_cursor.GetY() * H);
+            auto over = [&](float x, float y, float w, float h)
+            { return cursor.GetX() >= x && cursor.GetX() <= x + w && cursor.GetY() >= y && cursor.GetY() <= y + h; };
+            auto clicked = [&](float x, float y, float w, float h)
+            {
+                if (m_click && over(x, y, w, h))
+                {
+                    m_click = false;
+                    return true;
+                }
+                return false;
+            };
+            auto textIn = [&](Face face, const AZStd::string& value, float x, float top, float size, float lineHeight,
+                              const AZ::Color& c, int align = 0, float spacing = 0.0f)
+            { return text(face, value, x, Y(top + (lineHeight - 1.2f) * size * 0.5f), size, c, align, spacing, true); };
+            auto X = [&](float x) { return C(x); };
+            const AZ::Color goldLine(216 / 255.0f, 195 / 255.0f, 90 / 255.0f, 0.2f);
+            const AZ::Color goldTrack(216 / 255.0f, 195 / 255.0f, 90 / 255.0f, 0.15f);
+            auto say = [&](const AZStd::string& message)
+            {
+                m_orderNotice = message;
+                m_orderNoticeUntil = m_time + 4.0f;
+            };
+
+            // Background and scanlines, like the briefing terminal.
+            {
+                const AZ::Color scan(1.0f, 240 / 255.0f, 180 / 255.0f, 0.035f);
+                for (float y = 0.0f; y < DesignH; y += 3.0f)
+                {
+                    trect(0.0f, Y(y), W, Y(y + 1.0f) - Y(y), scan);
+                    trect(0.0f, Y(y + 1.0f), W, AZStd::min(H, Y(y + 3.0f)) - Y(y + 1.0f), TermBg);
+                }
+            }
+            // Header: the mark, FOUNDATION REQUISITIONS, the link, REQUISITION 120 RP.
+            {
+                const float stroke = 1.227f;
+                toutline(X(28.614f), Y(13.614f), 16.77f * s, 16.77f * s, AZStd::max(1.0f, stroke * s), TermGold);
+                trect(X(28.0f + 5.727f), Y(13.0f + 5.727f), 6.545f * s, 6.545f * s, TermGold);
+                const float w1 = measure(Face::Mono, "FOUNDATION REQUISITIONS", 12.0f, 2.0f) / s + 2.0f;
+                textIn(Face::Mono, "FOUNDATION REQUISITIONS", X(62.0f), 14.2f, 12.0f, 1.3f, TermGold, 0, 2.0f);
+                textIn(Face::Mono, "FORWARD BASE \xc2\xb7 LEVEL 0 \xc2\xb7 LINK VIA BREACH 4-A", X(62.0f + w1 + 16.0f), 14.2f, 12.0f, 1.3f, TermMuted, 0, 2.0f);
+                textIn(Face::Mono, AZStd::string::format("REQUISITION %d RP", base.m_rp), X(1252.0f), 14.2f, 12.0f, 1.3f, TermSelected, 2, 2.0f);
+                trect(0.0f, Y(44.0f), W, AZStd::max(1.0f, s), AZ::Color(216 / 255.0f, 195 / 255.0f, 90 / 255.0f, 0.35f));
+            }
+            // The sections (left, 250 px).
+            int open[3];
+            const int openCount = base.OpenOrders(open);
+            {
+                trect(X(250.0f), Y(45.0f), AZStd::max(1.0f, s), H - Y(45.0f), goldLine);
+                float y = 66.0f;
+                auto heading = [&](const char* name, float marginTop)
+                {
+                    y += marginTop;
+                    textIn(Face::Mono, name, X(20.0f), y, 11.0f, 1.3f, TermMuted, 0, 2.0f);
+                    y += 11.0f * 1.3f + 6.0f + 6.0f;
+                };
+                auto item = [&](const AZStd::string& name, int section)
+                {
+                    const float h = 13.0f * 1.3f + 14.0f;
+                    const bool cur = section == m_orderSection;
+                    if (cur)
+                    {
+                        trect(X(20.0f), Y(y), 210.0f * s, h * s, AZ::Color(216 / 255.0f, 195 / 255.0f, 90 / 255.0f, 0.14f));
+                        trect(X(20.0f), Y(y), 2.0f * s, h * s, TermGold);
+                    }
+                    const bool hover = over(X(20.0f), Y(y), 210.0f * s, h * s);
+                    textIn(Face::Mono, name, X(cur ? 30.0f : 32.0f), y + 7.0f, 13.0f, 1.3f, cur ? TermSelected : (hover ? TermHover : TermText));
+                    if (clicked(X(20.0f), Y(y), 210.0f * s, h * s))
+                    {
+                        m_orderSection = section;
+                        m_orderItem = 0;
+                    }
+                    y += h + 6.0f;
+                };
+                heading("REQUEST", 0.0f);
+                for (int i = 0; i < Base::SectionCount; ++i)
+                {
+                    item(Base::SectionNames[i], i);
+                }
+                heading("FOUNDATION ORDERS", 10.0f);
+                item(AZStd::string::format("Open orders (%d)", openCount), 5);
+                item(AZStd::string::format("Completed (%d)", base.OrdersDone()), 6);
+                heading("DELIVERIES", 10.0f);
+                item(AZStd::string::format("On the way (%d)", static_cast<int>(base.m_deliveries.size())), 7);
+            }
+            // The main column: the catalog, the button, the open orders.
+            const float mainX = 276.0f, mainW = 1280.0f - 280.0f - 26.0f - mainX;
+            float y = 66.0f;
+            auto orderRows = [&](const int* which, int count, bool done)
+            {
+                for (int k = 0; k < count; ++k)
+                {
+                    const Base::OrderDef& order = Base::Order(which[k]);
+                    const float frac = done ? 1.0f : base.OrderProgress(which[k]);
+                    textIn(Face::Mono, order.m_title, X(mainX), y, 12.0f, 1.3f, TermText);
+                    const float barX = mainX + mainW - 170.0f - 14.0f - 160.0f;
+                    trect(X(barX), Y(y + 5.0f), 160.0f * s, 6.0f * s, goldTrack);
+                    trect(X(barX), Y(y + 5.0f), 160.0f * s * AZStd::clamp(frac, 0.0f, 1.0f), 6.0f * s, TermGold);
+                    textIn(Face::Mono, done ? AZStd::string("done \xc2\xb7 ") + order.m_reward : AZStd::string(order.m_reward), X(mainX + mainW), y, 12.0f, 1.3f,
+                        TermGold, 2);
+                    y += 12.0f * 1.3f + 8.0f;
+                }
+            };
+            if (m_orderSection < Base::SectionCount)
+            {
+                const int section = m_orderSection;
+                const float titleW = measure(Face::Oswald, Base::SectionTitles[section], 24.0f, 3.0f) / s + 3.0f;
+                textIn(Face::Oswald, Base::SectionTitles[section], X(mainX), y, 24.0f, 1.482f, TermSelected, 0, 3.0f);
+                textIn(Face::Mono, "Delivered through Breach 4-A. It opens a crack, the crate comes through, it seals again.", X(mainX + titleW + 14.0f),
+                    y + 13.0f, 12.0f, 1.3f, TermMuted);
+                y += 24.0f * 1.482f + 14.0f;
+                // The cards, three across.
+                int items[8];
+                int n = 0;
+                for (int i = 0; i < Base::ReqCount && n < 8; ++i)
+                {
+                    if (Base::Req(i).m_section == section)
+                    {
+                        items[n++] = i;
+                    }
+                }
+                m_orderItem = AZStd::clamp(m_orderItem, 0, AZStd::max(0, n - 1));
+                const float cardW = (mainW - 20.0f) / 3.0f;
+                const float cardH = 14.0f + 14.0f * 1.3f + 6.0f + 11.0f * 1.3f + 6.0f + 12.0f * 1.3f + 14.0f;
+                for (int k = 0; k < n; ++k)
+                {
+                    const Base::ReqItem& req = Base::Req(items[k]);
+                    const bool itemLocked = !base.Unlocked(req.m_unlock);
+                    const float cx = mainX + (k % 3) * (cardW + 10.0f);
+                    const float cy = y + (k / 3) * (cardH + 10.0f);
+                    const bool sel = k == m_orderItem;
+                    if (itemLocked)
+                    {
+                        tdashed(X(cx), Y(cy), cardW * s, cardH * s, AZStd::max(1.0f, s), AZ::Color(216 / 255.0f, 195 / 255.0f, 90 / 255.0f, 0.25f));
+                    }
+                    else
+                    {
+                        if (sel)
+                        {
+                            trect(X(cx), Y(cy), cardW * s, cardH * s, AZ::Color(216 / 255.0f, 195 / 255.0f, 90 / 255.0f, 0.12f));
+                        }
+                        toutline(X(cx), Y(cy), cardW * s, cardH * s, AZStd::max(1.0f, s), sel ? TermGold : AZ::Color(216 / 255.0f, 195 / 255.0f, 90 / 255.0f, 0.3f));
+                    }
+                    textIn(Face::MonoSemiBold, req.m_name, X(cx + 14.0f), cy + 14.0f, 14.0f, 1.3f, itemLocked ? TermLocked : TermSelected);
+                    textIn(Face::Mono, req.m_desc, X(cx + 14.0f), cy + 14.0f + 14.0f * 1.3f + 6.0f, 11.0f, 1.3f, itemLocked ? TermLocked : TermMuted);
+                    textIn(Face::Mono, AZStd::string::format("%d RP", req.m_cost), X(cx + 14.0f), cy + 14.0f + 14.0f * 1.3f + 6.0f + 11.0f * 1.3f + 6.0f, 12.0f, 1.3f,
+                        itemLocked ? TermLocked : TermGold);
+                    if (clicked(X(cx), Y(cy), cardW * s, cardH * s))
+                    {
+                        m_orderItem = k;
+                    }
+                }
+                y += ((n + 2) / 3) * (cardH + 10.0f) - 10.0f + 14.0f + 4.0f;
+                // REQUEST PUMP SHOTGUN · 90 RP
+                if (n > 0)
+                {
+                    const Base::ReqItem& req = Base::Req(items[m_orderItem]);
+                    AZStd::string label = "REQUEST " + AZStd::string(req.m_name) + AZStd::string::format(" \xc2\xb7 %d RP", req.m_cost);
+                    for (char& c : label)
+                    {
+                        c = static_cast<char>(c >= 'a' && c <= 'z' ? c - 32 : c);
+                    }
+                    const float bw = measure(Face::MonoSemiBold, label, 12.0f, 2.0f) / s + 2.0f + 36.0f;
+                    const float bh = 12.0f * 1.3f + 20.0f;
+                    const bool usable = base.Unlocked(req.m_unlock) && base.m_rp >= req.m_cost;
+                    trect(X(mainX), Y(y), bw * s, bh * s, usable ? TermGold : AZ::Color(216 / 255.0f, 195 / 255.0f, 90 / 255.0f, 0.35f));
+                    textIn(Face::MonoSemiBold, label, X(mainX + 18.0f), y + 10.0f, 12.0f, 1.3f, TermBg, 0, 2.0f);
+                    const bool notice = !m_orderNotice.empty() && m_orderNoticeUntil > m_time;
+                    const float after = base.m_deliveries.empty() ? 0.0f : base.m_deliveries.back().m_left;
+                    const int eta = static_cast<int>(after + Base::DeliverySeconds);
+                    textIn(Face::Mono, notice ? m_orderNotice : AZStd::string::format("Arrives in about %d:%02d \xc2\xb7 stand clear of the breach", eta / 60, eta % 60),
+                        X(mainX + bw + 10.0f), y + 10.0f, 12.0f, 1.3f, notice ? TermSelected : TermMuted);
+                    if (clicked(X(mainX), Y(y), bw * s, bh * s) || m_orderRequest)
+                    {
+                        say(base.Requisition(items[m_orderItem]));
+                    }
+                    y += bh;
+                }
+                m_orderRequest = false;
+                // OPEN FOUNDATION ORDERS · EARN REQUISITION
+                y += 6.0f;
+                trect(X(mainX), Y(y), mainW * s, AZStd::max(1.0f, s), goldLine);
+                y += 14.0f;
+                textIn(Face::Mono, "OPEN FOUNDATION ORDERS \xc2\xb7 EARN REQUISITION", X(mainX), y, 11.0f, 1.3f, TermMuted, 0, 2.0f);
+                y += 11.0f * 1.3f + 8.0f;
+                orderRows(open, openCount, false);
+            }
+            else
+            {
+                static const char* const titles[3] = { "OPEN ORDERS", "COMPLETED", "ON THE WAY" };
+                static const char* const subs[3] = { "Do what the Foundation asks and it pays in requisition.", "Orders you have carried out.",
+                                                     "Crates waiting their turn at Breach 4-A." };
+                const int page = m_orderSection - 5;
+                const float titleW = measure(Face::Oswald, titles[page], 24.0f, 3.0f) / s + 3.0f;
+                textIn(Face::Oswald, titles[page], X(mainX), y, 24.0f, 1.482f, TermSelected, 0, 3.0f);
+                textIn(Face::Mono, subs[page], X(mainX + titleW + 14.0f), y + 13.0f, 12.0f, 1.3f, TermMuted);
+                y += 24.0f * 1.482f + 14.0f;
+                if (page == 0)
+                {
+                    orderRows(open, openCount, false);
+                }
+                else if (page == 1)
+                {
+                    int done[Base::OrderCount];
+                    int n = 0;
+                    for (int i = 0; i < Base::OrderCount; ++i)
+                    {
+                        if (base.m_ordersDone & (1 << i))
+                        {
+                            done[n++] = i;
+                        }
+                    }
+                    orderRows(done, n, true);
+                    if (n == 0)
+                    {
+                        textIn(Face::Mono, "None yet.", X(mainX), y, 12.0f, 1.3f, TermMuted);
+                    }
+                }
+                else
+                {
+                    for (const Base::Delivery& d : base.m_deliveries)
+                    {
+                        const int left = AZStd::max(0, static_cast<int>(d.m_left));
+                        textIn(Face::Mono, d.m_item < 0 ? "Foundation supply drop" : Base::Req(d.m_item).m_name, X(mainX), y, 12.0f, 1.3f, TermText);
+                        textIn(Face::Mono, AZStd::string::format("%d:%02d", left / 60, left % 60), X(mainX + mainW), y, 12.0f, 1.3f, TermGold, 2);
+                        y += 12.0f * 1.3f + 8.0f;
+                    }
+                    for (int item : base.m_waiting)
+                    {
+                        textIn(Face::Mono, item < 0 ? "Foundation supply drop" : Base::Req(item).m_name, X(mainX), y, 12.0f, 1.3f, TermText);
+                        textIn(Face::Mono, "at the breach \xc2\xb7 [E] open it", X(mainX + mainW), y, 12.0f, 1.3f, TermGold, 2);
+                        y += 12.0f * 1.3f + 8.0f;
+                    }
+                    if (base.m_deliveries.empty() && base.m_waiting.empty())
+                    {
+                        textIn(Face::Mono, "Nothing on the way.", X(mainX), y, 12.0f, 1.3f, TermMuted);
+                    }
+                }
+                m_orderRequest = false;
+            }
+            // The delivery column (right, 280 px): Breach 4-A sealed with its seam, what's on the way.
+            {
+                const float ax = 1000.0f + 20.0f, aw = 240.0f;
+                trect(X(1000.0f), Y(45.0f), AZStd::max(1.0f, s), H - Y(45.0f), goldLine);
+                float ay = 66.0f;
+                textIn(Face::Mono, "BREACH 4-A", X(ax), ay, 11.0f, 1.3f, TermMuted, 0, 2.0f);
+                ay += 11.0f * 1.3f + 12.0f;
+                trect(X(ax), Y(ay), aw * s, 150.0f * s, Hex(0x050403));
+                toutline(X(ax), Y(ay), aw * s, 150.0f * s, AZStd::max(1.0f, s), AZ::Color(216 / 255.0f, 195 / 255.0f, 90 / 255.0f, 0.3f));
+                // The seam: 4 px of violet light fading out at both ends (wider while it's open).
+                const float seam = 4.0f + 36.0f * AZStd::clamp(base.m_breachOpen, 0.0f, 1.0f);
+                for (int k = 0; k < 20; ++k)
+                {
+                    const float t = (k + 0.5f) / 20.0f;
+                    const float a = 0.9f * (1.0f - std::fabs(t - 0.5f) * 2.0f);
+                    trect(X(ax + aw * 0.5f - seam * 0.5f), Y(ay + 14.0f + k * 6.1f), seam * s, 6.2f * s, AZ::Color(140 / 255.0f, 130 / 255.0f, 1.0f, a));
+                }
+                textIn(Face::Mono, base.m_breachOpen > 0.05f ? "OPEN A CRACK \xc2\xb7 CRATE COMING THROUGH" : "SEALED \xc2\xb7 SEAM GLOWING", X(ax + 10.0f),
+                    ay + 150.0f - 8.0f - 13.0f, 10.0f, 1.3f, TermMuted, 0, 2.0f);
+                ay += 150.0f + 12.0f + 4.0f;
+                textIn(Face::Mono, "ON THE WAY", X(ax), ay, 11.0f, 1.3f, TermMuted, 0, 2.0f);
+                ay += 11.0f * 1.3f + 12.0f;
+                if (!base.m_deliveries.empty())
+                {
+                    const Base::Delivery& d = base.m_deliveries.front();
+                    const int left = AZStd::max(0, static_cast<int>(d.m_left));
+                    textIn(Face::Mono, d.m_item < 0 ? "Supply drop" : Base::Req(d.m_item).m_name, X(ax), ay, 12.0f, 1.3f, TermText);
+                    textIn(Face::Mono, AZStd::string::format("%d:%02d", left / 60, left % 60), X(ax + aw), ay, 12.0f, 1.3f, TermGold, 2);
+                    ay += 12.0f * 1.3f + 12.0f;
+                    trect(X(ax), Y(ay), aw * s, 6.0f * s, goldTrack);
+                    const float total = d.m_item < 0 ? 30.0f : Base::DeliverySeconds;
+                    trect(X(ax), Y(ay), aw * s * AZStd::clamp(1.0f - d.m_left / total, 0.0f, 1.0f), 6.0f * s, TermGold);
+                    ay += 6.0f + 12.0f;
+                }
+                else if (!base.m_waiting.empty())
+                {
+                    textIn(Face::Mono, "A crate is waiting at the breach", X(ax), ay, 12.0f, 1.3f, TermGold);
+                    ay += 12.0f * 1.3f + 12.0f;
+                }
+                else
+                {
+                    textIn(Face::Mono, "Nothing on the way", X(ax), ay, 12.0f, 1.3f, TermMuted);
+                    ay += 12.0f * 1.3f + 12.0f;
+                }
+                for (const AZStd::string& w2 : wrap(Face::Mono, "The breach opens just wide enough for the crate. Anything near it may come through too.", 11.0f, aw * s))
+                {
+                    textIn(Face::Mono, w2, X(ax), ay, 11.0f, 1.5f, TermMuted);
+                    ay += 16.5f;
+                }
+                textIn(Face::Mono, "[E] request \xc2\xb7 [TAB] sections \xc2\xb7 [ESC] close", X(ax), 720.0f - 22.0f - 11.0f * 1.3f, 11.0f, 1.3f, TermMuted, 0, 1.0f);
+            }
+            for (int layer = 0; layer < AZStd::clamp(static_cast<int>(hud_term_layers), 1, 8); ++layer)
+            {
+                AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments args;
+                args.m_verts = tv.data();
+                args.m_vertCount = static_cast<uint32_t>(tv.size());
+                args.m_colors = tc.data();
+                args.m_colorCount = static_cast<uint32_t>(tc.size());
+                args.m_opacityType = AZ::RPI::AuxGeomDraw::OpacityType::Translucent;
+                args.m_depthTest = AZ::RPI::AuxGeomDraw::DepthTest::Off;
+                args.m_depthWrite = AZ::RPI::AuxGeomDraw::DepthWrite::Off;
+                args.m_viewProjectionOverrideIndex = overlay;
+                draw->DrawTriangles(args);
+            }
+            m_click = false;
         }
         // ---- main menu: Main.dc.html (the live Level 0 behind it instead of the mockup's still) ----
         else if (m_page == Page::MainMenu)

@@ -510,7 +510,9 @@ def new_id(rnd):
     return rnd.getrandbits(63)
 
 
-def build_prefab(name, spec, template):
+def build_prefab(name, spec, template, folder="Prefabs/Clutter", mat_guid=None):
+    """Writes <folder>/<name>.prefab from the parts (also used by Tools/Base/make_base_pieces.py)."""
+    mat_guid = mat_guid or material_guid
     rnd = random.Random(name)
     data = copy.deepcopy(template)
     data["ContainerEntity"]["Name"] = name
@@ -531,7 +533,7 @@ def build_prefab(name, spec, template):
         if mesh:
             model, hint, unit = SHAPES[shape]
             comps["AZ::Render::EditorMeshComponent"]["Controller"]["Configuration"]["ModelAsset"] = {"assetId": dict(model), "assetHint": hint}
-            comps["EditorMaterialComponent"]["Controller"]["Configuration"]["materials"]["{}"]["MaterialAsset"]["assetId"]["guid"] = material_guid(mat)
+            comps["EditorMaterialComponent"]["Controller"]["Configuration"]["materials"]["{}"]["MaterialAsset"]["assetId"]["guid"] = mat_guid(mat)
             scale = [round(s / unit, 5) for s in size]
         else:
             del comps["AZ::Render::EditorMeshComponent"]
@@ -562,7 +564,7 @@ def build_prefab(name, spec, template):
         add_entity("Blocker", "box", (0, 0, h / 2), (w, d, h), None, None, mesh=False, collider=True)
     data["Entities"] = entities
     data["ContainerEntity"]["Components"]["EditorEntitySortComponent"]["Child Entity Order"] = order
-    with open(path("Prefabs/Clutter", f"{name}.prefab"), "w") as f:
+    with open(path(folder, f"{name}.prefab"), "w") as f:
         json.dump(data, f, indent=4)
 
 

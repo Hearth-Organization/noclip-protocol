@@ -127,6 +127,13 @@ namespace NoclipProtocol
         // The HUD's flashlight bar (Hearth HUD, bind "player.flashlight").
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
+            // A fresh battery from the workbench or the Foundation ([B] in the HUD).
+            bool refill = false;
+            if (registry->Get(refill, "/NoclipProtocol/Player/FlashlightRefill") && refill)
+            {
+                registry->Set("/NoclipProtocol/Player/FlashlightRefill", false);
+                m_batterySeconds = m_batteryCapacitySeconds;
+            }
             registry->Set("/NoclipProtocol/Hud/player.flashlight", static_cast<double>(GetBatteryFraction()));
             registry->Set("/NoclipProtocol/Hud/player.flashlight.seconds", static_cast<double>(m_batterySeconds));
             registry->Set("/NoclipProtocol/Player/FlashlightOn", m_switchedOn && m_batterySeconds > 0.0f);
