@@ -67,7 +67,8 @@
                     "Id": 2077334621170073869,
                     "Child Entity Order": [
                         "Entity_[82856217149560]",
-                        "Entity_[57178693453373]"
+                        "Entity_[57178693453373]",
+                        "Entity_[3079420216960]"
                     ]
                 },
                 "EditorInspectorComponent": {
@@ -326,6 +327,97 @@
                         "Configuration": {
                             "Radius": 0.3
                         }
+                    }
+                }
+            }
+        },
+        "Entity_[3079420216960]": {
+            "Id": "Entity_[3079420216960]",
+            "Name": "L0_DyingDarkPanel",
+            "Components": {
+                "AZ::Render::EditorMeshComponent": {
+                    "$type": "AZ::Render::EditorMeshComponent",
+                    "Id": 3988170586273185080,
+                    "Controller": {
+                        "Configuration": {
+                            "ModelAsset": {
+                                "assetId": {
+                                    "guid": "{C15CD465-9589-56ED-945F-8416FA4798A3}",
+                                    "subId": 284301017
+                                },
+                                "assetHint": "objects/_primitives/_box_1x1.fbx.azmodel"
+                            }
+                        }
+                    }
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 3047060132627183479
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 8587348614027069180
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 9152931548458463667
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 6643092886003633797
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 343723544011712946
+                },
+                "EditorMaterialComponent": {
+                    "$type": "EditorMaterialComponent",
+                    "Id": 1699407421154881781,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": {
+                                "{}": {
+                                    "MaterialAsset": {
+                                        "assetId": {
+                                            "guid": "{8C1E394D-52F7-55C6-8D45-4D45176DFB63}"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "EditorNonUniformScaleComponent": {
+                    "$type": "EditorNonUniformScaleComponent",
+                    "Id": 6901698457874581115,
+                    "NonUniformScale": [
+                        0.5,
+                        1.0,
+                        0.04
+                    ]
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 2438770472341929571
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 4283421729482594386
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 141833271566166558
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 1245787202809946675,
+                    "Parent Entity": "Entity_[23691688266654]",
+                    "Transform Data": {
+                        "Translate": [
+                            0.25,
+                            0.0,
+                            -0.019999999552965164
+                        ]
                     }
                 }
             }

@@ -31,6 +31,7 @@ namespace NoclipProtocol
 
     private:
         void SetLit(bool lit);
+        AZ::EntityId FindChildNamedLike(const char* suffix) const;
         void Crackle();
         float Range(float low, float high);
         bool PlayerIsNear() const;
@@ -40,6 +41,7 @@ namespace NoclipProtocol
         // Settings
         AZ::EntityId m_lightEntity;
         AZ::EntityId m_panelEntity;
+        AZ::EntityId m_darkPanelEntity; // shown instead of the glowing panel while the light is off
         float m_minSteadySeconds = 1.5f;
         float m_maxSteadySeconds = 9.0f;
         float m_blackoutChance = 0.15f; // chance a stutter ends in a long blackout
@@ -54,5 +56,6 @@ namespace NoclipProtocol
         bool m_lit = true;
         bool m_dying = false;
         bool m_dead = false;
+        bool m_synced = false;
     };
 } // namespace NoclipProtocol

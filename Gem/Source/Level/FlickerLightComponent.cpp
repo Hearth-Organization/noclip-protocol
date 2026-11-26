@@ -17,9 +17,10 @@ namespace NoclipProtocol
         if (auto serialize = azrtti_cast<AZ::SerializeContext*>(context))
         {
             serialize->Class<FlickerLightComponent, AZ::Component>()
-                ->Version(2)
+                ->Version(3)
                 ->Field("LightEntity", &FlickerLightComponent::m_lightEntity)
                 ->Field("PanelEntity", &FlickerLightComponent::m_panelEntity)
+                ->Field("DarkPanelEntity", &FlickerLightComponent::m_darkPanelEntity)
                 ->Field("MinSteady", &FlickerLightComponent::m_minSteadySeconds)
                 ->Field("MaxSteady", &FlickerLightComponent::m_maxSteadySeconds)
                 ->Field("BlackoutChance", &FlickerLightComponent::m_blackoutChance)
@@ -37,6 +38,8 @@ namespace NoclipProtocol
                     ->DataElement(AZ::Edit::UIHandlers::Default, &FlickerLightComponent::m_lightEntity, "Light entity", "The light to switch")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &FlickerLightComponent::m_panelEntity, "Panel entity",
                         "The glowing panel mesh to switch with it")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &FlickerLightComponent::m_darkPanelEntity, "Dark panel entity",
+                        "A dead panel shown in its place while the light is off, so the fixture never vanishes from the ceiling")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &FlickerLightComponent::m_minSteadySeconds, "Min steady (s)",
                         "Shortest time it stays on between stutters")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &FlickerLightComponent::m_maxSteadySeconds, "Max steady (s)",
@@ -70,6 +73,7 @@ namespace NoclipProtocol
         m_dying = false;
         m_dead = false;
         m_burstToggles = 0;
+        m_synced = false; // the dark panel is hidden on the first tick, once every entity of the light is active
         m_timer = Range(0.2f, m_maxSteadySeconds);
         AZ::TickBus::Handler::BusConnect();
     }
@@ -79,30 +83,53 @@ namespace NoclipProtocol
         AZ::TickBus::Handler::BusDisconnect();
     }
 
+    AZ::EntityId FlickerLightComponent::FindChildNamedLike(const char* suffix) const
+    {
+        // The dead panel that stands in while the light is off is found by name among this light's children,
+        // so older prefabs (and builders that don't know the Dark panel field) still work.
+        AZStd::vector<AZ::EntityId> children;
+        AZ::TransformBus::EventResult(children, GetEntityId(), &AZ::TransformBus::Events::GetChildren);
+        for (const AZ::EntityId& child : children)
+        {
+            AZ::Entity* entity = nullptr;
+            AZ::ComponentApplicationBus::BroadcastResult(entity, &AZ::ComponentApplicationRequests::FindEntity, child);
+            const AZStd::string_view name = entity ? AZStd::string_view(entity->GetName()) : AZStd::string_view();
+            const AZStd::string_view want(suffix);
+            if (name.size() >= want.size() && name.substr(name.size() - want.size()) == want)
+            {
+                return child;
+            }
+        }
+        return AZ::EntityId();
+    }
+
     void FlickerLightComponent::SetLit(bool lit)
     {
         m_lit = lit;
-        for (const AZ::EntityId& id : { m_lightEntity, m_panelEntity })
+        auto setActive = [](const AZ::EntityId& id, bool active)
         {
             if (!id.IsValid())
             {
-                continue;
+                return;
             }
             AZ::Entity* entity = nullptr;
             AZ::ComponentApplicationBus::BroadcastResult(entity, &AZ::ComponentApplicationRequests::FindEntity, id);
             if (!entity)
             {
-                continue;
+                return;
             }
-            if (lit && entity->GetState() == AZ::Entity::State::Init)
+            if (active && entity->GetState() == AZ::Entity::State::Init)
             {
                 entity->Activate();
             }
-            else if (!lit && entity->GetState() == AZ::Entity::State::Active)
+            else if (!active && entity->GetState() == AZ::Entity::State::Active)
             {
                 entity->Deactivate();
             }
-        }
+        };
+        setActive(m_lightEntity, lit);
+        setActive(m_panelEntity, lit);
+        setActive(m_darkPanelEntity, !lit); // the fixture stays in the ceiling, just dark
     }
 
     void FlickerLightComponent::Crackle()
@@ -133,6 +160,15 @@ namespace NoclipProtocol
 
     void FlickerLightComponent::OnTick(float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
+        if (!m_synced)
+        {
+            m_synced = true;
+            if (!m_darkPanelEntity.IsValid())
+            {
+                m_darkPanelEntity = FindChildNamedLike("DarkPanel");
+            }
+            SetLit(m_lit);
+        }
         // "All lights on" in the debug overlay: every flickering light stays on until it's switched off again.
         bool allOn = false;
         if (auto* registry = AZ::SettingsRegistry::Get())
