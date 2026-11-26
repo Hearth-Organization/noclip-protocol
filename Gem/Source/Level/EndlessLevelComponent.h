@@ -1,5 +1,7 @@
 #pragma once
 
+#include <AzCore/std/containers/unordered_set.h>
+
 #include "Level0Layout.h"
 
 #include <AzCore/Asset/AssetCommon.h>
@@ -72,6 +74,14 @@ namespace NoclipProtocol
             int m_pieces = 0; // walls, pillars, lights, stains... spawned for this chunk
             AZStd::vector<AZ::Vector3> m_noclipSpots;
             AZStd::vector<AZ::Vector3> m_litLights; // working and dying lights (what lights the player up)
+            struct LivePickup
+            {
+                AZ::Vector3 m_at;
+                int m_kind;
+                int m_index;
+                AzFramework::EntitySpawnTicket m_ticket;
+            };
+            AZStd::vector<LivePickup> m_pickups; // supplies still lying here
         };
 
         static AZ::u64 Key(int x, int y);
@@ -90,6 +100,13 @@ namespace NoclipProtocol
         bool m_buildEnabled = false;
         void StartBuilding();
         void DoBuildRequests();
+
+        // Supplies to gather (scrap, wire, fuel, Almond Water): [E] picks one up.
+        AZ::Data::Asset<AzFramework::Spawnable> m_pickupAssets[4];
+        AZStd::unordered_set<AZ::u64> m_collected; // chunk key ^ index: picked up this run, so they don't come back
+        AZ::u64 m_promptPickup = 0;                 // which pickup the "[E] Pick up" prompt is for (0: none)
+        bool m_pickupPrompt = false;
+        void UpdatePickups(const AZ::Vector3& at);
 
         // Settings (editable in the Editor)
         AZ::EntityId m_followEntity;

@@ -426,6 +426,7 @@ namespace NoclipProtocol
             LoadLevelLater(m_lastLevel.empty() ? AZStd::string("Intro") : m_lastLevel);
             break;
         case ActNew:
+            Base::Get().NewExpedition(); // a new expedition: starting stockpile, no base
             LoadLevelLater("Intro");
             break;
         case ActCoop:
@@ -451,7 +452,8 @@ namespace NoclipProtocol
         case ActAccept:
             if (m_inMenu)
             {
-                LoadLevelLater("Intro"); // the archive from the main menu: accepting starts a new expedition
+                Base::Get().NewExpedition(); // the archive from the main menu: accepting starts a new expedition
+                LoadLevelLater("Intro");
                 break;
             }
             m_page = Page::None;
@@ -513,6 +515,40 @@ namespace NoclipProtocol
     bool NoclipHudComponent::HandleKey(const AzFramework::InputChannelId& id)
     {
         using namespace AzFramework;
+        // Supplies: E at one picks it up (the level generator does it); Q drinks an Almond Water (sanity +35%).
+        if (m_page == Page::None && id == InputDeviceKeyboard::Key::AlphanumericE &&
+            RegString("/NoclipProtocol/Hud/interact.target", "") == "pickup")
+        {
+            Base::Get().m_pickRequested = true;
+            return true;
+        }
+        if (m_page == Page::None && id == InputDeviceKeyboard::Key::AlphanumericQ && !m_inMenu)
+        {
+            Base::State& base = Base::Get();
+            auto* registry = AZ::SettingsRegistry::Get();
+            if (registry)
+            {
+                double sanity = 1.0;
+                registry->Get(sanity, "/NoclipProtocol/Hud/player.sanity");
+                const char* text = "NO ALMOND WATER LEFT";
+                if (base.m_almondWater > 0 && sanity < 0.995)
+                {
+                    base.m_almondWater -= 1;
+                    double add = 0.0;
+                    registry->Get(add, "/NoclipProtocol/Player/SanityAdd");
+                    registry->Set("/NoclipProtocol/Player/SanityAdd", add + 0.35);
+                    base.Save();
+                    text = "ALMOND WATER \xc2\xb7 SANITY +35%";
+                }
+                else if (base.m_almondWater > 0)
+                {
+                    text = "YOU FEEL FINE \xc2\xb7 SAVE IT FOR LATER";
+                }
+                registry->Set("/NoclipProtocol/Hud/toast", AZStd::string(text));
+                registry->Set("/NoclipProtocol/Hud/toast.until", static_cast<double>(m_time) + 2.5);
+            }
+            return true;
+        }
         // The briefing terminal: E at the terminal opens it; Y accepts, N goes through the files, Esc / P closes it.
         if (m_page == Page::None && id == InputDeviceKeyboard::Key::AlphanumericE &&
             RegString("/NoclipProtocol/Hud/interact.target", "") == "terminal")
@@ -653,6 +689,7 @@ namespace NoclipProtocol
             else if (key == "N" || key == "n") { HandleKey(InputDeviceKeyboard::Key::AlphanumericN); }
             else if (key == "Esc" || key == "esc") { HandleKey(InputDeviceKeyboard::Key::Escape); }
             else if (key == "Tab") { HandleKey(InputDeviceKeyboard::Key::EditTab); }
+            else if (key == "Q") { HandleKey(InputDeviceKeyboard::Key::AlphanumericQ); }
             else if (key == "R") { HandleKey(InputDeviceKeyboard::Key::AlphanumericR); }
             else if (key == "X") { HandleKey(InputDeviceKeyboard::Key::AlphanumericX); }
             else if (key == "Click") { HandleKey(InputDeviceMouse::Button::Left); }
@@ -1143,6 +1180,10 @@ namespace NoclipProtocol
                     const int j = (i + 1) % 6;
                     line(ix + px[i] * u, iy + py[i] * u, ix + px[j] * u, iy + py[j] * u, 1.4f * s, Cream);
                 }
+                // Almond Water in the pack: always visible, so the player knows whether [Q] will do anything.
+                const int water = Base::Get().m_almondWater;
+                text(Face::Mono, AZStd::string::format("ALMOND WATER  %d  [Q]", water), R(right), Y(labelY - 22.0f), 11.0f,
+                    water > 0 ? Cream : Muted, 2, 2.0f);
             }
 
             // ---- toast (noclip, arrivals) ----

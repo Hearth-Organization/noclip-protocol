@@ -306,7 +306,7 @@ namespace NoclipProtocol
                 }
             }
             m_buildTickets.clear();
-            Base::Get().m_placed.clear();
+            // The base stays in Base::State (and the save) while other levels play.
             Base::Get().m_requests.clear();
             Base::Get().m_active = false;
             for (auto& asset : m_buildAssets)
@@ -314,6 +314,10 @@ namespace NoclipProtocol
                 asset.Release();
             }
             m_buildEnabled = false;
+        }
+        for (auto& asset : m_pickupAssets)
+        {
+            asset.Release();
         }
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
@@ -356,6 +360,13 @@ namespace NoclipProtocol
     bool EndlessLevelComponent::PieceAssetsReady() const
     {
         for (const auto& asset : m_pieceAssets)
+        {
+            if (asset.GetId().IsValid() && !asset.IsReady())
+            {
+                return false;
+            }
+        }
+        for (const auto& asset : m_pickupAssets)
         {
             if (asset.GetId().IsValid() && !asset.IsReady())
             {
@@ -682,6 +693,24 @@ namespace NoclipProtocol
                 SpawnBox(chunk.m_tickets[PieceNoclip], hole, true);
             }
         }
+        // Supplies: each its own spawn, so picking one up removes just that one.
+        for (const auto& pickup : layout.m_pickups)
+        {
+            const AZ::u64 id = Key(chunkX, chunkY) ^ (static_cast<AZ::u64>(pickup.m_index + 1) << 48);
+            const int kind = AZStd::clamp(pickup.m_kind, 0, 3);
+            if (m_collected.find(id) != m_collected.end() || !m_pickupAssets[kind].IsReady())
+            {
+                continue;
+            }
+            // Scrap: a bent plate; wire: a coil; fuel: a jerry can; Almond Water: a bottle.
+            static const float sizes[4][3] = { { 0.5f, 0.34f, 0.12f }, { 0.3f, 0.3f, 0.16f }, { 0.36f, 0.18f, 0.46f }, { 0.09f, 0.09f, 0.28f } };
+            Chunk::LivePickup live{ AZ::Vector3(pickup.m_at.m_x, pickup.m_at.m_y, 0.0f), kind, pickup.m_index,
+                                    AzFramework::EntitySpawnTicket(m_pickupAssets[kind]) };
+            SpawnBox(live.m_ticket, Level0::Box{ pickup.m_at.m_x, pickup.m_at.m_y, sizes[kind][2] * 0.5f, sizes[kind][0], sizes[kind][1], sizes[kind][2] },
+                true, static_cast<float>(pickup.m_index * 37 % 360) * 0.01745f);
+            chunk.m_pickups.push_back(AZStd::move(live));
+        }
+
         if (chunk.m_tickets[PieceFrame].IsValid())
         {
             for (const Level0::Box& frame : layout.m_frames)
@@ -800,6 +829,7 @@ namespace NoclipProtocol
             }
         }
         registry->Set("/NoclipProtocol/Player/Light", static_cast<double>(light));
+        UpdatePickups(at);
         // The forward base is the arrival room around the spawn point.
         const Level0::Point base = Level0::SpawnPoint(m_settings);
         const float bx = base.m_x - at.GetX();
@@ -843,15 +873,43 @@ namespace NoclipProtocol
         // The forward base: Level 0's spawn room (not the main menu's backdrop).
         m_buildEnabled = m_settings.m_style == 0 && !m_mainMenu && m_settings.m_spawnRoomRadius > 0;
         Base::State& base = Base::Get();
-        base.m_placed.clear();
+        base.LoadOnce(); // the expedition's stockpile and base (CONTINUE), once per run
         base.m_requests.clear();
-        base.m_beaconUp = false;
+        base.m_pickRequested = false;
         base.m_active = m_buildEnabled;
         m_buildTickets.clear();
+        m_collected.clear();
+        m_promptPickup = 0;
+        m_pickupPrompt = false;
+        // Supplies' pieces (every level with supplies, not the menu or the intro).
+        if (!m_mainMenu && m_settings.m_style <= 2)
+        {
+            static const char* const pickups[4] = { "prefabs/base/pickup_scrap.spawnable", "prefabs/base/pickup_wire.spawnable",
+                                                    "prefabs/base/pickup_fuel.spawnable", "prefabs/base/pickup_water.spawnable" };
+            for (int i = 0; i < 4; ++i)
+            {
+                AZ::Data::AssetId id;
+                AZ::Data::AssetCatalogRequestBus::BroadcastResult(id, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath, pickups[i],
+                    azrtti_typeid<AzFramework::Spawnable>(), false);
+                if (id.IsValid())
+                {
+                    m_pickupAssets[i] = AZ::Data::AssetManager::Instance().GetAsset<AzFramework::Spawnable>(id, AZ::Data::AssetLoadBehavior::PreLoad);
+                }
+            }
+        }
         if (!m_buildEnabled)
         {
             return;
         }
+        // Put the saved base back up (the pieces spawn once their assets are in).
+        base.m_beaconUp = false;
+        for (const Base::Placed& piece : base.m_placed)
+        {
+            Base::Request restore{ true, piece.m_kind, piece.m_x, piece.m_y, piece.m_yaw };
+            restore.m_restore = true;
+            base.m_requests.push_back(restore);
+        }
+        base.m_placed.clear();
         const float r = static_cast<float>(m_settings.m_spawnRoomRadius);
         const float cell = m_settings.m_cellSize;
         base.m_minX = -r * cell;
@@ -949,9 +1007,10 @@ namespace NoclipProtocol
                 }
                 base.m_placed.erase(base.m_placed.begin() + best);
                 m_buildTickets.erase(m_buildTickets.begin() + best);
+                base.Save();
                 continue;
             }
-            if (base.Blocked(request.m_kind, request.m_x, request.m_y))
+            if (!request.m_restore && base.Blocked(request.m_kind, request.m_x, request.m_y))
             {
                 continue; // the HUD checks first; things may have changed since
             }
@@ -1000,14 +1059,30 @@ namespace NoclipProtocol
             {
                 continue;
             }
-            base.m_scrap -= info.m_scrap;
-            base.m_wire -= info.m_wire;
-            base.m_fuel -= info.m_fuel;
+            if (!request.m_restore)
+            {
+                base.m_scrap -= info.m_scrap;
+                base.m_wire -= info.m_wire;
+                base.m_fuel -= info.m_fuel;
+            }
             base.m_placed.push_back(Base::Placed{ request.m_kind, x, y, request.m_yaw });
             m_buildTickets.push_back(AZStd::move(tickets));
+            if (!request.m_restore)
+            {
+                base.Save();
+            }
             if (request.m_kind == Base::Kind::Beacon && !base.m_beaconUp)
             {
                 base.m_beaconUp = true;
+                if (request.m_restore)
+                {
+                    if (registry)
+                    {
+                        registry->Set("/NoclipProtocol/Hud/game.objective", AZStd::string("Forward base established"));
+                        registry->Set("/NoclipProtocol/Hud/game.progress", AZStd::string("Scout Level 0 and find a way deeper"));
+                    }
+                    continue;
+                }
                 toast("FOUNDATION BEACON ONLINE \xc2\xb7 FORWARD BASE ESTABLISHED");
                 if (registry)
                 {
@@ -1120,5 +1195,90 @@ namespace NoclipProtocol
             }
         }
         chunk.m_tickets.clear();
+        if (auto* spawner = AzFramework::SpawnableEntitiesInterface::Get())
+        {
+            for (auto& pickup : chunk.m_pickups)
+            {
+                if (pickup.m_ticket.IsValid())
+                {
+                    spawner->DespawnAllEntities(pickup.m_ticket);
+                }
+            }
+        }
+        chunk.m_pickups.clear();
+    }
+
+    void EndlessLevelComponent::UpdatePickups(const AZ::Vector3& at)
+    {
+        auto* registry = AZ::SettingsRegistry::Get();
+        if (!registry || m_mainMenu || m_settings.m_style > 2)
+        {
+            return;
+        }
+        // The nearest supply within reach.
+        Chunk* bestChunk = nullptr;
+        int best = -1;
+        float bestD = 1.6f * 1.6f;
+        for (auto& [key, chunk] : m_chunks)
+        {
+            for (int i = 0; i < static_cast<int>(chunk.m_pickups.size()); ++i)
+            {
+                const float dx = chunk.m_pickups[i].m_at.GetX() - at.GetX();
+                const float dy = chunk.m_pickups[i].m_at.GetY() - at.GetY();
+                if (dx * dx + dy * dy < bestD)
+                {
+                    bestD = dx * dx + dy * dy;
+                    best = i;
+                    bestChunk = &chunk;
+                }
+            }
+        }
+        Base::State& base = Base::Get();
+        const bool near = best >= 0;
+        const AZ::u64 nearId = near ? (Key(bestChunk->m_x, bestChunk->m_y) ^ (static_cast<AZ::u64>(bestChunk->m_pickups[best].m_index + 1) << 48)) : 0;
+        if (near != m_pickupPrompt || nearId != m_promptPickup)
+        {
+            m_pickupPrompt = near;
+            m_promptPickup = nearId;
+            registry->Set("/NoclipProtocol/Hud/interact.verb", AZStd::string(near ? "Pick up" : ""));
+            registry->Set("/NoclipProtocol/Hud/interact.item", AZStd::string(near ? Base::SupplyName(bestChunk->m_pickups[best].m_kind) : ""));
+            registry->Set("/NoclipProtocol/Hud/interact.target", AZStd::string(near ? "pickup" : ""));
+        }
+        if (!base.m_pickRequested)
+        {
+            return;
+        }
+        base.m_pickRequested = false;
+        if (!near)
+        {
+            return;
+        }
+        Chunk::LivePickup& pickup = bestChunk->m_pickups[best];
+        if (auto* spawner = AzFramework::SpawnableEntitiesInterface::Get(); spawner && pickup.m_ticket.IsValid())
+        {
+            spawner->DespawnAllEntities(pickup.m_ticket);
+        }
+        m_collected.insert(Key(bestChunk->m_x, bestChunk->m_y) ^ (static_cast<AZ::u64>(pickup.m_index + 1) << 48));
+        // How much: scrap 2-4, wire 1-2, fuel 1, Almond Water 1.
+        int amount = 1;
+        AZStd::string text;
+        switch (pickup.m_kind)
+        {
+        case 0: amount = 2 + pickup.m_index % 3; base.m_scrap += amount; text = AZStd::string::format("+%d SCRAP", amount); break;
+        case 1: amount = 1 + pickup.m_index % 2; base.m_wire += amount; text = AZStd::string::format("+%d WIRE", amount); break;
+        case 2: base.m_fuel += 1; text = "+1 FUEL"; break;
+        default: base.m_almondWater += 1; text = "+1 ALMOND WATER \xc2\xb7 [Q] DRINK"; break;
+        }
+        bestChunk->m_pickups.erase(bestChunk->m_pickups.begin() + best);
+        m_pickupPrompt = false;
+        m_promptPickup = 0;
+        registry->Set("/NoclipProtocol/Hud/interact.verb", AZStd::string());
+        registry->Set("/NoclipProtocol/Hud/interact.item", AZStd::string());
+        registry->Set("/NoclipProtocol/Hud/interact.target", AZStd::string());
+        double now = 0.0;
+        registry->Get(now, "/NoclipProtocol/Hud/time");
+        registry->Set("/NoclipProtocol/Hud/toast", text);
+        registry->Set("/NoclipProtocol/Hud/toast.until", now + 2.5);
+        base.Save();
     }
 } // namespace NoclipProtocol

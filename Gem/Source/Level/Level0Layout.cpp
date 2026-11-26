@@ -72,6 +72,7 @@ namespace NoclipProtocol::Level0
             TagSpawnLight = 18,
             TagProp = 19,
             TagNoclip = 20,
+            TagPickup = 21,
         };
 
         float Smooth(float t) { return t * t * (3.0f - 2.0f * t); }
@@ -152,6 +153,7 @@ namespace NoclipProtocol::Level0
         }
         else if (settings.m_style == 2)
         {
+            settings.m_pickupChance = 0.03f; // small cells: fewer per cell
             // Level 2: cramped maintenance tunnels. 3 m cells, almost no loops, low ceiling, pipes along the walls,
             // a caged bulb every other cell at most.
             settings.m_chunkCells = 8;
@@ -664,6 +666,36 @@ namespace NoclipProtocol::Level0
                 const int cx = static_cast<int>(Mix(hn ^ 1) % static_cast<uint64_t>(n));
                 const int cy = static_cast<int>(Mix(hn ^ 2) % static_cast<uint64_t>(n));
                 layout.m_noclipSpots.push_back(Point{ (static_cast<float>(baseX + cx) + 0.5f) * cell, (static_cast<float>(baseY + cy) + 0.5f) * cell, 0.0f });
+            }
+        }
+
+        // 11. Supplies lying about: scrap (most), wire, fuel, Almond Water (rarest), never inside the spawn room.
+        if (settings.m_pickupChance > 0.0f && settings.m_style <= 2)
+        {
+            const int r = settings.m_spawnRoomRadius;
+            int index = 0;
+            for (int cy = 0; cy < n; ++cy)
+            {
+                for (int cx = 0; cx < n; ++cx)
+                {
+                    const int gx = baseX + cx;
+                    const int gy = baseY + cy;
+                    if (gx >= -r && gx <= r && gy >= -r && gy <= r)
+                    {
+                        continue;
+                    }
+                    const uint64_t hp = Hash(settings.m_seed, TagPickup, gx, gy);
+                    if (Unit(hp) >= settings.m_pickupChance)
+                    {
+                        continue;
+                    }
+                    const float roll = Unit(Mix(hp ^ 3));
+                    const int kind = roll < 0.45f ? 0 : (roll < 0.70f ? 1 : (roll < 0.85f ? 2 : 3));
+                    const float jx = (Unit(Mix(hp ^ 4)) - 0.5f) * 0.4f * cell;
+                    const float jy = (Unit(Mix(hp ^ 5)) - 0.5f) * 0.4f * cell;
+                    layout.m_pickups.push_back(ChunkLayout::Pickup{
+                        Point{ (static_cast<float>(gx) + 0.5f) * cell + jx, (static_cast<float>(gy) + 0.5f) * cell + jy, 0.0f }, kind, index++ });
+                }
             }
         }
 

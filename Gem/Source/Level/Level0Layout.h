@@ -43,6 +43,7 @@ namespace NoclipProtocol::Level0
         int m_style = 0;
         int m_lightSpacing = 1;        // a light every N cells (in a checker pattern when 2)
         float m_propChance = 0.0f;     // Level 1: crates per cell; Level 2: pipes per wall segment
+        float m_pickupChance = 0.05f; // per cell: scrap, wire, fuel or Almond Water lying about (ApplyStyle: fewer in Level 2)
         float m_noclipChance = 0.08f;  // chance a chunk has a noclip spot (a tear you walk through into the next level)
     };
 
@@ -107,6 +108,13 @@ namespace NoclipProtocol::Level0
         std::vector<Box> m_frames;        // Breach 4-A's hazard-striped frame (columns and lintel)
         std::vector<Box> m_voids;         // the breach itself where it is not a way out (Level 0's end of Breach 4-A)
         std::vector<Box> m_screens;       // glowing terminal screens
+        struct Pickup
+        {
+            Point m_at;  // on the floor
+            int m_kind;  // 0 scrap, 1 wire, 2 fuel, 3 Almond Water
+            int m_index; // its number in this chunk (with the chunk, a lasting id: collected ones stay gone)
+        };
+        std::vector<Pickup> m_pickups;    // supplies to gather for the forward base
     };
 
     //! The intro facility (style 3): where the player starts, the terminal, and Breach 4-A.

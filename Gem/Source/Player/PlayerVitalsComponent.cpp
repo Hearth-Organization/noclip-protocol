@@ -76,6 +76,13 @@ namespace NoclipProtocol
             m_grainSet = grain;
             AZ::Render::FilmGrainRequestBus::Broadcast(&AZ::Render::FilmGrainRequests::SetIntensity, grain);
         }
+        // Almond Water (the HUD's [Q]) adds to sanity.
+        double sanityAdd = 0.0;
+        if (registry->Get(sanityAdd, "/NoclipProtocol/Player/SanityAdd") && sanityAdd != 0.0)
+        {
+            m_sanity = AZStd::clamp(m_sanity + static_cast<float>(sanityAdd), 0.0f, 1.0f);
+            registry->Set("/NoclipProtocol/Player/SanityAdd", 0.0);
+        }
         bool paused = false;
         registry->Get(paused, "/NoclipProtocol/Paused");
         if (paused)

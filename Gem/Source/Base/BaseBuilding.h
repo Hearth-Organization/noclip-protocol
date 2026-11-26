@@ -6,7 +6,11 @@
 // static State is the hand-off between them.
 #pragma once
 
+#include <AzCore/IO/FileIO.h>
+#include <AzCore/JSON/document.h>
+#include <AzCore/Utils/Utils.h>
 #include <AzCore/std/containers/vector.h>
+#include <AzCore/std/string/string.h>
 
 #include <cmath>
 
@@ -65,7 +69,16 @@ namespace NoclipProtocol::Base
         float m_x;
         float m_y;
         float m_yaw;
+        bool m_restore = false; // putting a saved piece back: no cost, no checks, no fanfare
     };
+
+    //! Supplies found lying in the levels.
+    enum class Supply : int { Scrap = 0, Wire, Fuel, AlmondWater, Count };
+    inline const char* SupplyName(int kind)
+    {
+        static const char* const names[] = { "Scrap", "Wire", "Fuel", "Almond Water" };
+        return names[kind < 0 || kind > 3 ? 0 : kind];
+    }
 
     struct State
     {
@@ -83,8 +96,109 @@ namespace NoclipProtocol::Base
         int m_almondWater = 5;
         float m_powerMax = 10.0f;
         bool m_beaconUp = false;
-        AZStd::vector<Placed> m_placed;     // what stands (kept by the generator)
+        AZStd::vector<Placed> m_placed;     // what stands in the forward base (kept while other levels play, and saved)
         AZStd::vector<Request> m_requests;  // from the HUD, done by the generator on its next tick
+        bool m_pickRequested = false;       // [E] at a supply (the HUD asks, the generator picks it up)
+        bool m_loaded = false;              // the save has been read this run
+
+        void ResetToStart()
+        {
+            m_scrap = 38;
+            m_wire = 12;
+            m_fuel = 3;
+            m_almondWater = 5;
+            m_powerMax = 10.0f;
+            m_beaconUp = false;
+            m_placed.clear();
+            m_requests.clear();
+        }
+
+        // The expedition's save: the forward base and the stockpile (CONTINUE picks it up again).
+        static constexpr const char* SavePath = "@user@/Saves/expedition.json";
+
+        void Save() const
+        {
+            AZStd::string text = AZStd::string::format(
+                "{\n  \"version\": 1,\n  \"scrap\": %d,\n  \"wire\": %d,\n  \"fuel\": %d,\n  \"almondWater\": %d,\n  \"placed\": [",
+                m_scrap, m_wire, m_fuel, m_almondWater);
+            for (size_t i = 0; i < m_placed.size(); ++i)
+            {
+                const Placed& p = m_placed[i];
+                text += AZStd::string::format("%s\n    { \"kind\": %d, \"x\": %.2f, \"y\": %.2f, \"yaw\": %.4f }", i ? "," : "",
+                    static_cast<int>(p.m_kind), p.m_x, p.m_y, p.m_yaw);
+            }
+            text += "\n  ]\n}\n";
+            if (auto* io = AZ::IO::FileIOBase::GetInstance())
+            {
+                char resolved[AZ_MAX_PATH_LEN] = {};
+                if (io->ResolvePath(SavePath, resolved, sizeof(resolved)))
+                {
+                    AZ::Utils::WriteFile(text, resolved);
+                }
+            }
+        }
+
+        //! Reads the save once per run (later calls do nothing). No save: the starting stockpile.
+        void LoadOnce()
+        {
+            if (m_loaded)
+            {
+                return;
+            }
+            m_loaded = true;
+            auto* io = AZ::IO::FileIOBase::GetInstance();
+            char resolved[AZ_MAX_PATH_LEN] = {};
+            if (!io || !io->ResolvePath(SavePath, resolved, sizeof(resolved)))
+            {
+                return;
+            }
+            auto read = AZ::Utils::ReadFile<AZStd::string>(resolved);
+            if (!read.IsSuccess())
+            {
+                return;
+            }
+            rapidjson::Document doc;
+            doc.Parse(read.GetValue().c_str());
+            if (!doc.IsObject())
+            {
+                return;
+            }
+            auto number = [&doc](const char* key, int fallback)
+            { return doc.HasMember(key) && doc[key].IsNumber() ? static_cast<int>(doc[key].GetDouble()) : fallback; };
+            m_scrap = number("scrap", m_scrap);
+            m_wire = number("wire", m_wire);
+            m_fuel = number("fuel", m_fuel);
+            m_almondWater = number("almondWater", m_almondWater);
+            m_placed.clear();
+            if (doc.HasMember("placed") && doc["placed"].IsArray())
+            {
+                for (const auto& item : doc["placed"].GetArray())
+                {
+                    if (!item.IsObject() || !item.HasMember("kind") || !item["kind"].IsNumber())
+                    {
+                        continue;
+                    }
+                    const int kind = static_cast<int>(item["kind"].GetDouble());
+                    if (kind < 0 || kind >= static_cast<int>(Kind::Count))
+                    {
+                        continue;
+                    }
+                    auto f = [&item](const char* key) { return item.HasMember(key) && item[key].IsNumber() ? static_cast<float>(item[key].GetDouble()) : 0.0f; };
+                    m_placed.push_back(Placed{ static_cast<Kind>(kind), f("x"), f("y"), f("yaw") });
+                }
+            }
+        }
+
+        //! NEW EXPEDITION: back to the starting stockpile, no base, and the save gone.
+        void NewExpedition()
+        {
+            ResetToStart();
+            m_loaded = true;
+            if (auto* io = AZ::IO::FileIOBase::GetInstance())
+            {
+                io->Remove(SavePath);
+            }
+        }
 
         float PowerUsed() const
         {

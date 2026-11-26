@@ -11,6 +11,8 @@ Builds the base-building pieces (the approved Build mockup's LIGHTING tab):
   Prefabs/Base/Build_BeaconLight its gold light
   Prefabs/Base/Build_UvLamp     a violet UV lamp (on a 1.2 m stand)
   (Ceiling panel fix puts up Level 0's own ceiling light.)
+  Prefabs/Base/Pickup_Scrap / _Wire / _Fuel / _Water: supplies lying about in Levels 0-2 (no colliders; [E] picks
+  one up). The game stretches each to its size.
 
 Copies of the Level 0 pieces with materials and lights swapped, like the level tools.
 """
@@ -97,5 +99,33 @@ def main():
                {"panel": [0.18, 0.5, 0.08], "color": [0.6, 0.35, 1.0], "bulb": (0.7, 1.0), "fill": (0.5, 1.0)})
 
 
+def strip_colliders(rel):
+    full = path(rel)
+    with open(full) as f:
+        data = json.load(f)
+    for entity in [data.get("ContainerEntity")] + list(data.get("Entities", {}).values()):
+        comps = entity.get("Components", {}) if entity else {}
+        for key in [k for k, c in comps.items() if "Collider" in c.get("$type", "") or "RigidBody" in c.get("$type", "")]:
+            del comps[key]
+    with open(full, "w") as f:
+        json.dump(data, f, indent=4)
+
+
+def pickups():
+    pillar = asset_guid(lv.LEVEL0_MATERIALS["pillar"])
+    kinds = {
+        "Scrap": material("pickup_scrap", {"baseColor.color": [0.32, 0.22, 0.14, 1.0], "metallic.factor": 0.7, "roughness.factor": 0.8}),
+        "Wire": material("pickup_wire", {"baseColor.color": [0.75, 0.42, 0.2, 1.0], "metallic.factor": 1.0, "roughness.factor": 0.35}),
+        "Fuel": material("pickup_fuel", {"baseColor.color": [0.6, 0.06, 0.04, 1.0], "metallic.factor": 0.3, "roughness.factor": 0.5}),
+        # Almond Water: a pale bottle with a faint glow, so it's findable in the dark.
+        "Water": material("pickup_water", {"baseColor.color": [0.9, 0.88, 0.78, 1.0], "roughness.factor": 0.1,
+                                            "emissive.enable": True, "emissive.color": [1.0, 0.95, 0.8, 1.0], "emissive.intensity": 0.8}),
+    }
+    for name, guid in kinds.items():
+        copy_piece("L0_Pillar.prefab", f"Pickup_{name}.prefab", {pillar: guid})
+        strip_colliders(f"Prefabs/Base/Pickup_{name}.prefab")
+
+
 if __name__ == "__main__":
     main()
+    pickups()
