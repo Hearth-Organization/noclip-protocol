@@ -1,0 +1,237 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "SpaceHeater",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 5250736321573591033,
+                "Child Entity Order": [
+                    "Entity_[21422333386]",
+                    "Entity_[734482962871]"
+                ]
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 611352882883999996
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 8375018504070457259
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 4814141268154145727
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 5942763974552814363
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 2422873699817385250
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 2739362323085952781
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 7362555899402560818
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 5184151175362249206
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 1792364377685597307,
+                "Parent Entity": ""
+            }
+        }
+    },
+    "Entities": {
+        "Entity_[21422333386]": {
+            "Id": "Entity_[21422333386]",
+            "Name": "SpaceHeater_Part0",
+            "Components": {
+                "AZ::Render::EditorMeshComponent": {
+                    "$type": "AZ::Render::EditorMeshComponent",
+                    "Id": 2153662855291914219,
+                    "Controller": {
+                        "Configuration": {
+                            "ModelAsset": {
+                                "assetId": {
+                                    "guid": "{C15CD465-9589-56ED-945F-8416FA4798A3}",
+                                    "subId": 284301017
+                                },
+                                "assetHint": "objects/_primitives/_box_1x1.fbx.azmodel"
+                            }
+                        }
+                    }
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 4083345573457239886
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 2341953323251963750
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 8745447006815215439
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 3278512302949088534
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 7239283406747461927
+                },
+                "EditorMaterialComponent": {
+                    "$type": "EditorMaterialComponent",
+                    "Id": 7203446118223274960,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": {
+                                "{}": {
+                                    "MaterialAsset": {
+                                        "assetId": {
+                                            "guid": "{33F59354-0EC4-5E11-83E7-F1AEAB796C6B}"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "EditorNonUniformScaleComponent": {
+                    "$type": "EditorNonUniformScaleComponent",
+                    "Id": 7480962150485278515,
+                    "NonUniformScale": [
+                        0.4,
+                        0.22,
+                        0.55
+                    ]
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 900394956820812249
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 3037552937018819550
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 4844948272593612093
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 8238123622070637623,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0,
+                            0,
+                            0.275
+                        ]
+                    }
+                }
+            }
+        },
+        "Entity_[734482962871]": {
+            "Id": "Entity_[734482962871]",
+            "Name": "SpaceHeater_Part1",
+            "Components": {
+                "AZ::Render::EditorMeshComponent": {
+                    "$type": "AZ::Render::EditorMeshComponent",
+                    "Id": 7802197615537643793,
+                    "Controller": {
+                        "Configuration": {
+                            "ModelAsset": {
+                                "assetId": {
+                                    "guid": "{C15CD465-9589-56ED-945F-8416FA4798A3}",
+                                    "subId": 284301017
+                                },
+                                "assetHint": "objects/_primitives/_box_1x1.fbx.azmodel"
+                            }
+                        }
+                    }
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 2137049586380500388
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 1233403618573622262
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 5762063856905533162
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 5571367311979727401
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 7503837217701597981
+                },
+                "EditorMaterialComponent": {
+                    "$type": "EditorMaterialComponent",
+                    "Id": 7877894283487139784,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": {
+                                "{}": {
+                                    "MaterialAsset": {
+                                        "assetId": {
+                                            "guid": "{F72D44E5-C795-5AFD-A805-4EB2C7678C5E}"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "EditorNonUniformScaleComponent": {
+                    "$type": "EditorNonUniformScaleComponent",
+                    "Id": 2500207674929617523,
+                    "NonUniformScale": [
+                        0.32,
+                        0.01,
+                        0.4
+                    ]
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 3918871023072266351
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 7953430111925418962
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 2689895365059188134
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 7569453601985378931,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0,
+                            0.112,
+                            0.28
+                        ]
+                    }
+                }
+            }
+        }
+    }
+}

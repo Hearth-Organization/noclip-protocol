@@ -1,0 +1,416 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "StandingFan",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 5839277452133613790,
+                "Child Entity Order": [
+                    "Entity_[641597568828]",
+                    "Entity_[708589131128]",
+                    "Entity_[992195038384]",
+                    "Entity_[46647529284]"
+                ]
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 7731376672790897464
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 2043622679257079431
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 4921018102709081402
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 291497712667807832
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 1215374681846921480
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 7125091233619061326
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 1207739127118377329
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 2681799781182943500
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 8533211783162517463,
+                "Parent Entity": ""
+            }
+        }
+    },
+    "Entities": {
+        "Entity_[641597568828]": {
+            "Id": "Entity_[641597568828]",
+            "Name": "StandingFan_Part0",
+            "Components": {
+                "AZ::Render::EditorMeshComponent": {
+                    "$type": "AZ::Render::EditorMeshComponent",
+                    "Id": 6653440046190962276,
+                    "Controller": {
+                        "Configuration": {
+                            "ModelAsset": {
+                                "assetId": {
+                                    "guid": "{F322592F-43BC-50E7-903C-CC231846093F}",
+                                    "subId": 276443623
+                                },
+                                "assetHint": "objects/_primitives/_cylinder_1x1.fbx.azmodel"
+                            }
+                        }
+                    }
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 4611426899652230359
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 3754540221587737035
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 1556865199279155301
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 3638890599535034599
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 3557893624027871342
+                },
+                "EditorMaterialComponent": {
+                    "$type": "EditorMaterialComponent",
+                    "Id": 2517519813296230475,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": {
+                                "{}": {
+                                    "MaterialAsset": {
+                                        "assetId": {
+                                            "guid": "{82406D78-5193-5FC8-96DF-52C5B5BB95C9}"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "EditorNonUniformScaleComponent": {
+                    "$type": "EditorNonUniformScaleComponent",
+                    "Id": 3378602503278503540,
+                    "NonUniformScale": [
+                        0.4,
+                        0.4,
+                        0.04
+                    ]
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 1752714577862742810
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 261514655439115691
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 5428358409168219349
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 1359850606699364909,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0,
+                            0,
+                            0.02
+                        ]
+                    }
+                }
+            }
+        },
+        "Entity_[708589131128]": {
+            "Id": "Entity_[708589131128]",
+            "Name": "StandingFan_Part1",
+            "Components": {
+                "AZ::Render::EditorMeshComponent": {
+                    "$type": "AZ::Render::EditorMeshComponent",
+                    "Id": 586003107683825335,
+                    "Controller": {
+                        "Configuration": {
+                            "ModelAsset": {
+                                "assetId": {
+                                    "guid": "{F322592F-43BC-50E7-903C-CC231846093F}",
+                                    "subId": 276443623
+                                },
+                                "assetHint": "objects/_primitives/_cylinder_1x1.fbx.azmodel"
+                            }
+                        }
+                    }
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 9108227370507137223
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 8246268682224511058
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 8635047920525565848
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 1701304461810599261
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 7072847838442528857
+                },
+                "EditorMaterialComponent": {
+                    "$type": "EditorMaterialComponent",
+                    "Id": 5470017952635816258,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": {
+                                "{}": {
+                                    "MaterialAsset": {
+                                        "assetId": {
+                                            "guid": "{82406D78-5193-5FC8-96DF-52C5B5BB95C9}"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "EditorNonUniformScaleComponent": {
+                    "$type": "EditorNonUniformScaleComponent",
+                    "Id": 8950293770126722867,
+                    "NonUniformScale": [
+                        0.04,
+                        0.04,
+                        1.0
+                    ]
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 705352306374325196
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 104109513958434724
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 4939163548335882464
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 1656450300602452388,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0,
+                            0,
+                            0.54
+                        ]
+                    }
+                }
+            }
+        },
+        "Entity_[992195038384]": {
+            "Id": "Entity_[992195038384]",
+            "Name": "StandingFan_Part2",
+            "Components": {
+                "AZ::Render::EditorMeshComponent": {
+                    "$type": "AZ::Render::EditorMeshComponent",
+                    "Id": 6018417761899342945,
+                    "Controller": {
+                        "Configuration": {
+                            "ModelAsset": {
+                                "assetId": {
+                                    "guid": "{F322592F-43BC-50E7-903C-CC231846093F}",
+                                    "subId": 276443623
+                                },
+                                "assetHint": "objects/_primitives/_cylinder_1x1.fbx.azmodel"
+                            }
+                        }
+                    }
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 5849036023328340247
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 5736934105145198928
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 8219829510792614295
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 3479626677323087782
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 9125893809793210988
+                },
+                "EditorMaterialComponent": {
+                    "$type": "EditorMaterialComponent",
+                    "Id": 6221360173740809471,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": {
+                                "{}": {
+                                    "MaterialAsset": {
+                                        "assetId": {
+                                            "guid": "{82406D78-5193-5FC8-96DF-52C5B5BB95C9}"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "EditorNonUniformScaleComponent": {
+                    "$type": "EditorNonUniformScaleComponent",
+                    "Id": 2370570946297398354,
+                    "NonUniformScale": [
+                        0.45,
+                        0.45,
+                        0.12
+                    ]
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 5608086183104927170
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 4933415728777454282
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 1758285827803750729
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 9105330116915499756,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0,
+                            0.05,
+                            1.12
+                        ],
+                        "Rotate": [
+                            90.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                }
+            }
+        },
+        "Entity_[46647529284]": {
+            "Id": "Entity_[46647529284]",
+            "Name": "StandingFan_Blocker",
+            "Components": {
+                "EditorColliderComponent": {
+                    "$type": "EditorColliderComponent",
+                    "Id": 5540548535799829272,
+                    "ColliderConfiguration": {
+                        "MaterialSlots": {
+                            "Slots": [
+                                {
+                                    "Name": "Entire object"
+                                }
+                            ]
+                        }
+                    },
+                    "ShapeConfiguration": {
+                        "ShapeType": 1,
+                        "HasNonUniformScale": true
+                    },
+                    "HasNonUniformScale": true
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 9042876035018954109
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 7976306388477211048
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 2774124228850398885
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 4294597533686677578
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 8633065286296217021
+                },
+                "EditorNonUniformScaleComponent": {
+                    "$type": "EditorNonUniformScaleComponent",
+                    "Id": 1151093601913793985,
+                    "NonUniformScale": [
+                        0.45,
+                        0.4,
+                        1.345
+                    ]
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 6587541760262005106
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 3506910782812252958
+                },
+                "EditorStaticRigidBodyComponent": {
+                    "$type": "EditorStaticRigidBodyComponent",
+                    "Id": 9106106905627121242
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 5144984871691956185
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 8700453396570192633,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0,
+                            0,
+                            0.6725
+                        ]
+                    }
+                }
+            }
+        }
+    }
+}

@@ -45,8 +45,8 @@ namespace NoclipProtocol::Level0
         float m_propChance = 0.0f;     // Level 1: crates per cell; Level 2: pipes per wall segment
         float m_pickupChance = 0.05f; // per cell: scrap, wire, fuel or Almond Water lying about (ApplyStyle: fewer in Level 2)
         float m_noclipChance = 0.08f;  // chance a chunk has a noclip spot (a tear you walk through into the next level)
-        float m_clutterChance = 0.5f;  // per cell: something that ended up here (ApplyStyle sets it per level; 0 = none)
-        float m_scatterChance = 0.3f;  // per cell: small things lying about (cans, papers, a backpack)
+        float m_clutterChance = 0.6f;  // per cell: something that ended up here (ApplyStyle sets it per level; 0 = none)
+        float m_scatterChance = 0.4f;  // per cell: small things lying about (cans, papers, a backpack)
     };
 
     //! Level 1 and 2 presets: sizes, openness, pillars, rooms, lights and props for that level's look.

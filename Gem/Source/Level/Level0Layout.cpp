@@ -140,7 +140,7 @@ namespace NoclipProtocol::Level0
             settings.m_decalChance = 0.45f;
             settings.m_lightSpacing = 1;
             settings.m_propChance = 0.2f;
-            settings.m_clutterChance = 0.55f;
+            settings.m_clutterChance = 0.65f;
             settings.m_scatterChance = 0.3f;
         }
         else if (settings.m_style == 3)
@@ -175,8 +175,8 @@ namespace NoclipProtocol::Level0
             settings.m_decalChance = 0.35f;
             settings.m_lightSpacing = 2;
             settings.m_propChance = 0.65f;
-            settings.m_clutterChance = 0.4f;
-            settings.m_scatterChance = 0.35f;
+            settings.m_clutterChance = 0.5f;
+            settings.m_scatterChance = 0.4f;
         }
     }
 

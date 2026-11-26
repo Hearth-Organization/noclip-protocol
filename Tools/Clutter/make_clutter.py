@@ -145,9 +145,30 @@ def legs4(w, d, h, t, mat, inset=0.03, z0=0.0):
 PROPS = {}
 
 
+def bounds(parts):
+    """Width (x), depth (y) and height of a prop from its parts, centered on the origin (turned parts included)."""
+    import math
+    mx = my = mz = 0.0
+    for _shape, center, size, _mat, rot in parts:
+        rx, ry, rz = [math.radians(a) for a in (rot or (0, 0, 0))]
+        cx, sx_, cy, sy_, cz, sz_ = math.cos(rx), math.sin(rx), math.cos(ry), math.sin(ry), math.cos(rz), math.sin(rz)
+        for dx in (-0.5, 0.5):
+            for dy in (-0.5, 0.5):
+                for dz in (-0.5, 0.5):
+                    x, y, z = dx * size[0], dy * size[1], dz * size[2]
+                    y, z = y * cx - z * sx_, y * sx_ + z * cx      # about X
+                    x, z = x * cy + z * sy_, -x * sy_ + z * cy     # about Y
+                    x, y = x * cz - y * sz_, x * sz_ + y * cz      # about Z
+                    mx = max(mx, abs(center[0] + x))
+                    my = max(my, abs(center[1] + y))
+                    mz = max(mz, center[2] + z)
+    return (round(2 * mx, 3), round(2 * my, 3), round(mz, 3))
+
+
 def prop(name, place, size, weights, parts, collide=True):
-    """size = (width x, depth y, height); weights = (Level 0, Level 1, Level 2)."""
-    PROPS[name] = {"place": place, "size": size, "weights": weights, "parts": parts, "collide": collide}
+    """weights = (Level 0, Level 1, Level 2). The size is worked out from the parts (the given one is only a note)."""
+    assert name not in PROPS, f"duplicate prop {name}"
+    PROPS[name] = {"place": place, "size": bounds(parts), "weights": weights, "parts": parts, "collide": collide}
 
 
 def office_chair():
@@ -243,13 +264,13 @@ prop("Payphone", "wall", (0.4, 0.3, 1.7), (3, 2, 0), [
     F(0, -0.05, 0.95, 0.36, 0.2, 0.6, "metal"), F(0, 0.06, 1.2, 0.2, 0.02, 0.2, "metal_dark"),
     F(-0.12, 0.08, 1.05, 0.06, 0.06, 0.25, "black_plastic"), F(0, 0.07, 0.95, 0.12, 0.02, 0.15, "metal_dark")])
 
-prop("PhoneBooth", "wall", (1.0, 1.0, 2.4), (2, 1, 0), [
-    F(-0.47, -0.47, 0, 0.06, 0.06, 2.3, "red_paint"), F(0.47, -0.47, 0, 0.06, 0.06, 2.3, "red_paint"),
-    F(-0.47, 0.47, 0, 0.06, 0.06, 2.3, "red_paint"), F(0.47, 0.47, 0, 0.06, 0.06, 2.3, "red_paint"),
-    F(0, 0, 2.3, 1.0, 1.0, 0.1, "red_paint"), F(0, 0, 0, 1.0, 1.0, 0.05, "red_paint"),
-    F(0, -0.47, 0.05, 0.88, 0.04, 2.25, "red_paint"),
-    F(-0.47, 0, 1.0, 0.03, 0.88, 1.1, "glass_dark"), F(0.47, 0, 1.0, 0.03, 0.88, 1.1, "glass_dark"),
-    F(0, -0.42, 1.2, 0.3, 0.06, 0.4, "metal"), F(0, 0, 2.15, 0.6, 1.02, 0.12, "lamp_glow")])
+prop("PhoneBooth", "wall", (1.0, 0.9, 2.4), (2, 1, 0), [
+    F(-0.47, -0.42, 0, 0.06, 0.06, 2.3, "red_paint"), F(0.47, -0.42, 0, 0.06, 0.06, 2.3, "red_paint"),
+    F(-0.47, 0.42, 0, 0.06, 0.06, 2.3, "red_paint"), F(0.47, 0.42, 0, 0.06, 0.06, 2.3, "red_paint"),
+    F(0, 0, 2.3, 1.0, 0.9, 0.1, "red_paint"), F(0, 0, 0, 1.0, 0.9, 0.05, "red_paint"),
+    F(0, -0.42, 0.05, 0.88, 0.04, 2.25, "red_paint"),
+    F(-0.47, 0, 1.0, 0.03, 0.78, 1.1, "glass_dark"), F(0.47, 0, 1.0, 0.03, 0.78, 1.1, "glass_dark"),
+    F(0, -0.37, 1.2, 0.3, 0.06, 0.4, "metal"), F(0, 0, 2.15, 0.6, 0.86, 0.12, "lamp_glow")])
 
 prop("LoneDoor", "free", (1.1, 0.2, 2.15), (3, 0, 1), [
     F(-0.5, 0, 0, 0.08, 0.14, 2.12, "wood_light"), F(0.5, 0, 0, 0.08, 0.14, 2.12, "wood_light"),
@@ -434,7 +455,7 @@ prop("Crt Monitor Pile".replace(" ", ""), "wall", (1.0, 0.6, 0.9), (3, 1, 1), [
 
 
 # A fallen MTF soldier, lying on his back with his gear (later: [E] search for his weapon, ammo, notes).
-prop("FallenSoldier", "free", (0.9, 1.9, 0.3), (2, 2, 2), [
+prop("FallenSoldier", "small", (0.9, 1.9, 0.3), (2, 2, 2), [
     F(0, 0.15, 0, 0.42, 0.62, 0.22, "mtf_uniform"), F(0, 0.15, 0.2, 0.44, 0.5, 0.08, "mtf_vest"),
     F(-0.16, 0.38, 0.28, 0.06, 0.06, 0.01, "mtf_patch"),
     S(0, 0.62, 0.11, 0.22, "mannequin", 0.2), S(0, 0.63, 0.15, 0.27, "mtf_vest", 0.18),
@@ -443,6 +464,10 @@ prop("FallenSoldier", "free", (0.9, 1.9, 0.3), (2, 2, 2), [
     F(-0.3, 0.2, 0, 0.11, 0.55, 0.11, "mtf_uniform", [0, 0, 18]), F(0.33, 0.35, 0, 0.11, 0.5, 0.11, "mtf_uniform", [0, 0, -40]),
     F(0.55, 0.0, 0, 0.08, 0.85, 0.09, "metal_dark", [0, 0, 25]), F(0.53, 0.05, 0.02, 0.06, 0.2, 0.14, "metal_dark", [0, 0, 25])],
     collide=False)
+
+import more_props  # noqa: E402  (everything else that has fallen in)
+more_props.add(prop, F, B, C, S, legs4)
+
 
 # Little scenes, laid out around a cell's middle: (prop, x, y, yaw degrees). Weights as for props.
 VIGNETTES = {
@@ -457,6 +482,23 @@ VIGNETTES = {
     "Bedroom": ((3, 0, 1), [("Mattress", -0.3, 0, 5), ("FloorLamp", 0.75, -0.8, 0), ("TeddyBear", -0.2, 0.7, 160), ("Radio", 0.6, 0.5, -80)]),
     "FallenPatrol": ((2, 2, 2), [("FallenSoldier", 0, 0, 0), ("Backpack", 0.7, -0.6, 60), ("Papers", -0.5, -0.8, 0),
                                  ("Lantern", -0.6, 0.5, 0), ("TinCans", 0.6, 0.8, 0)]),
+    "Kitchenette": ((4, 0, 0), [("KitchenTable", 0, 0.2, 0), ("KitchenChair", -0.75, 0.2, 90), ("KitchenChair", 0.75, 0.2, -90),
+                                ("DirtyDishes", 0.1, 0.25, 0), ("Kettle", 0, -1.1, 0), ("TrashBags", 1.2, -1.1, 0)]),
+    "WaitingRoom": ((3, 1, 0), [("WaitingChairs", 0, -0.9, 0), ("CoffeeTable", 0, 0.1, 0), ("PottedFern", 1.15, -1.1, 0),
+                                ("Papers", -0.6, 0.6, 0), ("WetFloorSign", 0.9, 0.9, 30)]),
+    "Classroom": ((3, 0, 0), [("SchoolDesk", -0.6, -0.5, 0), ("SchoolDesk", 0.6, -0.5, 0), ("SchoolDesk", -0.6, 0.7, 0),
+                              ("SchoolDesk", 0.6, 0.7, 10), ("Globe", 1.25, 1.2, 0), ("PaperStack", -1.2, 1.2, 0)]),
+    "Party": ((2, 0, 0), [("PartyTable", 0, 0, 0), ("Balloons", 1.1, 0.8, 0), ("GiftBoxes", -1.0, -0.8, 30),
+                          ("PlasticChair", 0, 0.75, 180), ("PlasticChair", 0.9, -0.6, 60)]),
+    "Laundry": ((3, 0, 1), [("WashingMachine", -0.4, -1.2, 0), ("WashingMachine", 0.3, -1.2, 0), ("LaundryBasket", 0.6, 0.2, 20),
+                            ("IroningBoard", -0.4, 0.6, 80), ("PairOfShoes", 0.9, 1.0, 0)]),
+    "Hospital": ((2, 0, 1), [("Gurney", -0.3, 0, 0), ("IvStand", 0.5, 0.6, 0), ("Wheelchair", 0.8, -0.9, 200), ("OxygenTank", -1.2, 0.9, 0)]),
+    "Playroom": ((2, 0, 0), [("RockingHorse", -0.6, 0.3, 40), ("ToyBlocks", 0.3, 0.4, 0), ("RedBall", 0.9, -0.5, 0), ("Tricycle", -0.2, -0.8, 120),
+                             ("TeddyBear", 0.6, 0.9, 200), ("Crib", 0.0, 1.0, 90)]),
+    "Garage": ((0, 4, 1), [("Workbench", 0, -1.6, 0), ("RollingToolChest", 1.6, -1.6, 0), ("Bicycle", -1.2, 0.5, 70),
+                           ("JerryCans", 0.8, 0.6, 0), ("TireStack", -1.6, -1.2, 0), ("PaintCans", 0.5, -0.6, 0)]),
+    "MtfOutpost": ((1, 2, 3), [("ArmyCot", -0.7, 0, 0), ("FoundationCrate", 0.8, -0.8, 0), ("AmmoCrate", 0.9, 0.3, 30),
+                               ("FieldRadio", 0.2, 0.9, 0), ("Lantern", -0.1, -0.2, 0), ("Sandbags", 0.5, 1.4, 180)]),
     "Workshop": ((0, 3, 5), [("Toolbox", 0, 0, 20), ("RustyBarrel", -0.8, 0.5, 0), ("Bucket", 0.5, 0.6, 0), ("Ladder", 0.9, -0.6, 90),
                              ("TrafficCone", -0.5, -0.6, 0)]),
 }
@@ -565,7 +607,39 @@ def write_catalog():
         f.write("\n".join(lines))
 
 
+def check_fits():
+    """Warn about props that can never be placed in a level they are weighted for (same limits as Level0Layout)."""
+    import math
+    levels = [(4.0, 0.2), (8.0, 0.3), (3.0, 0.25)]  # cell size, wall thickness per level
+    bad = 0
+    for name, s in PROPS.items():
+        w, d, _h = s["size"]
+        r = 0.5 * math.hypot(w, d)
+        for lvl, (cell, thick) in enumerate(levels):
+            if s["weights"][lvl] <= 0:
+                continue
+            inner = cell / 2 - thick / 2
+            band = min(0.95, cell * 0.25)
+            span = inner - band - 0.05
+            open_ = cell / 2 - 0.25
+            ok = {"wall": d <= band and w / 2 <= span, "free": r <= open_ - 0.6 or r <= span,
+                  "big": r <= open_, "small": r <= span + 0.3}[s["place"]]
+            if not ok:
+                # Too big for that level's cells on its own: left out there (scenes check their own fit).
+                bad += 1
+                weights = list(s["weights"])
+                weights[lvl] = 0
+                s["weights"] = tuple(weights)
+    for name, s in PROPS.items():
+        for part in s["parts"]:
+            assert part[3] in MATERIALS, f"{name}: unknown material {part[3]}"
+    if bad:
+        print(f"{bad} prop/level pairs left out (too big for those cells)")
+    return bad
+
+
 def main():
+    check_fits()
     write_materials()
     with open(path("Prefabs/Level0", "L0_Pillar.prefab")) as f:
         template = json.load(f)
