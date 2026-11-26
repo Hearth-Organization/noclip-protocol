@@ -436,6 +436,11 @@ def noclip_spot():
     for entity in [prefab.get("ContainerEntity")] + list(prefab.get("Entities", {}).values()):
         if entity and "Name" in entity:
             entity["Name"] = entity["Name"].replace("L0_Pillar", "NoclipSpot")
+    # Walk-through: no collider (a solid tear stopped the player just short of the spot).
+    for entity in [prefab.get("ContainerEntity")] + list(prefab.get("Entities", {}).values()):
+        comps = entity.get("Components", {}) if entity else {}
+        for key in [k for k, c in comps.items() if "Collider" in c.get("$type", "") or "RigidBody" in c.get("$type", "")]:
+            del comps[key]
     with open(path("Prefabs/Levels/NoclipSpot.prefab"), "w") as f:
         json.dump(prefab, f, indent=4)
     print("wrote Prefabs/Levels/NoclipSpot.prefab")

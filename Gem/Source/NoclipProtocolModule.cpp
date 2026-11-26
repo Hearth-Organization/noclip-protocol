@@ -10,6 +10,7 @@
 #include "Level/FlickerLightComponent.h"
 #include "Hud/NoclipHudComponent.h"
 #include "Player/PlayerVitalsComponent.h"
+#include "Debug/GameBridgeComponent.h"
 #include "Scripting/HearthBlocksComponent.h"
 #include "Hud/HearthHudComponent.h"
 #include "Debug/HearthDebugOverlayComponent.h"
@@ -41,6 +42,7 @@ namespace NoclipProtocol
                 HearthHudComponent::CreateDescriptor(),
                 NoclipHudComponent::CreateDescriptor(),
                 PlayerVitalsComponent::CreateDescriptor(),
+                GameBridgeComponent::CreateDescriptor(),
                 HearthDebugOverlayComponent::CreateDescriptor(),
                 HearthMonsterComponent::CreateDescriptor(),
             });

@@ -249,11 +249,15 @@ namespace NoclipProtocol
     {
         m_time = 0.0f;
         m_page = Page::None;
+        m_savedThisLevel = false;
         LoadSettings();
         ApplySettings();
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
             registry->Set("/NoclipProtocol/Paused", false);
+            // The HUD's clock starts again with each level: a toast from the last level ("Stepping through...")
+            // would otherwise stay up for as long as that level ran.
+            registry->Set("/NoclipProtocol/Hud/toast.until", 0.0);
         }
         AZ::TickBus::Handler::BusConnect();
         AzFramework::InputChannelEventListener::Connect();
@@ -682,8 +686,9 @@ namespace NoclipProtocol
             // The level being played, for CONTINUE: saved with the settings whenever it changes.
             AZStd::string level;
             registry->Get(level, "/NoclipProtocol/Save/Level");
-            if (!level.empty() && level != m_lastLevel)
+            if (!level.empty() && (level != m_lastLevel || !m_savedThisLevel))
             {
+                m_savedThisLevel = true; // the time it was last played: once per level load
                 m_lastLevel = level;
                 char when[32] = {};
                 const std::time_t now = std::time(nullptr);

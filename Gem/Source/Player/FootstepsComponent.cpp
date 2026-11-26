@@ -240,3 +240,4 @@ namespace NoclipProtocol
 // Player vitals are compiled with this file until the project is reconfigured with them in noclipprotocol_files.cmake
 // (a reconfigure build waits for the owner's OK).
 #include "PlayerVitalsComponent.cpp"
+#include "../Debug/GameBridgeComponent.cpp" // until the owner OKs a reconfigure for new files

@@ -2,6 +2,7 @@
 #include "../Render/RayTracing.h"
 #include "../Hud/NoclipHudComponent.h"
 #include "PlayerVitalsComponent.h"
+#include "../Debug/GameBridgeComponent.h"
 
 #include <AzCore/Settings/SettingsRegistry.h>
 #include <AzCore/Console/IConsole.h>
@@ -191,6 +192,7 @@ namespace NoclipProtocol
         m_uiEntity = aznew AZ::Entity("Noclip UI");
         m_uiEntity->CreateComponent<NoclipHudComponent>();
         m_uiEntity->CreateComponent<PlayerVitalsComponent>();
+        m_uiEntity->CreateComponent<GameBridgeComponent>();
         m_uiEntity->Init();
         m_uiEntity->Activate();
     }

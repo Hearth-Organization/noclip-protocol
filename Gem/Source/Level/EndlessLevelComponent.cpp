@@ -1035,7 +1035,7 @@ namespace NoclipProtocol
                 const bool inside = breach
                     ? std::fabs(d.GetX()) < 1.5f && std::fabs(d.GetY()) < 0.35f // walking through the 3 m wide hole
                     : d.GetX() * d.GetX() + d.GetY() * d.GetY() <= 0.6f * 0.6f;
-                if (!inside || std::fabs(d.GetZ()) > 1.5f)
+                if (!inside || std::fabs(d.GetZ()) > 2.5f) // the followed entity may be the eye (1.6 m up), not the feet
                 {
                     continue;
                 }

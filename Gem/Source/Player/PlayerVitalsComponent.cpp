@@ -66,6 +66,16 @@ namespace NoclipProtocol
             m_sanity = AZStd::clamp(static_cast<float>(player_sanity_set), 0.0f, 1.0f);
             player_sanity_set = -1.0f;
         }
+        // (Also while paused: the main menu is paused.) Film grain only creeps in as sanity goes: none above 60%, up to 0.3 at none left.
+        const float grain = 0.3f * AZStd::clamp((0.6f - m_sanity) / 0.6f, 0.0f, 1.0f);
+        // Sent again every second too: the level's post effects can come up after the player does.
+        m_grainResend -= deltaTime;
+        if (std::fabs(grain - m_grainSet) > 0.005f || m_grainSet < 0.0f || m_grainResend <= 0.0f)
+        {
+            m_grainResend = 1.0f;
+            m_grainSet = grain;
+            AZ::Render::FilmGrainRequestBus::Broadcast(&AZ::Render::FilmGrainRequests::SetIntensity, grain);
+        }
         bool paused = false;
         registry->Get(paused, "/NoclipProtocol/Paused");
         if (paused)
@@ -121,12 +131,5 @@ namespace NoclipProtocol
         registry->Set("/NoclipProtocol/Hud/player.stamina", static_cast<double>(m_stamina));
         registry->Set("/NoclipProtocol/Hud/player.sanity", static_cast<double>(m_sanity));
 
-        // Film grain only creeps in as sanity goes: none above 60%, up to 0.3 at none left.
-        const float grain = 0.3f * AZStd::clamp((0.6f - m_sanity) / 0.6f, 0.0f, 1.0f);
-        if (std::fabs(grain - m_grainSet) > 0.005f || m_grainSet < 0.0f)
-        {
-            m_grainSet = grain;
-            AZ::Render::FilmGrainRequestBus::Broadcast(&AZ::Render::FilmGrainRequests::SetIntensity, grain);
-        }
     }
 } // namespace NoclipProtocol
