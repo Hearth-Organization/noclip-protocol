@@ -73,7 +73,9 @@ namespace NoclipProtocol
         bool PieceAssetsReady() const;
         void SpawnChunk(int chunkX, int chunkY);
         void DespawnChunk(Chunk& chunk);
-        void SpawnBox(AzFramework::EntitySpawnTicket& ticket, const Level0::Box& box, bool stretch, float yawRadians = 0.0f);
+        void SpawnBox(AzFramework::EntitySpawnTicket& ticket, const Level0::Box& box, bool stretch, float yawRadians = 0.0f,
+            bool hum = false);
+        void UpdateHums(float deltaTime);
 
         // Settings (editable in the Editor)
         AZ::EntityId m_followEntity;
@@ -118,6 +120,16 @@ namespace NoclipProtocol
         // Runtime state
         AZ::Data::Asset<AzFramework::Spawnable> m_pieceAssets[PieceCount];
         AZStd::unordered_map<AZ::u64, Chunk> m_chunks;
+
+        // Light hum: only some lights hum, each starting at its own moment so the loops don't line up into one drone.
+        struct PendingHum
+        {
+            AZ::EntityId m_entity;
+            float m_delay = 0.0f;
+            int m_tries = 0;
+        };
+        AZStd::vector<PendingHum> m_pendingHums;
+        float m_humShareField = 0.5f; // share of working and dying lights that hum
         bool m_assetsMissing = false;
         bool m_announced = false;
         AZ::s64 m_shiftsSeen = 0;      // /NoclipProtocol/Level0/Shifts (Hearth Blocks "Shift the rooms")

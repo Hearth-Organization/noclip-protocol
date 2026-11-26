@@ -2,6 +2,10 @@
 #include "Level0Scripting.h"
 #include "Level0Json.h"
 #include "../Render/RayTracing.h"
+#include <AzCore/Component/ComponentApplicationBus.h>
+#include <AzCore/Component/Entity.h>
+#include <MiniAudio/MiniAudioPlaybackBus.h>
+#include <MiniAudio/SoundAsset.h>
 
 #include <AzCore/Asset/AssetManager.h>
 #include <AzCore/Asset/AssetManagerBus.h>
@@ -42,6 +46,7 @@ namespace NoclipProtocol
                 ->Field("DecalChance", &EndlessLevelComponent::m_decalChanceField)
                 ->Field("WorkingLights", &EndlessLevelComponent::m_workingLightsField)
                 ->Field("WorkingLightsRayTraced", &EndlessLevelComponent::m_workingLightsRayTracedField)
+                ->Field("HumShare", &EndlessLevelComponent::m_humShareField)
                 ->Field("EnablePillars", &EndlessLevelComponent::m_enablePillars)
                 ->Field("EnableLightBulbs", &EndlessLevelComponent::m_enableLightBulbs)
                 ->Field("EnableFlicker", &EndlessLevelComponent::m_enableFlicker)
@@ -118,6 +123,10 @@ namespace NoclipProtocol
                         "Working lights (ray traced)", "Used instead when ray-traced bounce light is on: bounced light brightens rooms, so fewer lights work")
                         ->Attribute(AZ::Edit::Attributes::Min, 0.05f)
                         ->Attribute(AZ::Edit::Attributes::Max, 0.9f)
+                    ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_humShareField, "Humming lights",
+                        "Share of working lights that hum (flickering ones always buzz while lit)")
+                        ->Attribute(AZ::Edit::Attributes::Min, 0.0f)
+                        ->Attribute(AZ::Edit::Attributes::Max, 1.0f)
                     ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_darkZoneScaleField, "Dark zone size",
                         "About how many cells across a dark zone is")
                         ->Attribute(AZ::Edit::Attributes::Min, 1.0f)
@@ -226,6 +235,7 @@ namespace NoclipProtocol
             DespawnChunk(chunk);
         }
         m_chunks.clear();
+        m_pendingHums.clear();
         m_statsShown.clear();
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
@@ -274,6 +284,7 @@ namespace NoclipProtocol
 
     void EndlessLevelComponent::OnTick([[maybe_unused]] float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
+        UpdateHums(deltaTime);
         // First frame (every entity is active by now): turn the player toward the most open view,
         // so a run never starts staring at a wall.
         if (!m_facedPlayer && m_followEntity.IsValid())
@@ -489,7 +500,8 @@ namespace NoclipProtocol
                 piece = m_enableLightBulbs ? PieceLightDying : PieceLightDead;
             }
             SpawnBox(chunk.m_tickets[piece],
-                Level0::Box{ light.m_position.m_x, light.m_position.m_y, light.m_position.m_z, 1.0f, 1.0f, 1.0f }, false);
+                Level0::Box{ light.m_position.m_x, light.m_position.m_y, light.m_position.m_z, 1.0f, 1.0f, 1.0f }, false, 0.0f,
+                piece == PieceLight || piece == PieceLightDying);
         }
         if (m_enableStains)
         {
@@ -507,7 +519,8 @@ namespace NoclipProtocol
         m_chunks.emplace(Key(chunkX, chunkY), AZStd::move(chunk));
     }
 
-    void EndlessLevelComponent::SpawnBox(AzFramework::EntitySpawnTicket& ticket, const Level0::Box& box, bool stretch, float yawRadians)
+    void EndlessLevelComponent::SpawnBox(AzFramework::EntitySpawnTicket& ticket, const Level0::Box& box, bool stretch, float yawRadians,
+        bool hum)
     {
         ++m_spawnedPieces;
         const AZ::Vector3 translation(box.m_cx, box.m_cy, box.m_cz);
@@ -543,7 +556,66 @@ namespace NoclipProtocol
                 }
             }
         };
+        if (hum)
+        {
+            // Decided per light from its position, so a light hums (or doesn't) the same way every time its chunk loads.
+            const AZ::u64 seed = m_settings.m_seed ^ (static_cast<AZ::u64>(static_cast<AZ::s64>(box.m_cx * 4.0f)) * 0x9E3779B97F4A7C15ull)
+                               ^ (static_cast<AZ::u64>(static_cast<AZ::s64>(box.m_cy * 4.0f)) * 0xC2B2AE3D27D4EB4Full);
+            auto unit = [](AZ::u64 x)
+            {
+                x ^= x >> 33; x *= 0xff51afd7ed558ccdull; x ^= x >> 33; x *= 0xc4ceb9fe1a85ec53ull; x ^= x >> 33;
+                return static_cast<float>(x >> 40) / static_cast<float>(1ull << 24);
+            };
+            const bool keep = unit(seed) < m_humShareField;
+            const float delay = unit(seed + 1) * 4.0f;
+            args.m_completionCallback =
+                [this, keep, delay]([[maybe_unused]] AzFramework::EntitySpawnTicket::Id ticketId, AzFramework::SpawnableConstEntityContainerView view)
+            {
+                for (const AZ::Entity* entity : view)
+                {
+                    const AZStd::string& name = entity->GetName();
+                    if (name.size() < 4 || name.substr(name.size() - 4) != "Bulb")
+                    {
+                        continue;
+                    }
+                    // The bulbs' hum doesn't start by itself; kept ones start after their own delay.
+                    MiniAudio::MiniAudioPlaybackRequestBus::Event(entity->GetId(), &MiniAudio::MiniAudioPlaybackRequests::Stop);
+                    if (keep)
+                    {
+                        m_pendingHums.push_back(PendingHum{ entity->GetId(), delay, 0 });
+                    }
+                }
+            };
+        }
         AzFramework::SpawnableEntitiesInterface::Get()->SpawnAllEntities(ticket, AZStd::move(args));
+    }
+
+    void EndlessLevelComponent::UpdateHums(float deltaTime)
+    {
+        for (size_t i = 0; i < m_pendingHums.size();)
+        {
+            PendingHum& hum = m_pendingHums[i];
+            hum.m_delay -= deltaTime;
+            if (hum.m_delay > 0.0f)
+            {
+                ++i;
+                continue;
+            }
+            AZ::Data::Asset<MiniAudio::SoundAsset> asset;
+            MiniAudio::MiniAudioPlaybackRequestBus::EventResult(asset, hum.m_entity, &MiniAudio::MiniAudioPlaybackRequests::GetSoundAsset);
+            if (asset.IsReady())
+            {
+                MiniAudio::MiniAudioPlaybackRequestBus::Event(hum.m_entity, &MiniAudio::MiniAudioPlaybackRequests::Play);
+            }
+            else if (++hum.m_tries < 20)
+            {
+                hum.m_delay = 0.25f; // still loading (or its chunk is gone): try again shortly, then give up
+                ++i;
+                continue;
+            }
+            m_pendingHums[i] = m_pendingHums.back();
+            m_pendingHums.pop_back();
+        }
     }
 
     void EndlessLevelComponent::DespawnChunk(Chunk& chunk)
