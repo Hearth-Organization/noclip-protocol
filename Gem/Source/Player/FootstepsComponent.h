@@ -38,8 +38,8 @@ namespace NoclipProtocol
         AZ::EntityId m_follow;                         // whose steps these are (empty = this entity)
         AZStd::vector<AZ::EntityId> m_stepSounds;      // one MiniAudio Playback per entity, played in turn
         AZ::EntityId m_landSound;
-        float m_walkStride = 0.75f;
-        float m_sprintStride = 1.0f;
+        float m_walkStride = 1.6f;
+        float m_sprintStride = 2.1f;
         float m_sprintSpeed = 4.8f;                    // m/s above which it counts as sprinting
         float m_walkVolume = 55.0f;
         float m_sprintVolume = 80.0f;
@@ -52,6 +52,8 @@ namespace NoclipProtocol
         float m_fallSpeed = 0.0f;
         bool m_airborne = false;
         bool m_started = false;
+        float m_speedSmooth = 0.0f;    // walking speed smoothed over time (physics doesn't move the player every frame)
+        float m_stillTime = 0.0f;      // how long the player hasn't moved
         float m_verticalSmooth = 0.0f; // smoothed vertical speed: physics jitters a little every frame
         float m_debugTimer = 0.0f;     // short log so we can see what the steps do
         float m_debugTotal = 0.0f;

@@ -79,6 +79,23 @@ namespace NoclipProtocol
         }
         AZ_CONSOLEFREEFUNC("noclip_tp", NoclipTeleport, AZ::ConsoleFunctorFlags::Null,
             "Move the player: noclip_tp <x> <y> <z> [yaw degrees] [pitch degrees]");
+
+        // Walks the player forward for a while, as if W were held: lets Claude test footsteps and movement
+        // without a keyboard. noclip_walk <seconds> [sprint 0/1]
+        void NoclipWalk(const AZ::ConsoleCommandContainer& arguments)
+        {
+            if (!s_activePlayer || arguments.empty())
+            {
+                AZ_Printf("Noclip", "noclip_walk <seconds> [sprint 0/1]%s", s_activePlayer ? "" : " (no player is playing)");
+                return;
+            }
+            const float seconds = AZStd::stof(AZStd::string(arguments[0]));
+            const bool sprint = arguments.size() > 1 && AZStd::string(arguments[1]) != "0";
+            s_activePlayer->WalkFor(seconds, sprint);
+            AZ_Printf("Noclip", "noclip_walk: %.1f s%s", seconds, sprint ? " sprinting" : "");
+        }
+        AZ_CONSOLEFREEFUNC("noclip_walk", NoclipWalk, AZ::ConsoleFunctorFlags::Null,
+            "Walk the player forward: noclip_walk <seconds> [sprint 0/1]");
     } // namespace
 
     void FirstPersonControllerComponent::Teleport(const AZ::Vector3& position, float yaw, float pitch, bool setYaw, bool setPitch)
@@ -384,7 +401,12 @@ namespace NoclipProtocol
         m_jumpRequested = false;
 
         // --- Walk / sprint ---
-        float forwardInput = (m_forward ? 1.0f : 0.0f) - (m_back ? 1.0f : 0.0f);
+        const bool autoWalk = m_autoWalkSeconds > 0.0f;
+        if (autoWalk)
+        {
+            m_autoWalkSeconds -= deltaTime;
+        }
+        float forwardInput = ((m_forward || autoWalk) ? 1.0f : 0.0f) - (m_back ? 1.0f : 0.0f);
         float rightInput = (m_right ? 1.0f : 0.0f) - (m_left ? 1.0f : 0.0f);
 
         // O3DE: +Y is forward, +X is right, +Z is up. Rotate the input by the yaw.
@@ -394,7 +416,7 @@ namespace NoclipProtocol
         {
             move.Normalize();
         }
-        const float speed = (m_sprint && forwardInput > 0.0f) ? m_sprintSpeed : m_walkSpeed;
+        const float speed = ((m_sprint || (autoWalk && m_autoWalkSprint)) && forwardInput > 0.0f) ? m_sprintSpeed : m_walkSpeed;
         move *= speed;
         move.SetZ(m_verticalSpeed);
 

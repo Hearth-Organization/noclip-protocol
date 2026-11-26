@@ -60,6 +60,8 @@ namespace NoclipProtocol
         m_airborne = false;
         m_next = 0;
         m_verticalSmooth = 0.0f;
+        m_speedSmooth = 0.0f;
+        m_stillTime = 0.0f;
         m_debugTimer = 0.0f;
         m_debugTotal = 0.0f;
         m_stepsPlayed = 0;
@@ -178,7 +180,7 @@ namespace NoclipProtocol
         if (m_debugTotal < 60.0f && m_debugTimer >= 0.5f)
         {
             m_debugTimer = 0.0f;
-            const float flatSpeed = AZ::Vector3(moved.GetX(), moved.GetY(), 0.0f).GetLength() / deltaTime;
+            const float flatSpeed = m_speedSmooth;
             if (flatSpeed > 0.3f || airborneNow)
             {
                 AZ_TracePrintf("Footsteps", "speed %.2f vz %.2f (smoothed %.2f) airborne %d steps %d\n", flatSpeed, verticalSpeed,
@@ -206,14 +208,25 @@ namespace NoclipProtocol
 
         const AZ::Vector3 flat(moved.GetX(), moved.GetY(), 0.0f);
         const float step = flat.GetLength();
-        const float speed = step / deltaTime;
-        if (speed < 0.3f)
+        // Physics moves the player at its own fixed rate, so on a fast graphics card many frames show no movement
+        // and the next one shows two frames' worth. Judge speed smoothed over time, and only count as standing still
+        // after a moment without movement (it used to reset the stride on every still frame, so no step ever played).
+        m_speedSmooth += (step / deltaTime - m_speedSmooth) * AZStd::min(1.0f, deltaTime * 10.0f);
+        if (step < 0.0005f)
+        {
+            m_stillTime += deltaTime;
+        }
+        else
+        {
+            m_stillTime = 0.0f;
+        }
+        if (m_stillTime > 0.2f || (step < 0.0005f && m_speedSmooth < 0.3f))
         {
             // Standing still: the next step comes after half a stride, so starting to walk sounds right.
             m_distance = AZStd::min(m_distance, m_walkStride * 0.5f);
             return;
         }
-        const bool sprinting = speed > m_sprintSpeed;
+        const bool sprinting = m_speedSmooth > m_sprintSpeed;
         const float stride = sprinting ? m_sprintStride : m_walkStride;
         m_distance += step;
         if (m_distance >= stride)

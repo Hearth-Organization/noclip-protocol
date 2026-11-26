@@ -27,6 +27,8 @@ namespace NoclipProtocol
 
         //! Developer teleport (console command noclip_tp).
         void Teleport(const AZ::Vector3& position, float yaw, float pitch, bool setYaw, bool setPitch);
+        //! Walk forward for a while as if W were held (the noclip_walk dev command).
+        void WalkFor(float seconds, bool sprint) { m_autoWalkSeconds = seconds; m_autoWalkSprint = sprint; }
 
     protected:
         void Activate() override;
@@ -74,5 +76,8 @@ namespace NoclipProtocol
         AZ::EntityId m_rayTracedLight;
         bool m_rayTracedLightSearched = false;
         int m_rayTracedLightPause = 0;
+
+        float m_autoWalkSeconds = 0.0f;
+        bool m_autoWalkSprint = false;
     };
 } // namespace NoclipProtocol
