@@ -364,3 +364,7 @@ namespace NoclipProtocol
         }
     }
 } // namespace NoclipProtocol
+
+// Noclip HUD (the approved HUD mockup and the pause menu) is compiled with this file until the project is reconfigured
+// with it in noclipprotocol_files.cmake (a reconfigure build waits for the owner's OK).
+#include "NoclipHudComponent.cpp"

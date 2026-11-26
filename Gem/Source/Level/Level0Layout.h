@@ -38,10 +38,12 @@ namespace NoclipProtocol::Level0
         float m_workingLights = 0.66f; // share of lights in lit areas that work; lower = more dead and flickering (ray tracing uses 0.33)
 
         // Which level this is: 0 = Level 0 (yellow rooms), 1 = Level 1 (concrete warehouse / garage),
-        // 2 = Level 2 (pipe tunnels). ApplyStyle sets the rest of the settings to match.
+        // 2 = Level 2 (pipe tunnels), 3 = the intro: Site-[REDACTED] Sublevel 4 (one fixed facility, not endless).
+        // ApplyStyle sets the rest of the settings to match.
         int m_style = 0;
         int m_lightSpacing = 1;        // a light every N cells (in a checker pattern when 2)
         float m_propChance = 0.0f;     // Level 1: crates per cell; Level 2: pipes per wall segment
+        float m_noclipChance = 0.08f;  // chance a chunk has a noclip spot (a tear you walk through into the next level)
     };
 
     //! Level 1 and 2 presets: sizes, openness, pillars, rooms, lights and props for that level's look.
@@ -100,6 +102,25 @@ namespace NoclipProtocol::Level0
         std::vector<Light> m_lights; // cells with no light at all are simply absent
         std::vector<Decal> m_decals;
         std::vector<Box> m_props;    // Level 1 crates, Level 2 pipes (one stretched box each)
+        std::vector<Point> m_noclipSpots; // on the floor, in the middle of a cell
+        bool m_hasSlabs = true;           // false: no floor or ceiling (the empty chunks around the intro facility)
+        std::vector<Box> m_frames;        // Breach 4-A's hazard-striped frame (columns and lintel)
+        std::vector<Box> m_voids;         // the breach itself where it is not a way out (Level 0's end of Breach 4-A)
+        std::vector<Box> m_screens;       // glowing terminal screens
+    };
+
+    //! The intro facility (style 3): where the player starts, the terminal, and Breach 4-A.
+    struct Facility
+    {
+        static constexpr float StartX = 10.0f, StartY = 6.0f;      // corridor start, facing north (+Y)
+        static constexpr float TerminalX = 19.4f, TerminalY = 16.0f; // kiosk in the briefing room, screen facing west
+        static constexpr float BreachX = 10.0f, BreachY = 40.0f;    // Breach 4-A in the middle of the breach chamber
+    };
+    //! Breach 4-A's Level 0 end: against the spawn room's back (south) wall, where the Foundation punched through.
+    struct Level0Breach
+    {
+        static constexpr float X = 2.0f, Y = -11.6f;     // the breach (the spawn room's south wall face is at y -11.9)
+        static constexpr float ArriveX = 2.0f, ArriveY = -9.0f; // where you step out, facing north into the room
     };
 
     //! Builds the layout of one chunk.

@@ -128,6 +128,8 @@ namespace NoclipProtocol
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
             registry->Set("/NoclipProtocol/Hud/player.flashlight", static_cast<double>(GetBatteryFraction()));
+            registry->Set("/NoclipProtocol/Hud/player.flashlight.seconds", static_cast<double>(m_batterySeconds));
+            registry->Set("/NoclipProtocol/Player/FlashlightOn", m_switchedOn && m_batterySeconds > 0.0f);
         }
         if (!m_switchedOn || m_batterySeconds <= 0.0f)
         {

@@ -1,5 +1,7 @@
 #include "FirstPersonControllerComponent.h"
 #include "../Render/RayTracing.h"
+#include "../Hud/NoclipHudComponent.h"
+#include "PlayerVitalsComponent.h"
 
 #include <AzCore/Settings/SettingsRegistry.h>
 #include <AzCore/Console/IConsole.h>
@@ -184,6 +186,13 @@ namespace NoclipProtocol
         AzFramework::InputChannelEventListener::Connect();
         AZ::TickBus::Handler::BusConnect();
         SetCursorCaptured(true);
+
+        // The in-game UI and the player's vitals live on their own runtime entity.
+        m_uiEntity = aznew AZ::Entity("Noclip UI");
+        m_uiEntity->CreateComponent<NoclipHudComponent>();
+        m_uiEntity->CreateComponent<PlayerVitalsComponent>();
+        m_uiEntity->Init();
+        m_uiEntity->Activate();
     }
 
     void FirstPersonControllerComponent::Deactivate()
@@ -195,6 +204,12 @@ namespace NoclipProtocol
         SetCursorCaptured(false);
         AZ::TickBus::Handler::BusDisconnect();
         AzFramework::InputChannelEventListener::Disconnect();
+        if (m_uiEntity)
+        {
+            m_uiEntity->Deactivate();
+            delete m_uiEntity;
+            m_uiEntity = nullptr;
+        }
     }
 
     void FirstPersonControllerComponent::SetCursorCaptured(bool captured)
@@ -309,6 +324,31 @@ namespace NoclipProtocol
             return;
         }
         UpdateRayTracedLight();
+        bool paused = false;
+        double sensitivity = 1.0;
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Get(paused, "/NoclipProtocol/Paused");
+            registry->Get(sensitivity, "/NoclipProtocol/Player/MouseSensitivity");
+        }
+        if (paused)
+        {
+            // The pause menu needs the mouse; the player stands still.
+            if (m_cursorCaptured)
+            {
+                SetCursorCaptured(false);
+            }
+            m_mouseDeltaX = 0.0f;
+            m_mouseDeltaY = 0.0f;
+            m_jumpRequested = false;
+            return;
+        }
+        if (!m_cursorCaptured)
+        {
+            SetCursorCaptured(true);
+        }
+        m_mouseDeltaX *= static_cast<float>(sensitivity);
+        m_mouseDeltaY *= static_cast<float>(sensitivity);
         {
             // Pick up the facing on the first frame, and whenever something else turns the player
             // (the level generator at the start of a run, a teleport...).
@@ -416,7 +456,17 @@ namespace NoclipProtocol
         {
             move.Normalize();
         }
-        const float speed = ((m_sprint || (autoWalk && m_autoWalkSprint)) && forwardInput > 0.0f) ? m_sprintSpeed : m_walkSpeed;
+        bool exhausted = false;
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Get(exhausted, "/NoclipProtocol/Player/Exhausted");
+        }
+        const bool sprinting = (m_sprint || (autoWalk && m_autoWalkSprint)) && forwardInput > 0.0f && !exhausted;
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Set("/NoclipProtocol/Player/Sprinting", sprinting);
+        }
+        const float speed = sprinting ? m_sprintSpeed : m_walkSpeed;
         move *= speed;
         move.SetZ(m_verticalSpeed);
 

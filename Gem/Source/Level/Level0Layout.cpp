@@ -71,6 +71,7 @@ namespace NoclipProtocol::Level0
             TagSmallRoom = 17,
             TagSpawnLight = 18,
             TagProp = 19,
+            TagNoclip = 20,
         };
 
         float Smooth(float t) { return t * t * (3.0f - 2.0f * t); }
@@ -137,6 +138,18 @@ namespace NoclipProtocol::Level0
             settings.m_lightSpacing = 1;
             settings.m_propChance = 0.2f;
         }
+        else if (settings.m_style == 3)
+        {
+            // The intro facility: one chunk big enough to hold it, nothing generated.
+            settings.m_chunkCells = 1;
+            settings.m_cellSize = 64.0f;
+            settings.m_ceilingHeight = 3.2f;
+            settings.m_wallThickness = 0.3f;
+            settings.m_spawnRoomRadius = 0;
+            settings.m_noclipChance = 0.0f;
+            settings.m_lightSpacing = 1;
+            settings.m_propChance = 0.0f;
+        }
         else if (settings.m_style == 2)
         {
             // Level 2: cramped maintenance tunnels. 3 m cells, almost no loops, low ceiling, pipes along the walls,
@@ -159,11 +172,96 @@ namespace NoclipProtocol::Level0
 
     Point SpawnPoint(const Settings& settings)
     {
+        if (settings.m_style == 3)
+        {
+            return Point{ Facility::StartX, Facility::StartY, 0.0f };
+        }
         return Point{ settings.m_cellSize * 0.5f, settings.m_cellSize * 0.5f, 0.0f };
     }
 
+    namespace
+    {
+        // Breach 4-A's frame: two hazard-striped columns and a lintel around a 3 m wide hole, facing along Y.
+        void AddBreachFrame(ChunkLayout& layout, float cx, float cy)
+        {
+            layout.m_frames.push_back(Box{ cx - 1.7f, cy, 1.45f, 0.4f, 0.6f, 2.9f });
+            layout.m_frames.push_back(Box{ cx + 1.7f, cy, 1.45f, 0.4f, 0.6f, 2.9f });
+            layout.m_frames.push_back(Box{ cx, cy, 3.03f, 3.8f, 0.6f, 0.26f });
+        }
+
+        // Site-[REDACTED], Sublevel 4: a corridor from the lift, the briefing room with the terminal off its east side,
+        // and the breach chamber at the far end where Breach 4-A hangs in its frame.
+        ChunkLayout GenerateFacility(const Settings& settings, int chunkX, int chunkY)
+        {
+            ChunkLayout layout;
+            layout.m_chunkX = chunkX;
+            layout.m_chunkY = chunkY;
+            if (chunkX != 0 || chunkY != 0)
+            {
+                layout.m_hasSlabs = false;
+                return layout;
+            }
+            const float h = settings.m_ceilingHeight;
+            const float t = settings.m_wallThickness;
+            auto wall = [&](float x0, float y0, float x1, float y1)
+            {
+                const bool alongX = std::fabs(y1 - y0) < 0.01f;
+                layout.m_walls.push_back(alongX
+                    ? Box{ (x0 + x1) * 0.5f, y0, h * 0.5f, std::fabs(x1 - x0) + t, t, h }
+                    : Box{ x0, (y0 + y1) * 0.5f, h * 0.5f, t, std::fabs(y1 - y0) + t, h });
+            };
+            // Corridor x 8..12, y 4..32 (door to the briefing room at y 15..17).
+            wall(8, 4, 8, 32);
+            wall(12, 4, 12, 15);
+            wall(12, 17, 12, 32);
+            wall(8, 4, 12, 4);
+            // Briefing room x 12..20, y 12..20.
+            wall(12, 12, 20, 12);
+            wall(12, 20, 20, 20);
+            wall(20, 12, 20, 20);
+            // Breach chamber x 4..16, y 32..44, open to the corridor at x 8..12.
+            wall(4, 32, 8, 32);
+            wall(12, 32, 16, 32);
+            wall(4, 32, 4, 44);
+            wall(16, 32, 16, 44);
+            wall(4, 44, 16, 44);
+            // Columns at the chamber's corners (hazard bands, like the Foundation marks a containment area).
+            for (float cx : { 4.6f, 15.4f })
+            {
+                for (float cy : { 32.6f, 43.4f })
+                {
+                    layout.m_pillars.push_back(Box{ cx, cy, h * 0.5f, 0.7f, 0.7f, h });
+                }
+            }
+            // Strip lights: down the corridor, two in the briefing room, four in the chamber (one of them failing).
+            for (float y = 6.0f; y <= 30.0f; y += 4.0f)
+            {
+                layout.m_lights.push_back(Light{ Point{ 10.0f, y, h }, LightState::Working });
+            }
+            layout.m_lights.push_back(Light{ Point{ 16.0f, 14.0f, h }, LightState::Working });
+            layout.m_lights.push_back(Light{ Point{ 16.0f, 18.0f, h }, LightState::Working });
+            layout.m_lights.push_back(Light{ Point{ 7.0f, 36.0f, h }, LightState::Working });
+            layout.m_lights.push_back(Light{ Point{ 13.0f, 36.0f, h }, LightState::Working });
+            layout.m_lights.push_back(Light{ Point{ 7.0f, 42.0f, h }, LightState::Working });
+            layout.m_lights.push_back(Light{ Point{ 13.0f, 42.0f, h }, LightState::Flickering });
+            // The terminal (a prop: a kiosk), and the breach (a noclip spot that stays sealed until the briefing is accepted).
+            layout.m_props.push_back(Box{ Facility::TerminalX + 0.1f, Facility::TerminalY, 0.6f, 0.5f, 0.9f, 1.2f });
+            layout.m_screens.push_back(Box{ Facility::TerminalX - 0.18f, Facility::TerminalY, 1.42f, 0.04f, 0.78f, 0.46f });
+            layout.m_noclipSpots.push_back(Point{ Facility::BreachX, Facility::BreachY, 0.0f });
+            AddBreachFrame(layout, Facility::BreachX, Facility::BreachY);
+            // Slabs covering the whole facility.
+            layout.m_floor = Box{ 12.0f, 24.0f, -0.05f, 24.0f, 48.0f, 0.1f };
+            layout.m_ceiling = Box{ 12.0f, 24.0f, h + 0.05f, 24.0f, 48.0f, 0.1f };
+            return layout;
+        }
+    } // namespace
+
     ChunkLayout GenerateChunk(const Settings& settings, int chunkX, int chunkY)
     {
+        if (settings.m_style == 3)
+        {
+            return GenerateFacility(settings, chunkX, chunkY);
+        }
         const int n = settings.m_chunkCells;
         const float cell = settings.m_cellSize;
         const float thick = settings.m_wallThickness;
@@ -402,6 +500,14 @@ namespace NoclipProtocol::Level0
         layout.m_floor = Box{ originX + chunkSize * 0.5f, originY + chunkSize * 0.5f, -0.05f, chunkSize, chunkSize, 0.1f };
         layout.m_ceiling = Box{ originX + chunkSize * 0.5f, originY + chunkSize * 0.5f, height + 0.05f, chunkSize, chunkSize, 0.1f };
 
+        // 6b. Level 0's end of Breach 4-A: the hole the Foundation punched through the spawn room's south wall.
+        if (settings.m_style == 0 && settings.m_spawnRoomRadius > 0 && Level0Breach::X >= originX && Level0Breach::X < originX + chunkSize &&
+            Level0Breach::Y >= originY && Level0Breach::Y < originY + chunkSize)
+        {
+            AddBreachFrame(layout, Level0Breach::X, Level0Breach::Y);
+            layout.m_voids.push_back(Box{ Level0Breach::X, Level0Breach::Y - 0.24f, 1.35f, 3.0f, 0.1f, 2.7f });
+        }
+
         // 7. Lights, decided per global cell (independent of chunk generation order).
         //    Lit areas: mostly working, some flickering, a few dead. Dark zones: mostly missing, some dead, rare flicker.
         //    The spawn room is mostly lit: the cells around spawn always work, elsewhere some lights are out.
@@ -548,6 +654,19 @@ namespace NoclipProtocol::Level0
             }
         }
 
+        // 10. Now and then a noclip spot: a tear in the level that drops you into the next one.
+        if (settings.m_noclipChance > 0.0f)
+        {
+            const uint64_t hn = Hash(settings.m_seed, TagNoclip, chunkX, chunkY);
+            const bool nearOrigin = std::abs(chunkX) + std::abs(chunkY) <= 1; // never right by the arrival area
+            if (!nearOrigin && Unit(hn) < settings.m_noclipChance)
+            {
+                const int cx = static_cast<int>(Mix(hn ^ 1) % static_cast<uint64_t>(n));
+                const int cy = static_cast<int>(Mix(hn ^ 2) % static_cast<uint64_t>(n));
+                layout.m_noclipSpots.push_back(Point{ (static_cast<float>(baseX + cx) + 0.5f) * cell, (static_cast<float>(baseY + cy) + 0.5f) * cell, 0.0f });
+            }
+        }
+
         return layout;
     }
 
@@ -592,6 +711,10 @@ namespace NoclipProtocol::Level0
 
     float OpenestYaw(const Settings& settings, float x, float y)
     {
+        if (settings.m_style == 3)
+        {
+            return 0.0f; // the intro starts looking down the corridor
+        }
         int cx = 0;
         int cy = 0;
         WorldToChunk(settings, x, y, cx, cy);

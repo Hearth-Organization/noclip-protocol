@@ -77,6 +77,7 @@ namespace NoclipProtocol
         bool m_rayTracedLightSearched = false;
         int m_rayTracedLightPause = 0;
 
+        AZ::Entity* m_uiEntity = nullptr; // HUD, pause menu and vitals, made at runtime so levels don't need them
         float m_autoWalkSeconds = 0.0f;
         bool m_autoWalkSprint = false;
     };

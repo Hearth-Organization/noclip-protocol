@@ -8,6 +8,8 @@
 #include "Player/FootstepsComponent.h"
 #include "Level/EndlessLevelComponent.h"
 #include "Level/FlickerLightComponent.h"
+#include "Hud/NoclipHudComponent.h"
+#include "Player/PlayerVitalsComponent.h"
 #include "Scripting/HearthBlocksComponent.h"
 #include "Hud/HearthHudComponent.h"
 #include "Debug/HearthDebugOverlayComponent.h"
@@ -37,6 +39,8 @@ namespace NoclipProtocol
                 FlickerLightComponent::CreateDescriptor(),
                 HearthBlocksComponent::CreateDescriptor(),
                 HearthHudComponent::CreateDescriptor(),
+                NoclipHudComponent::CreateDescriptor(),
+                PlayerVitalsComponent::CreateDescriptor(),
                 HearthDebugOverlayComponent::CreateDescriptor(),
                 HearthMonsterComponent::CreateDescriptor(),
             });

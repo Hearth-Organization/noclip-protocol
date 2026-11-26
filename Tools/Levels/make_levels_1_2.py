@@ -399,6 +399,48 @@ def level_file(level, spawnables):
     print("wrote", f"Levels/Level{level}/Level{level}.prefab")
 
 
+def noclip_spot():
+    """The tear you noclip through: a near-black slab with a faint violet glow, shared by every level."""
+    s = 256
+    tex.RNG = np.random.default_rng(404)
+    n = tex.periodic_noise(s, s, 18.0, octaves=5)
+    edge = np.clip(1.0 - np.abs(np.linspace(-1, 1, s))[None, :] * 1.05, 0, 1) ** 0.6
+    glow = np.clip((n - 0.35) * 2.0, 0, 1) * edge
+    tex.save(np.stack([0.02 + 0.03 * glow] * 3, -1), path("Assets/Textures/Levels/noclip_void_basecolor.png"))
+    tex.save(np.stack([0.35 * glow, 0.15 * glow, 0.9 * glow], -1), path("Assets/Textures/Levels/noclip_void_emissive.png"))
+    rel = "Assets/Materials/Levels/noclip_void.material"
+    data = {
+        "materialType": "@gemroot:Atom_Feature_Common@/Assets/Materials/Types/StandardPBR.materialtype",
+        "materialTypeVersion": 5,
+        "propertyValues": {
+            "baseColor.color": [1, 1, 1, 1],
+            "baseColor.textureMap": "../../Textures/Levels/noclip_void_basecolor.png",
+            "roughness.factor": 0.25,
+            "emissive.enable": True,
+            "emissive.color": [0.7, 0.5, 1.0, 1.0],
+            "emissive.textureMap": "../../Textures/Levels/noclip_void_emissive.png",
+            "emissive.intensity": 2.5,
+        },
+    }
+    with open(path(rel), "w") as f:
+        json.dump(data, f, indent=4)
+    with open(path("Prefabs/Level0/L0_Pillar.prefab")) as f:
+        prefab = json.load(f)
+    old = asset_guid(LEVEL0_MATERIALS["pillar"])
+    new = asset_guid(rel)
+
+    def fix(node):
+        if isinstance(node.get("guid"), str) and node["guid"].upper() == old:
+            node["guid"] = new
+    walk(prefab, fix)
+    for entity in [prefab.get("ContainerEntity")] + list(prefab.get("Entities", {}).values()):
+        if entity and "Name" in entity:
+            entity["Name"] = entity["Name"].replace("L0_Pillar", "NoclipSpot")
+    with open(path("Prefabs/Levels/NoclipSpot.prefab"), "w") as f:
+        json.dump(prefab, f, indent=4)
+    print("wrote Prefabs/Levels/NoclipSpot.prefab")
+
+
 def main():
     level1_textures()
     level2_textures()
@@ -407,6 +449,7 @@ def main():
     spawnables = pieces(mats)
     for level in (1, 2):
         level_file(level, spawnables)
+    noclip_spot()  # last: it reseeds the noise, so the level textures above stay the same
 
 
 if __name__ == "__main__":

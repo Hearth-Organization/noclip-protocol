@@ -58,6 +58,9 @@ namespace NoclipProtocol
             PieceDecalWorn,
             PieceLightDying,
             PieceProp,
+            PieceNoclip,
+            PieceFrame,   // Breach 4-A's hazard-striped frame
+            PieceScreen,  // glowing terminal screen
             PieceCount
         };
 
@@ -67,6 +70,8 @@ namespace NoclipProtocol
             int m_y = 0;
             AZStd::vector<AzFramework::EntitySpawnTicket> m_tickets;
             int m_pieces = 0; // walls, pillars, lights, stains... spawned for this chunk
+            AZStd::vector<AZ::Vector3> m_noclipSpots;
+            AZStd::vector<AZ::Vector3> m_litLights; // working and dying lights (what lights the player up)
         };
 
         static AZ::u64 Key(int x, int y);
@@ -97,7 +102,17 @@ namespace NoclipProtocol
         AZStd::string m_decalWornPrefab = "prefabs/level0/l0_decalworn.spawnable";
         AZStd::string m_lightDyingPrefab = "prefabs/level0/l0_lightdying.spawnable";
         AZStd::string m_propPrefab;       // Level 1 crate / Level 2 pipe (empty = no props)
-        int m_styleField = 0;             // 0 = Level 0, 1 = Level 1, 2 = Level 2
+        int m_styleField = 0;             // 0 = Level 0, 1 = Level 1, 2 = Level 2, 3 = the intro facility
+        AZStd::string m_noclipPrefab = "prefabs/levels/noclipspot.spawnable";
+        AZStd::string m_framePrefab;      // breach frame (empty = none)
+        AZStd::string m_screenPrefab;     // terminal screen (empty = none)
+        bool m_terminalPrompt = false;    // the intro's "Access terminal" prompt is showing
+        bool m_accepted = false;          // the intro's deployment has been accepted (Breach 4-A unsealed)
+        float m_sealedToastAt = -100.0f;  // when the "sealed" message was last shown
+        AZStd::string m_noclipTarget;     // level a noclip spot drops you into (empty = the next one: 0 -> 1 -> 2 -> 0)
+        bool m_noclipping = false;
+        void CheckNoclipSpots();
+        void PublishPlayerState(); // light level, base distance and bearing, level name: for the HUD and sanity
         // Feature switches (for finding problems and for performance)
         bool m_enablePillars = true;
         bool m_enableLightBulbs = true;     // real point lights (off = glowing panels only)

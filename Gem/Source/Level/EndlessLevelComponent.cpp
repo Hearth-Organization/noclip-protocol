@@ -2,12 +2,14 @@
 #include "Level0Scripting.h"
 #include "Level0Json.h"
 #include "../Render/RayTracing.h"
+#include "../Player/FirstPersonControllerComponent.h"
 #include <AzCore/Component/ComponentApplicationBus.h>
 #include <AzCore/Component/Entity.h>
 #include <MiniAudio/MiniAudioPlaybackBus.h>
 #include <MiniAudio/SoundAsset.h>
 
 #include <AzCore/Asset/AssetManager.h>
+#include <AzCore/Console/IConsole.h>
 #include <AzCore/Asset/AssetManagerBus.h>
 #include <AzCore/Component/TransformBus.h>
 #include <AzCore/Math/Quaternion.h>
@@ -21,6 +23,7 @@
 #include <AzFramework/Components/TransformComponent.h>
 #include <AzFramework/Entity/EntityDebugDisplayBus.h>
 
+#include <cmath>
 #include <cstdlib>
 
 namespace NoclipProtocol
@@ -49,6 +52,10 @@ namespace NoclipProtocol
                 ->Field("HumShare", &EndlessLevelComponent::m_humShareField)
                 ->Field("Style", &EndlessLevelComponent::m_styleField)
                 ->Field("PropPrefab", &EndlessLevelComponent::m_propPrefab)
+                ->Field("NoclipPrefab", &EndlessLevelComponent::m_noclipPrefab)
+                ->Field("FramePrefab", &EndlessLevelComponent::m_framePrefab)
+                ->Field("ScreenPrefab", &EndlessLevelComponent::m_screenPrefab)
+                ->Field("NoclipTarget", &EndlessLevelComponent::m_noclipTarget)
                 ->Field("EnablePillars", &EndlessLevelComponent::m_enablePillars)
                 ->Field("EnableLightBulbs", &EndlessLevelComponent::m_enableLightBulbs)
                 ->Field("EnableFlicker", &EndlessLevelComponent::m_enableFlicker)
@@ -126,9 +133,9 @@ namespace NoclipProtocol
                         ->Attribute(AZ::Edit::Attributes::Min, 0.05f)
                         ->Attribute(AZ::Edit::Attributes::Max, 0.9f)
                     ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_styleField, "Level",
-                        "Which Backrooms level this generates: 0 = yellow rooms, 1 = concrete warehouse, 2 = pipe tunnels")
+                        "Which level this generates: 0 = yellow rooms, 1 = concrete warehouse, 2 = pipe tunnels, 3 = the intro facility (Sublevel 4)")
                         ->Attribute(AZ::Edit::Attributes::Min, 0)
-                        ->Attribute(AZ::Edit::Attributes::Max, 2)
+                        ->Attribute(AZ::Edit::Attributes::Max, 3)
                     ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_humShareField, "Humming lights",
                         "Share of working lights that hum (flickering ones always buzz while lit)")
                         ->Attribute(AZ::Edit::Attributes::Min, 0.0f)
@@ -166,7 +173,12 @@ namespace NoclipProtocol
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_decalMoldPrefab, "Mold", "Spawnable product path")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_decalWornPrefab, "Worn patch", "Spawnable product path")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_lightDyingPrefab, "Dying light", "Spawnable product path")
-                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_propPrefab, "Prop", "Spawnable product path: Level 1 crate, Level 2 pipe (empty = none)");
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_propPrefab, "Prop", "Spawnable product path: Level 1 crate, Level 2 pipe (empty = none)")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_noclipPrefab, "Noclip spot", "Spawnable product path (empty = no noclip spots)")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_framePrefab, "Breach frame", "Spawnable product path: Breach 4-A's hazard frame (empty = none)")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_screenPrefab, "Terminal screen", "Spawnable product path (empty = none)")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_noclipTarget, "Noclip leads to",
+                        "Level a noclip spot drops you into (empty = the next level: 0 -> 1 -> 2 -> 0)");
             }
         }
     }
@@ -213,7 +225,7 @@ namespace NoclipProtocol
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
             AZStd::string overrideText;
-            if (registry->Get(overrideText, "/NoclipProtocol/Level0/Override") && !overrideText.empty())
+            if (m_settings.m_style != 3 && registry->Get(overrideText, "/NoclipProtocol/Level0/Override") && !overrideText.empty())
             {
                 Level0::ApplySettingsText(m_settings, std::string(overrideText.c_str()));
                 const std::string text(overrideText.c_str());
@@ -229,10 +241,29 @@ namespace NoclipProtocol
             }
         }
         AZ_Printf("NoclipProtocol", "Endless Level 0 seed: %llu", static_cast<unsigned long long>(m_settings.m_seed));
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            static const char* const objectives[] = {
+                "Scout Level 0 and find a way deeper",
+                "Find a way through the warehouse",
+                "Get through the tunnels",
+                "Report to the briefing terminal",
+            };
+            registry->Set("/NoclipProtocol/Hud/game.objective", AZStd::string(objectives[AZStd::clamp(m_settings.m_style, 0, 3)]));
+            registry->Set("/NoclipProtocol/Hud/game.progress",
+                AZStd::string(m_settings.m_style == 3 ? "Sublevel 4, briefing room" : "Look for a tear in the walls"));
+            if (m_settings.m_style == 3)
+            {
+                registry->Set("/NoclipProtocol/Intro/Accepted", false); // every run of the intro starts with the briefing
+            }
+        }
 
         m_assetsMissing = !LoadPieceAssets();
         m_announced = false;
         m_facedPlayer = false;
+        m_noclipping = false;
+        m_terminalPrompt = false;
+        m_accepted = false;
         AZ::TickBus::Handler::BusConnect();
     }
 
@@ -260,7 +291,8 @@ namespace NoclipProtocol
     {
         const AZStd::string* paths[PieceCount] = { &m_wallPrefab, &m_pillarPrefab, &m_floorPrefab, &m_ceilingPrefab, &m_lightPrefab,
                                                    &m_lightFlickerPrefab, &m_lightDeadPrefab, &m_decalWetPrefab, &m_decalMoldPrefab,
-                                                   &m_decalWornPrefab, &m_lightDyingPrefab, &m_propPrefab };
+                                                   &m_decalWornPrefab, &m_lightDyingPrefab, &m_propPrefab, &m_noclipPrefab,
+                                                   &m_framePrefab, &m_screenPrefab };
         bool allFound = true;
         for (int i = 0; i < PieceCount; ++i)
         {
@@ -298,6 +330,8 @@ namespace NoclipProtocol
     void EndlessLevelComponent::OnTick([[maybe_unused]] float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
         UpdateHums(deltaTime);
+        CheckNoclipSpots();
+        PublishPlayerState();
         // First frame (every entity is active by now): turn the player toward the most open view,
         // so a run never starts staring at a wall.
         if (!m_facedPlayer && m_followEntity.IsValid())
@@ -305,9 +339,36 @@ namespace NoclipProtocol
             m_facedPlayer = true;
             AZ::Vector3 start = AZ::Vector3::CreateZero();
             AZ::TransformBus::EventResult(start, m_followEntity, &AZ::TransformBus::Events::GetWorldTranslation);
-            const float yaw = Level0::OpenestYaw(m_settings, start.GetX(), start.GetY());
-            AZ::TransformBus::Event(m_followEntity, &AZ::TransformBus::Events::SetWorldRotationQuaternion,
-                AZ::Quaternion::CreateRotationZ(yaw));
+            AZStd::string arrived;
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Get(arrived, "/NoclipProtocol/Level/Arrived");
+                registry->Set("/NoclipProtocol/Level/Arrived", AZStd::string());
+            }
+            FirstPersonControllerComponent* player = nullptr;
+            AZ::Entity* entity = nullptr;
+            AZ::ComponentApplicationBus::BroadcastResult(entity, &AZ::ComponentApplicationRequests::FindEntity, m_followEntity);
+            if (entity)
+            {
+                player = entity->FindComponent<FirstPersonControllerComponent>();
+            }
+            if (m_settings.m_style == 0 && arrived == "breach" && player)
+            {
+                // Stepped out of Breach 4-A: in front of the hole in the spawn room's south wall, facing into the room.
+                player->Teleport(AZ::Vector3(Level0::Level0Breach::ArriveX, Level0::Level0Breach::ArriveY, start.GetZ()), 0.0f, 0.0f, true, true);
+            }
+            else if (m_settings.m_style == 3 && player)
+            {
+                // The intro always starts at the lift end of the corridor, looking down it.
+                const Level0::Point spawn = Level0::SpawnPoint(m_settings);
+                player->Teleport(AZ::Vector3(spawn.m_x, spawn.m_y, start.GetZ()), 0.0f, 0.0f, true, true);
+            }
+            else
+            {
+                const float yaw = Level0::OpenestYaw(m_settings, start.GetX(), start.GetY());
+                AZ::TransformBus::Event(m_followEntity, &AZ::TransformBus::Events::SetWorldRotationQuaternion,
+                    AZ::Quaternion::CreateRotationZ(yaw));
+            }
         }
 
         if (m_assetsMissing || !PieceAssetsReady())
@@ -489,8 +550,11 @@ namespace NoclipProtocol
                 SpawnBox(chunk.m_tickets[PiecePillar], pillar, true);
             }
         }
-        SpawnBox(chunk.m_tickets[PieceFloor], layout.m_floor, true);
-        SpawnBox(chunk.m_tickets[PieceCeiling], layout.m_ceiling, true);
+        if (layout.m_hasSlabs)
+        {
+            SpawnBox(chunk.m_tickets[PieceFloor], layout.m_floor, true);
+            SpawnBox(chunk.m_tickets[PieceCeiling], layout.m_ceiling, true);
+        }
         for (const Level0::Light& light : layout.m_lights)
         {
             Level0::LightState state = light.m_state;
@@ -519,6 +583,11 @@ namespace NoclipProtocol
             {
                 piece = m_enableLightBulbs ? PieceLightDying : PieceLightDead;
             }
+            if (piece == PieceLight || piece == PieceLightDying || piece == PieceLightFlicker)
+            {
+                chunk.m_litLights.push_back(AZ::Vector3(light.m_position.m_x, light.m_position.m_y,
+                    piece == PieceLightFlicker ? -1.0f : 1.0f)); // z: -1 marks a flickering one (half as much light)
+            }
             SpawnBox(chunk.m_tickets[piece],
                 Level0::Box{ light.m_position.m_x, light.m_position.m_y, light.m_position.m_z, 1.0f, 1.0f, 1.0f }, false, 0.0f,
                 piece == PieceLight || piece == PieceLightDying);
@@ -540,6 +609,46 @@ namespace NoclipProtocol
             for (const Level0::Box& prop : layout.m_props)
             {
                 SpawnBox(chunk.m_tickets[PieceProp], prop, true);
+            }
+        }
+
+        for (const Level0::Point& spot : layout.m_noclipSpots)
+        {
+            chunk.m_noclipSpots.push_back(AZ::Vector3(spot.m_x, spot.m_y, spot.m_z));
+            if (chunk.m_tickets[PieceNoclip].IsValid())
+            {
+                if (m_settings.m_style == 3)
+                {
+                    // Breach 4-A: a 3 m wide hole hanging in its frame, facing down the corridor.
+                    SpawnBox(chunk.m_tickets[PieceNoclip], Level0::Box{ spot.m_x, spot.m_y, 1.35f, 3.0f, 0.1f, 2.7f }, true);
+                }
+                else
+                {
+                    // A tall, thin tear standing in the middle of the cell.
+                    SpawnBox(chunk.m_tickets[PieceNoclip], Level0::Box{ spot.m_x, spot.m_y, 1.15f, 0.9f, 0.06f, 2.3f }, true,
+                        static_cast<float>(chunk.m_x * 7 + chunk.m_y * 3));
+                }
+            }
+        }
+        if (chunk.m_tickets[PieceNoclip].IsValid())
+        {
+            for (const Level0::Box& hole : layout.m_voids)
+            {
+                SpawnBox(chunk.m_tickets[PieceNoclip], hole, true);
+            }
+        }
+        if (chunk.m_tickets[PieceFrame].IsValid())
+        {
+            for (const Level0::Box& frame : layout.m_frames)
+            {
+                SpawnBox(chunk.m_tickets[PieceFrame], frame, true);
+            }
+        }
+        if (chunk.m_tickets[PieceScreen].IsValid())
+        {
+            for (const Level0::Box& screen : layout.m_screens)
+            {
+                SpawnBox(chunk.m_tickets[PieceScreen], screen, true);
             }
         }
 
@@ -616,6 +725,133 @@ namespace NoclipProtocol
             };
         }
         AzFramework::SpawnableEntitiesInterface::Get()->SpawnAllEntities(ticket, AZStd::move(args));
+    }
+
+    void EndlessLevelComponent::PublishPlayerState()
+    {
+        auto* registry = AZ::SettingsRegistry::Get();
+        if (!registry || !m_followEntity.IsValid())
+        {
+            return;
+        }
+        AZ::Vector3 at = AZ::Vector3::CreateZero();
+        AZ::TransformBus::EventResult(at, m_followEntity, &AZ::TransformBus::Events::GetWorldTranslation);
+        // How lit the player is: from the nearest light that's on (a flickering one counts half).
+        const float reach = m_settings.m_cellSize * 1.25f + 1.0f;
+        float light = 0.0f;
+        for (const auto& [key, chunk] : m_chunks)
+        {
+            for (const AZ::Vector3& lamp : chunk.m_litLights)
+            {
+                const float dx = lamp.GetX() - at.GetX();
+                const float dy = lamp.GetY() - at.GetY();
+                const float d = std::sqrt(dx * dx + dy * dy);
+                float lit = AZStd::clamp(1.0f - (d - 1.0f) / reach, 0.0f, 1.0f);
+                if (lamp.GetZ() < 0.0f)
+                {
+                    lit *= 0.5f;
+                }
+                light = AZStd::max(light, lit);
+            }
+        }
+        registry->Set("/NoclipProtocol/Player/Light", static_cast<double>(light));
+        // The forward base is the arrival room around the spawn point.
+        const Level0::Point base = Level0::SpawnPoint(m_settings);
+        const float bx = base.m_x - at.GetX();
+        const float by = base.m_y - at.GetY();
+        registry->Set("/NoclipProtocol/Hud/base.distance", static_cast<double>(std::sqrt(bx * bx + by * by)));
+        registry->Set("/NoclipProtocol/Hud/base.x", static_cast<double>(base.m_x));
+        registry->Set("/NoclipProtocol/Hud/base.y", static_cast<double>(base.m_y));
+        static const char* const titles[] = { "LEVEL 0", "LEVEL 1", "LEVEL 2", "SITE-[REDACTED]" };
+        static const char* const subtitles[] = { "THE LOBBY · UNSTABLE", "HABITABLE ZONE · DAMP", "PIPE DREAMS · HOT",
+                                                 "SUBLEVEL 4 · BREACH 4-A" };
+        const int style = AZStd::clamp(m_settings.m_style, 0, 3);
+        registry->Set("/NoclipProtocol/Hud/level.title", AZStd::string(titles[style]));
+        registry->Set("/NoclipProtocol/Hud/level.subtitle", AZStd::string(subtitles[style]));
+
+        if (m_settings.m_style == 3)
+        {
+            // The briefing terminal: "[E] Access" when standing at it. The HUD opens the terminal page on E.
+            const float tx = Level0::Facility::TerminalX - at.GetX();
+            const float ty = Level0::Facility::TerminalY - at.GetY();
+            const bool near = tx * tx + ty * ty < 1.8f * 1.8f;
+            if (near != m_terminalPrompt)
+            {
+                m_terminalPrompt = near;
+                registry->Set("/NoclipProtocol/Hud/interact.verb", AZStd::string(near ? "Access" : ""));
+                registry->Set("/NoclipProtocol/Hud/interact.item", AZStd::string(near ? "Secure terminal" : ""));
+                registry->Set("/NoclipProtocol/Hud/interact.target", AZStd::string(near ? "terminal" : ""));
+            }
+            bool accepted = false;
+            registry->Get(accepted, "/NoclipProtocol/Intro/Accepted");
+            if (accepted && !m_accepted)
+            {
+                m_accepted = true;
+                registry->Set("/NoclipProtocol/Hud/game.objective", AZStd::string("Enter Breach 4-A"));
+                registry->Set("/NoclipProtocol/Hud/game.progress", AZStd::string("Breach chamber, end of the corridor"));
+            }
+        }
+    }
+
+    void EndlessLevelComponent::CheckNoclipSpots()
+    {
+        if (m_noclipping || !m_followEntity.IsValid())
+        {
+            return;
+        }
+        AZ::Vector3 at = AZ::Vector3::CreateZero();
+        AZ::TransformBus::EventResult(at, m_followEntity, &AZ::TransformBus::Events::GetWorldTranslation);
+        for (const auto& [key, chunk] : m_chunks)
+        {
+            for (const AZ::Vector3& spot : chunk.m_noclipSpots)
+            {
+                const AZ::Vector3 d = at - spot;
+                const bool breach = m_settings.m_style == 3;
+                const bool inside = breach
+                    ? std::fabs(d.GetX()) < 1.5f && std::fabs(d.GetY()) < 0.35f // walking through the 3 m wide hole
+                    : d.GetX() * d.GetX() + d.GetY() * d.GetY() <= 0.6f * 0.6f;
+                if (!inside || std::fabs(d.GetZ()) > 1.5f)
+                {
+                    continue;
+                }
+                auto* registry = AZ::SettingsRegistry::Get();
+                double now = 0.0;
+                if (registry)
+                {
+                    registry->Get(now, "/NoclipProtocol/Hud/time");
+                }
+                if (breach && !m_accepted)
+                {
+                    // Sealed until the briefing is accepted at the terminal.
+                    if (registry && now - m_sealedToastAt > 4.0)
+                    {
+                        m_sealedToastAt = static_cast<float>(now);
+                        registry->Set("/NoclipProtocol/Hud/toast", AZStd::string("BREACH 4-A SEALED · ACCEPT THE BRIEFING FIRST"));
+                        registry->Set("/NoclipProtocol/Hud/toast.until", now + 3.0);
+                    }
+                    return;
+                }
+                m_noclipping = true;
+                static const char* const next[] = { "Level1", "Level2", "Level0", "Level0" };
+                const AZStd::string target = !m_noclipTarget.empty() ? m_noclipTarget : AZStd::string(next[AZStd::clamp(m_settings.m_style, 0, 3)]);
+                AZ_Printf("NoclipProtocol", "Noclip spot at %.1f %.1f: falling through into %s", spot.GetX(), spot.GetY(), target.c_str());
+                if (registry)
+                {
+                    registry->Set("/NoclipProtocol/Hud/toast", AZStd::string(breach ? "Stepping through Breach 4-A..." : "You slip through the floor..."));
+                    registry->Set("/NoclipProtocol/Hud/toast.until", now + 3.0);
+                    registry->Set("/NoclipProtocol/Level/Arrived", AZStd::string(breach ? "breach" : "noclip"));
+                }
+                // Next frame, outside this tick: loading a level tears down this component.
+                AZ::TickBus::QueueFunction([target]()
+                {
+                    if (auto* console = AZ::Interface<AZ::IConsole>::Get())
+                    {
+                        console->PerformCommand(AZStd::string::format("LoadLevel %s", target.c_str()).c_str());
+                    }
+                });
+                return;
+            }
+        }
     }
 
     void EndlessLevelComponent::UpdateHums(float deltaTime)
