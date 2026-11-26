@@ -190,9 +190,9 @@
                     "$type": "EditorNonUniformScaleComponent",
                     "Id": 6929553118326231222,
                     "NonUniformScale": [
-                        0.6000000238418579,
-                        0.6000000238418579,
-                        0.03999999910593033
+                        0.5,
+                        1.0,
+                        0.04
                     ]
                 },
                 "EditorOnlyEntityComponent": {
@@ -213,7 +213,7 @@
                     "Parent Entity": "Entity_[23691688266654]",
                     "Transform Data": {
                         "Translate": [
-                            0.0,
+                            0.25,
                             0.0,
                             -0.019999999552965164
                         ]
@@ -230,7 +230,7 @@
                     "Id": 6283910958497615825,
                     "Controller": {
                         "Configuration": {
-                            "LightType": 6,
+                            "LightType": 2,
                             "Color": [
                                 1.0,
                                 0.9599999785423279,
@@ -280,9 +280,14 @@
                     "Parent Entity": "Entity_[23691688266654]",
                     "Transform Data": {
                         "Translate": [
+                            0.25,
                             0.0,
+                            -0.05
+                        ],
+                        "Rotate": [
+                            180.0,
                             0.0,
-                            -0.3499999940395355
+                            0.0
                         ]
                     }
                 },
@@ -305,6 +310,21 @@
                             "Min Distance": 0.800000011920929,
                             "Max Distance": 7.0,
                             "Auto-follow": true
+                        }
+                    }
+                },
+                "EditorDiskShapeComponent": {
+                    "$type": "EditorDiskShapeComponent",
+                    "Id": 2538842065637285472,
+                    "ShapeColor": [
+                        1.0,
+                        0.96,
+                        0.85,
+                        1.0
+                    ],
+                    "DiskShape": {
+                        "Configuration": {
+                            "Radius": 0.3
                         }
                     }
                 }

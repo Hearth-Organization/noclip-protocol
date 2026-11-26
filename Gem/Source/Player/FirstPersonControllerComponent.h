@@ -25,6 +25,9 @@ namespace NoclipProtocol
         static void GetRequiredServices(AZ::ComponentDescriptor::DependencyArrayType& required);
         static void GetProvidedServices(AZ::ComponentDescriptor::DependencyArrayType& provided);
 
+        //! Developer teleport (console command noclip_tp).
+        void Teleport(const AZ::Vector3& position, float yaw, float pitch, bool setYaw, bool setPitch);
+
     protected:
         void Activate() override;
         void Deactivate() override;

@@ -1,6 +1,8 @@
 #include "FirstPersonControllerComponent.h"
 
 #include <AzCore/Settings/SettingsRegistry.h>
+#include <AzCore/Console/IConsole.h>
+#include <AzCore/std/string/conversions.h>
 
 #include <AzCore/Component/TransformBus.h>
 #include <AzCore/Math/MathUtils.h>
@@ -14,6 +16,53 @@
 
 namespace NoclipProtocol
 {
+    namespace
+    {
+        // The player that is playing right now (there is one first-person player per game window).
+        FirstPersonControllerComponent* s_activePlayer = nullptr;
+
+        // noclip_tp <x> <y> <z> [yaw degrees] [pitch degrees]: put the player somewhere, facing a way.
+        // A developer command, so Claude (through the editor's script console) and the owner can take
+        // screenshots and test spots without walking there.
+        void NoclipTeleport(const AZ::ConsoleCommandContainer& arguments)
+        {
+            if (!s_activePlayer || arguments.size() < 3)
+            {
+                AZ_Printf("Noclip", "noclip_tp <x> <y> <z> [yaw] [pitch]%s", s_activePlayer ? "" : " (no player is playing)");
+                return;
+            }
+            float values[5] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+            const size_t count = AZStd::min<size_t>(arguments.size(), 5);
+            for (size_t i = 0; i < count; ++i)
+            {
+                values[i] = AZStd::stof(AZStd::string(arguments[i]));
+            }
+            s_activePlayer->Teleport(AZ::Vector3(values[0], values[1], values[2]), AZ::DegToRad(values[3]),
+                AZ::DegToRad(values[4]), arguments.size() >= 4, arguments.size() >= 5);
+            AZ_Printf("Noclip", "noclip_tp: %.2f %.2f %.2f yaw %.1f pitch %.1f", values[0], values[1], values[2], values[3], values[4]);
+        }
+        AZ_CONSOLEFREEFUNC("noclip_tp", NoclipTeleport, AZ::ConsoleFunctorFlags::Null,
+            "Move the player: noclip_tp <x> <y> <z> [yaw degrees] [pitch degrees]");
+    } // namespace
+
+    void FirstPersonControllerComponent::Teleport(const AZ::Vector3& position, float yaw, float pitch, bool setYaw, bool setPitch)
+    {
+        Physics::CharacterRequestBus::Event(GetEntityId(), &Physics::CharacterRequests::SetBasePosition, position);
+        AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldTranslation, position);
+        if (setYaw)
+        {
+            m_yaw = yaw;
+            m_facingRead = true;
+            m_lastWrittenRotation = AZ::Quaternion::CreateRotationZ(m_yaw);
+            AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion, m_lastWrittenRotation);
+        }
+        if (setPitch)
+        {
+            m_pitch = pitch;
+        }
+        m_verticalSpeed = 0.0f;
+    }
+
     void FirstPersonControllerComponent::Reflect(AZ::ReflectContext* context)
     {
         if (auto serialize = azrtti_cast<AZ::SerializeContext*>(context))
@@ -70,6 +119,7 @@ namespace NoclipProtocol
         // level generator have had the chance to turn the player.
         m_facingRead = false;
         m_pitch = 0.0f;
+        s_activePlayer = this;
 
         AzFramework::InputChannelEventListener::Connect();
         AZ::TickBus::Handler::BusConnect();
@@ -78,6 +128,10 @@ namespace NoclipProtocol
 
     void FirstPersonControllerComponent::Deactivate()
     {
+        if (s_activePlayer == this)
+        {
+            s_activePlayer = nullptr;
+        }
         SetCursorCaptured(false);
         AZ::TickBus::Handler::BusDisconnect();
         AzFramework::InputChannelEventListener::Disconnect();

@@ -7,7 +7,7 @@ Generates the Level 0 textures (seamless where they tile) with numpy + Pillow.
 Writes, for O3DE's image presets (the suffix picks the preset):
   level0_wallpaper_basecolor.png / _normal.png / _roughness.png   one 4.2 m x 3 m wall face, with baseboard
   level0_carpet_basecolor.png / _roughness.png                    a 4 m x 4 m seamless carpet tile
-  level0_ceiling_basecolor.png / _normal.png                      a 2.4 m x 2.4 m seamless block of 4 x 4 drop-ceiling tiles
+  level0_ceiling_basecolor.png / _normal.png                      a 2 m x 2 m seamless block of 4 x 4 drop-ceiling tiles
   level0_fixture_basecolor.png / _emissive.png                    a two-tube fluorescent fixture
 """
 
@@ -132,7 +132,7 @@ def carpet(out):
 # ----------------------------------------------------------------------------- ceiling tiles
 
 def ceiling(out):
-    n = 1024  # 2.4 m block of 4 x 4 tiles (0.6 m each), seamless
+    n = 1024  # 2.0 m block of 4 x 4 tiles (0.5 m each, lined up with the 4 m cells), seamless
     tile = n // 4
     y, x = np.mgrid[0:n, 0:n]
     tx, ty = x % tile, y % tile
@@ -176,34 +176,65 @@ def fixture(out):
     save(emissive, os.path.join(out, "level0_fixture_emissive.png"))
 
 
+def troffer_mask(w, h):
+    """Shared shape of a 0.5 m x 1.0 m two-tube troffer (512 x 1024 px, ~1 mm per px): the steel frame
+    and the recessed diffuser inside it."""
+    y, x = np.mgrid[0:h, 0:w].astype(float)
+    frame = (x < 26) | (x > w - 27) | (y < 26) | (y > h - 27)
+    lip = ((x < 34) | (x > w - 35) | (y < 34) | (y > h - 35)) & ~frame   # shadowed inner edge
+    return x, y, frame, lip
+
+
 def square_panel(out):
-    n = 512  # one 0.6 m ceiling tile replaced by a light panel
-    y, x = np.mgrid[0:n, 0:n].astype(float)
-    frame = (x < 18) | (x > n - 18) | (y < 18) | (y > n - 18)
-    color = np.ones((n, n, 3)) * np.array([0.95, 0.94, 0.88])
-    color[frame] = np.array([0.80, 0.78, 0.70])
-    # diffuser: bright and even, a touch brighter in the middle
-    cx, cy = (x - n / 2) / (n / 2), (y - n / 2) / (n / 2)
-    glow = np.clip(1.0 - 0.18 * (cx * cx + cy * cy), 0, 1) * (~frame)
-    emissive = glow[..., None] * np.array([1.0, 0.97, 0.82])
+    """A working ceiling light: a 2 x 4 ft (0.5 m x 1.0 m here, two ceiling tiles) fluorescent troffer.
+    Ribbed prismatic diffuser over two tubes that run its length, a painted steel frame, a little grime
+    and a few dead bugs at one end. The emissive map is the light coming through the diffuser, brightest
+    over the tubes, so the panel reads as a fixture instead of a white square."""
+    w, h = 512, 1024
+    x, y, frame, lip = troffer_mask(w, h)
+    lens = ~frame & ~lip
+    ribs = 0.5 + 0.5 * np.cos(2 * np.pi * x / 9.0) * np.cos(2 * np.pi * y / 9.0)  # prismatic pyramids
+    grime = periodic_noise(h, w, 90, octaves=3)
+    end_dirt = np.clip((y - h * 0.78) / (h * 0.22), 0, 1) * (0.5 + 0.5 * grime)
+    color = np.ones((h, w, 3)) * np.array([0.93, 0.92, 0.86])
+    color *= (0.95 + 0.05 * ribs)[..., None]
+    color = color * (1 - 0.25 * end_dirt[..., None]) + np.array([0.55, 0.5, 0.36]) * (0.25 * end_dirt[..., None])
+    bugs = (periodic_noise(h, w, 5, octaves=2) > 0.87) & (end_dirt > 0.35)
+    color[bugs] = np.array([0.14, 0.12, 0.09])
+    color[frame] = np.array([0.80, 0.79, 0.74])
+    color[lip] = np.array([0.52, 0.51, 0.47])
+
+    tubes = np.zeros((h, w))
+    for cx in (w * 0.33, w * 0.67):
+        tubes += np.exp(-((x - cx) ** 2) / (2 * 34.0 ** 2))
+    ends = np.clip(np.minimum(y - 40, h - 40 - y) / 90.0, 0, 1)          # tubes dim toward their ends
+    light = (0.42 + 0.58 * np.clip(tubes, 0, 1) * ends) * (0.9 + 0.1 * ribs)
+    light *= 1 - 0.55 * end_dirt
+    light[bugs] = 0.05
+    emissive = (light * lens)[..., None] * np.array([1.0, 0.97, 0.84])
     save(color, os.path.join(out, "level0_panel_basecolor.png"))
     save(emissive, os.path.join(out, "level0_panel_emissive.png"))
 
 
 def dead_panel(out):
-    """A broken light panel: dirty grey diffuser with a crack and dead bugs, no glow."""
-    n = 512
-    y, x = np.mgrid[0:n, 0:n].astype(float)
-    frame = (x < 18) | (x > n - 18) | (y < 18) | (y > n - 18)
-    grime = periodic_noise(n, n, 60, octaves=4)
-    color = np.ones((n, n, 3)) * np.array([0.55, 0.54, 0.5]) * (0.75 + 0.35 * grime)[..., None]
+    """A dead troffer, same size as the working one: dirty grey diffuser, a crack, dead bugs piled
+    at the low end, a dark scorch where a tube burned out. No glow."""
+    w, h = 512, 1024
+    x, y, frame, lip = troffer_mask(w, h)
+    grime = periodic_noise(h, w, 60, octaves=4)
+    ribs = 0.5 + 0.5 * np.cos(2 * np.pi * x / 9.0) * np.cos(2 * np.pi * y / 9.0)
+    color = np.ones((h, w, 3)) * np.array([0.52, 0.51, 0.47]) * (0.72 + 0.34 * grime)[..., None]
+    color *= (0.94 + 0.06 * ribs)[..., None]
+    scorch = np.exp(-(((x - w * 0.33) / 40.0) ** 2 + ((y - h * 0.12) / 70.0) ** 2))
+    color *= (1 - 0.6 * scorch)[..., None]
+    crack = np.abs((x - w * 0.62) - 0.28 * (y - h * 0.35) - 14 * np.sin(y / 31.0)) < 2.4
+    crack &= (y > h * 0.35) & (y < h * 0.8)
+    color[crack] = np.array([0.16, 0.15, 0.13])
+    pile = np.clip((y - h * 0.82) / (h * 0.18), 0, 1)
+    bugs = periodic_noise(h, w, 6, octaves=2) > (0.9 - 0.12 * pile)
+    color[bugs & (pile > 0)] = np.array([0.1, 0.09, 0.07])
     color[frame] = np.array([0.6, 0.58, 0.52])
-    crack = np.abs((y - n * 0.3) - 0.45 * (x - n * 0.2) - 18 * np.sin(x / 23.0)) < 2.2
-    crack &= (x > n * 0.2) & (x < n * 0.85)
-    color[crack] = np.array([0.18, 0.17, 0.15])
-    bugs = periodic_noise(n, n, 6, octaves=2) > 0.86
-    corner = ((x - n * 0.7) ** 2 + (y - n * 0.75) ** 2) < (n * 0.12) ** 2
-    color[bugs & corner] = np.array([0.12, 0.11, 0.09])
+    color[lip] = np.array([0.38, 0.37, 0.34])
     save(color, os.path.join(out, "level0_deadpanel_basecolor.png"))
 
 
@@ -255,25 +286,20 @@ def wet_spot(n, r):
 
 
 def mold(n, r):
-    """Mold: round colonies of mixed sizes, each a near-black green core fading through olive to a
-    faint brown stain; dense in the middle, thinning out toward the edge."""
-    rng = np.random.default_rng(77)
-    y, x = np.mgrid[0:n, 0:n].astype(float) / n
-    wobble = periodic_noise(n, n, 18, octaves=2) - 0.5
-    core = np.zeros((n, n))
-    halo = np.zeros((n, n))
-    for _ in range(70):
-        ang, dist = rng.uniform(0, 2 * np.pi), 0.36 * np.sqrt(rng.random())
-        cx, cy = 0.5 + dist * np.cos(ang), 0.5 + dist * np.sin(ang)
-        size = rng.uniform(0.008, 0.035) * (1.3 - dist * 1.6)
-        d = np.sqrt((x - cx) ** 2 + (y - cy) ** 2) + 0.012 * wobble
-        core = np.maximum(core, np.clip((size - d) / (size * 0.35), 0, 1))
-        halo = np.maximum(halo, np.clip((size * 2.6 - d) / (size * 1.8), 0, 1))
-    stain = organic(n, r, 0.5, 0.3, warp=0.6)
-    rgb = np.ones((n, n, 3)) * CARPET * 0.62 * np.array([0.95, 0.9, 0.7])
-    rgb = rgb * (1 - halo[..., None] * 0.8) + np.array([0.28, 0.29, 0.12]) * (halo[..., None] * 0.8)
-    rgb = rgb * (1 - core[..., None]) + np.array([0.06, 0.08, 0.035]) * core[..., None]
-    alpha = np.maximum(np.maximum(core * 0.95, halo * 0.5), stain * 0.22)
+    """Mold on damp carpet: irregular fuzzy patches (not dots) that grow out of a brown damp stain,
+    darkest and greenest where they are oldest, with a few small satellite spores around them."""
+    damp = organic(n, r, 0.6, 0.28, warp=0.7)                       # the wet stain it grows in
+    growth_noise = periodic_noise(n, n, 55, octaves=5, persistence=0.6)
+    fuzz = periodic_noise(n, n, 9, octaves=3)
+    patch = np.clip((growth_noise - 0.56) / 0.12, 0, 1) * np.clip(damp * 1.6, 0, 1)
+    patch = np.clip(patch * (0.75 + 0.5 * fuzz), 0, 1)              # fuzzy edges
+    old = np.clip((growth_noise - 0.66) / 0.08, 0, 1) * patch        # dense, darkest centres
+    spores = np.clip((periodic_noise(n, n, 4, octaves=2) - 0.83) / 0.05, 0, 1) * np.clip(damp * 2 - 0.4, 0, 1)
+    rgb = np.ones((n, n, 3)) * CARPET * 0.6 * np.array([0.95, 0.88, 0.7])
+    rgb = rgb * (1 - patch[..., None] * 0.85) + np.array([0.24, 0.26, 0.14]) * (patch[..., None] * 0.85)
+    rgb = rgb * (1 - old[..., None] * 0.9) + np.array([0.07, 0.09, 0.05]) * (old[..., None] * 0.9)
+    rgb = rgb * (1 - spores[..., None] * 0.7) + np.array([0.12, 0.13, 0.07]) * (spores[..., None] * 0.7)
+    alpha = np.maximum.reduce([damp * 0.28, patch * 0.8, old * 0.95, spores * 0.6])
     return rgb, alpha
 
 
