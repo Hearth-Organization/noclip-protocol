@@ -1,4 +1,5 @@
 #include "Level0Layout.h"
+#include "ClutterCatalog.h"
 
 #include <algorithm>
 #include <cmath>
@@ -73,6 +74,7 @@ namespace NoclipProtocol::Level0
             TagProp = 19,
             TagNoclip = 20,
             TagPickup = 21,
+            TagClutter = 22,
         };
 
         float Smooth(float t) { return t * t * (3.0f - 2.0f * t); }
@@ -138,6 +140,8 @@ namespace NoclipProtocol::Level0
             settings.m_decalChance = 0.45f;
             settings.m_lightSpacing = 1;
             settings.m_propChance = 0.2f;
+            settings.m_clutterChance = 0.55f;
+            settings.m_scatterChance = 0.3f;
         }
         else if (settings.m_style == 3)
         {
@@ -150,6 +154,8 @@ namespace NoclipProtocol::Level0
             settings.m_noclipChance = 0.0f;
             settings.m_lightSpacing = 1;
             settings.m_propChance = 0.0f;
+            settings.m_clutterChance = 0.0f;
+            settings.m_scatterChance = 0.0f;
         }
         else if (settings.m_style == 2)
         {
@@ -169,6 +175,8 @@ namespace NoclipProtocol::Level0
             settings.m_decalChance = 0.35f;
             settings.m_lightSpacing = 2;
             settings.m_propChance = 0.65f;
+            settings.m_clutterChance = 0.4f;
+            settings.m_scatterChance = 0.35f;
         }
     }
 
@@ -258,7 +266,7 @@ namespace NoclipProtocol::Level0
         }
     } // namespace
 
-    ChunkLayout GenerateChunk(const Settings& settings, int chunkX, int chunkY)
+    ChunkLayout GenerateChunk(const Settings& settings, int chunkX, int chunkY, int shift)
     {
         if (settings.m_style == 3)
         {
@@ -271,7 +279,8 @@ namespace NoclipProtocol::Level0
         const int baseX = chunkX * n; // global cell index of this chunk's first column
         const int baseY = chunkY * n;
 
-        Rng rng(Hash(settings.m_seed, TagChunk, chunkX, chunkY));
+        // A shifted chunk draws its interior from a new stream; shift 0 keeps the original layout exactly.
+        Rng rng(shift == 0 ? Hash(settings.m_seed, TagChunk, chunkX, chunkY) : Hash(settings.m_seed, TagChunk, chunkX, chunkY, shift));
 
         // Local wall grids. h[x][y]: wall on line y (0..n) spanning cell x. v[x][y]: wall on line x (0..n) spanning cell y.
         std::vector<std::vector<bool>> h(n, std::vector<bool>(n + 1, true));
@@ -369,7 +378,7 @@ namespace NoclipProtocol::Level0
         //     clear inside but still walled round by the maze, so they feel like rooms you find, not holes.
         //     Their own random stream, so the rest of the chunk doesn't change when this does.
         {
-            Rng roomRng(Hash(settings.m_seed, TagSmallRoom, chunkX, chunkY));
+            Rng roomRng(shift == 0 ? Hash(settings.m_seed, TagSmallRoom, chunkX, chunkY) : Hash(settings.m_seed, TagSmallRoom, chunkX, chunkY, shift));
             for (int attempt = 0; attempt < 4 && n >= 3; ++attempt)
             {
                 const bool make = roomRng.NextUnit() < settings.m_roomChance;
@@ -695,6 +704,205 @@ namespace NoclipProtocol::Level0
                     const float jy = (Unit(Mix(hp ^ 5)) - 0.5f) * 0.4f * cell;
                     layout.m_pickups.push_back(ChunkLayout::Pickup{
                         Point{ (static_cast<float>(gx) + 0.5f) * cell + jx, (static_cast<float>(gy) + 0.5f) * cell + jy, 0.0f }, kind, index++ });
+                }
+            }
+        }
+
+        // 12. Clutter: anything can end up in the Backrooms. Per cell, one of: props against its walls, one thing
+        //     standing in the open, a big thing or a little scene in an open cell; plus small things lying about.
+        //     Room is kept so every doorway and walkway stays passable: wall props keep out of the corners and
+        //     within a band along the wall, free props keep to the middle, and the spawn room stays clear to build in.
+        if (settings.m_clutterChance > 0.0f && settings.m_style <= 2)
+        {
+            using namespace Clutter;
+            const int level = settings.m_style;
+            const float inner = cell * 0.5f - thick * 0.5f;               // cell middle to a wall's face
+            const float band = std::min(0.95f, cell * 0.25f);              // how deep wall props may be
+            const float span = inner - band - 0.05f;                        // half the usable length of a wall
+            const float middle = inner - band - 0.05f;                      // free props keep within this of the middle
+            const float open = cell * 0.5f - 0.25f;                         // open cells: half-size for big things and scenes
+
+            auto pick = [&](Place place, uint64_t h, auto&& fits) -> int
+            {
+                int total = 0;
+                for (int k = 0; k < KindCount; ++k)
+                {
+                    if (Kinds[k].m_place == place && Kinds[k].m_weight[level] > 0 && fits(Kinds[k])) { total += Kinds[k].m_weight[level]; }
+                }
+                if (total == 0) { return -1; }
+                int roll = static_cast<int>(Mix(h) % static_cast<uint64_t>(total));
+                for (int k = 0; k < KindCount; ++k)
+                {
+                    if (Kinds[k].m_place == place && Kinds[k].m_weight[level] > 0 && fits(Kinds[k]))
+                    {
+                        roll -= Kinds[k].m_weight[level];
+                        if (roll < 0) { return k; }
+                    }
+                }
+                return -1;
+            };
+            auto radius = [](const Kind& k) { return 0.5f * std::sqrt(k.m_width * k.m_width + k.m_depth * k.m_depth); };
+            auto lowPipe = [&](float wx, float wy, float sideSign) // Level 2: a low pipe run on this side of this wall
+            {
+                if (settings.m_style != 2) { return false; }
+                const uint64_t hp = Hash(settings.m_seed, TagProp, static_cast<int64_t>(std::floor(wx * 2.0f)), static_cast<int64_t>(std::floor(wy * 2.0f)));
+                if (Unit(hp) >= settings.m_propChance) { return false; }
+                const float side = Unit(Mix(hp ^ 1)) < 0.5f ? -1.0f : 1.0f;
+                return Unit(Mix(hp ^ 2)) < 0.3f && side == sideSign;
+            };
+
+            for (int x = 0; x < n; ++x)
+            {
+                for (int y = 0; y < n; ++y)
+                {
+                    const int gx = baseX + x;
+                    const int gy = baseY + y;
+                    if (inRoom(gx, gy))
+                    {
+                        continue; // the forward base stays clear
+                    }
+                    if (settings.m_style == 1 && Unit(Hash(settings.m_seed, TagProp, gx, gy)) < settings.m_propChance)
+                    {
+                        continue; // Level 1: crates already stand here
+                    }
+                    const float mx = originX + (static_cast<float>(x) + 0.5f) * cell;
+                    const float my = originY + (static_cast<float>(y) + 0.5f) * cell;
+                    bool busy = settings.m_pickupChance > 0.0f && Unit(Hash(settings.m_seed, TagPickup, gx, gy)) < settings.m_pickupChance;
+                    for (const Point& spot : layout.m_noclipSpots)
+                    {
+                        busy = busy || (std::fabs(spot.m_x - mx) < 0.1f && std::fabs(spot.m_y - my) < 0.1f);
+                    }
+                    // This cell's walls: south, north, west, east (outward direction, and the wall's center).
+                    struct Side { bool m_wall; float m_nx, m_ny; };
+                    const Side sides[4] = {
+                        { h[x][y], 0.0f, -1.0f }, { h[x][y + 1], 0.0f, 1.0f }, { v[x][y], -1.0f, 0.0f }, { v[x + 1][y], 1.0f, 0.0f } };
+                    int walls = 0;
+                    for (const Side& s : sides) { walls += s.m_wall ? 1 : 0; }
+
+                    const uint64_t hc = Hash(settings.m_seed, TagClutter, gx, gy, shift);
+                    bool middleUsed = busy;
+                    if (Unit(hc) < settings.m_clutterChance)
+                    {
+                        const float mode = Unit(Mix(hc ^ 1));
+                        if (walls == 0 && !busy && mode < 0.45f)
+                        {
+                            // An open cell: a little scene, or one big thing (a car, a bed, a bathtub).
+                            const float turn = static_cast<float>(Mix(hc ^ 2) % 4) * 1.5707963f;
+                            const float c = std::cos(turn);
+                            const float s = std::sin(turn);
+                            bool placed = false;
+                            if (Unit(Mix(hc ^ 3)) < 0.55f)
+                            {
+                                int total = 0;
+                                for (const Scene& scene : Scenes) { total += scene.m_weight[level]; }
+                                if (total > 0)
+                                {
+                                    int roll = static_cast<int>(Mix(hc ^ 4) % static_cast<uint64_t>(total));
+                                    const Scene* chosen = nullptr;
+                                    for (const Scene& scene : Scenes)
+                                    {
+                                        roll -= scene.m_weight[level];
+                                        if (roll < 0) { chosen = &scene; break; }
+                                    }
+                                    // Does it fit in this cell? Each piece's turned footprint must stay inside.
+                                    bool fits = chosen != nullptr;
+                                    for (int i = 0; fits && i < chosen->m_count; ++i)
+                                    {
+                                        const ScenePiece& piece = chosen->m_pieces[i];
+                                        const Kind& kind = Kinds[piece.m_kind];
+                                        const float px = piece.m_x * c - piece.m_y * s;
+                                        const float py = piece.m_x * s + piece.m_y * c;
+                                        fits = std::fabs(px) + radius(kind) * 0.85f <= open && std::fabs(py) + radius(kind) * 0.85f <= open;
+                                    }
+                                    if (fits)
+                                    {
+                                        for (int i = 0; i < chosen->m_count; ++i)
+                                        {
+                                            const ScenePiece& piece = chosen->m_pieces[i];
+                                            layout.m_clutter.push_back(ChunkLayout::Clutter{
+                                                Point{ mx + piece.m_x * c - piece.m_y * s, my + piece.m_x * s + piece.m_y * c, 0.0f },
+                                                turn + piece.m_yawDegrees * 0.01745329f, piece.m_kind });
+                                        }
+                                        placed = true;
+                                    }
+                                }
+                            }
+                            if (!placed)
+                            {
+                                const int k = pick(Place::Big, hc ^ 5, [&](const Kind& kind) { return radius(kind) <= open; });
+                                if (k >= 0)
+                                {
+                                    // Parked straight (give or take), like someone left it there.
+                                    const float yaw = turn + (Unit(Mix(hc ^ 6)) - 0.5f) * 0.25f;
+                                    const float room = open - radius(Kinds[k]);
+                                    layout.m_clutter.push_back(ChunkLayout::Clutter{
+                                        Point{ mx + (Unit(Mix(hc ^ 7)) - 0.5f) * room, my + (Unit(Mix(hc ^ 8)) - 0.5f) * room, 0.0f }, yaw, k });
+                                    placed = true;
+                                }
+                            }
+                            middleUsed = middleUsed || placed;
+                        }
+                        else if (walls > 0 && mode < 0.75f)
+                        {
+                            // Against the walls: one, sometimes two (on different walls).
+                            const int want = Unit(Mix(hc ^ 9)) < 0.3f ? 2 : 1;
+                            int done = 0;
+                            int used = 0; // sides already taken (bits)
+                            for (int tries = 0; tries < 6 && done < want; ++tries)
+                            {
+                                const int sideIndex = static_cast<int>(Mix(hc ^ (10 + tries)) % 4);
+                                const Side& side = sides[sideIndex];
+                                if ((used & (1 << sideIndex)) != 0)
+                                {
+                                    continue;
+                                }
+                                used |= 1 << sideIndex;
+                                if (!side.m_wall || lowPipe(mx + side.m_nx * cell * 0.5f, my + side.m_ny * cell * 0.5f, side.m_nx + side.m_ny < 0.0f ? 1.0f : -1.0f))
+                                {
+                                    continue;
+                                }
+                                const int k = pick(Place::Wall, hc ^ (20 + tries), [&](const Kind& kind)
+                                    { return kind.m_depth <= band && kind.m_width * 0.5f <= span; });
+                                if (k < 0) { break; }
+                                const Kind& kind = Kinds[k];
+                                const float along = (Unit(Mix(hc ^ (30 + tries))) - 0.5f) * 2.0f * (span - kind.m_width * 0.5f);
+                                const float out = inner - kind.m_depth * 0.5f - 0.03f;
+                                // Front faces into the cell: yaw turns +Y to (-sin, cos).
+                                const float yaw = std::atan2(side.m_nx, -side.m_ny);
+                                layout.m_clutter.push_back(ChunkLayout::Clutter{
+                                    Point{ mx + side.m_nx * out - side.m_ny * along, my + side.m_ny * out + side.m_nx * along, 0.0f }, yaw, k });
+                                ++done;
+                            }
+                        }
+                        else if (!busy)
+                        {
+                            // One thing standing in the open, turned any which way.
+                            const float limit = walls == 0 ? open - 0.6f : middle;
+                            const int k = pick(Place::Free, hc ^ 40, [&](const Kind& kind) { return radius(kind) <= limit; });
+                            if (k >= 0)
+                            {
+                                const float room = limit - radius(Kinds[k]);
+                                layout.m_clutter.push_back(ChunkLayout::Clutter{
+                                    Point{ mx + (Unit(Mix(hc ^ 41)) - 0.5f) * 2.0f * room, my + (Unit(Mix(hc ^ 42)) - 0.5f) * 2.0f * room, 0.0f },
+                                    Unit(Mix(hc ^ 43)) * 6.2831853f, k });
+                                middleUsed = true;
+                            }
+                        }
+                    }
+                    // Small things lying about (no colliders), in the middle of the cell when nothing else is there.
+                    if (!middleUsed && Unit(Mix(hc ^ 50)) < settings.m_scatterChance)
+                    {
+                        const int count = 1 + (Unit(Mix(hc ^ 51)) < 0.35f ? 1 : 0);
+                        for (int i = 0; i < count; ++i)
+                        {
+                            const int k = pick(Place::Small, hc ^ (52 + i), [&](const Kind& kind) { return radius(kind) <= middle + 0.3f; });
+                            if (k < 0) { break; }
+                            const float room = std::max(0.0f, middle + 0.3f - radius(Kinds[k]));
+                            layout.m_clutter.push_back(ChunkLayout::Clutter{
+                                Point{ mx + (Unit(Mix(hc ^ (60 + i))) - 0.5f) * 2.0f * room, my + (Unit(Mix(hc ^ (70 + i))) - 0.5f) * 2.0f * room, 0.0f },
+                                Unit(Mix(hc ^ (80 + i))) * 6.2831853f, k });
+                        }
+                    }
                 }
             }
         }

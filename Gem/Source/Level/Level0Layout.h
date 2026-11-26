@@ -45,6 +45,8 @@ namespace NoclipProtocol::Level0
         float m_propChance = 0.0f;     // Level 1: crates per cell; Level 2: pipes per wall segment
         float m_pickupChance = 0.05f; // per cell: scrap, wire, fuel or Almond Water lying about (ApplyStyle: fewer in Level 2)
         float m_noclipChance = 0.08f;  // chance a chunk has a noclip spot (a tear you walk through into the next level)
+        float m_clutterChance = 0.5f;  // per cell: something that ended up here (ApplyStyle sets it per level; 0 = none)
+        float m_scatterChance = 0.3f;  // per cell: small things lying about (cans, papers, a backpack)
     };
 
     //! Level 1 and 2 presets: sizes, openness, pillars, rooms, lights and props for that level's look.
@@ -115,6 +117,13 @@ namespace NoclipProtocol::Level0
             int m_index; // its number in this chunk (with the chunk, a lasting id: collected ones stay gone)
         };
         std::vector<Pickup> m_pickups;    // supplies to gather for the forward base
+        struct Clutter
+        {
+            Point m_at;     // on the floor: the prop's origin
+            float m_yaw;    // radians, 0 = front facing +Y
+            int m_kind;     // index into Clutter::Kinds (ClutterCatalog.h)
+        };
+        std::vector<Clutter> m_clutter;   // everything that has ended up in here: furniture, junk, lost belongings
     };
 
     //! The intro facility (style 3): where the player starts, the terminal, and Breach 4-A.
@@ -131,8 +140,10 @@ namespace NoclipProtocol::Level0
         static constexpr float ArriveX = 2.0f, ArriveY = -9.0f; // where you step out, facing north into the room
     };
 
-    //! Builds the layout of one chunk.
-    ChunkLayout GenerateChunk(const Settings& settings, int chunkX, int chunkY);
+    //! Builds the layout of one chunk. shift > 0: the same chunk after it has rearranged itself that many times
+    //! (low sanity): new interior walls, rooms and clutter; its border doorways, lights, supplies and noclip spot
+    //! stay, and its maze still reaches every cell, so the way back to the base and to the tears always stays open.
+    ChunkLayout GenerateChunk(const Settings& settings, int chunkX, int chunkY, int shift = 0);
 
     //! Which chunk a world position falls in.
     void WorldToChunk(const Settings& settings, float x, float y, int& chunkX, int& chunkY);

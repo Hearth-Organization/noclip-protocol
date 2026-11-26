@@ -4,6 +4,7 @@
 #include "../Render/RayTracing.h"
 #include "../Player/FirstPersonControllerComponent.h"
 #include "../Base/BaseBuilding.h"
+#include "ClutterCatalog.h"
 #include <AzCore/Component/ComponentApplicationBus.h>
 #include <AzCore/Component/Entity.h>
 #include <MiniAudio/MiniAudioPlaybackBus.h>
@@ -25,6 +26,7 @@
 #include <AzFramework/Components/TransformComponent.h>
 #include <AzFramework/Entity/EntityDebugDisplayBus.h>
 
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 
@@ -198,8 +200,35 @@ namespace NoclipProtocol
         return (static_cast<AZ::u64>(static_cast<AZ::u32>(x)) << 32) | static_cast<AZ::u32>(y);
     }
 
+    namespace
+    {
+        // noclip_shift: rearrange every chunk the player can't see right now (testing the low-sanity shifts).
+        void NoclipShift([[maybe_unused]] const AZ::ConsoleCommandContainer& arguments)
+        {
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Set("/NoclipProtocol/Level0/ForceShift", true);
+            }
+        }
+        AZ_CONSOLEFREEFUNC("noclip_shift", NoclipShift, AZ::ConsoleFunctorFlags::Null,
+            "Rearrange every chunk out of the player's sight now (what low sanity does, one chunk at a time)");
+
+        // noclip_clutter 0/1: hide or show the clutter (rebuilds the loaded chunks; for testing).
+        void NoclipClutter(const AZ::ConsoleCommandContainer& arguments)
+        {
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Set("/NoclipProtocol/Level0/ClutterOff", !arguments.empty() && arguments[0] == "0");
+            }
+        }
+        AZ_CONSOLEFREEFUNC("noclip_clutter", NoclipClutter, AZ::ConsoleFunctorFlags::Null, "noclip_clutter 0 hides the clutter, 1 shows it");
+    } // namespace
+
     void EndlessLevelComponent::Activate()
     {
+        m_chunkShifts.clear();
+        m_shiftClock = 0.0f;
+        m_shiftsDone = 0;
         m_settings.m_chunkCells = AZStd::max(2, m_chunkCellsField);
         m_settings.m_lightFraction = m_lightFractionField;
         m_settings.m_openFraction = m_openFractionField;
@@ -319,6 +348,11 @@ namespace NoclipProtocol
         {
             asset.Release();
         }
+        for (auto& asset : m_clutterAssets)
+        {
+            asset.Release();
+        }
+        m_clutterAssets.clear();
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
             registry->Set("/Hearth/Viewport/Stats", AZStd::string_view{});
@@ -354,7 +388,39 @@ namespace NoclipProtocol
             }
             m_pieceAssets[i] = AZ::Data::AssetManager::Instance().GetAsset<AzFramework::Spawnable>(id, AZ::Data::AssetLoadBehavior::PreLoad);
         }
+        LoadClutterAssets();
         return allFound;
+    }
+
+    void EndlessLevelComponent::LoadClutterAssets()
+    {
+        m_clutterAssets.clear();
+        m_clutterAssets.resize(Clutter::KindCount);
+        if (m_settings.m_style > 2)
+        {
+            return; // the intro facility has its own fixed set
+        }
+        int missing = 0;
+        for (int k = 0; k < Clutter::KindCount; ++k)
+        {
+            if (Clutter::Kinds[k].m_weight[m_settings.m_style] <= 0)
+            {
+                continue; // never in this level
+            }
+            AZStd::string name = Clutter::Kinds[k].m_name;
+            for (char& ch : name) { ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch))); }
+            const AZStd::string assetPath = AZStd::string::format("prefabs/clutter/%s.spawnable", name.c_str());
+            AZ::Data::AssetId id;
+            AZ::Data::AssetCatalogRequestBus::BroadcastResult(id, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath, assetPath.c_str(),
+                azrtti_typeid<AzFramework::Spawnable>(), false);
+            if (!id.IsValid())
+            {
+                ++missing;
+                continue;
+            }
+            m_clutterAssets[k] = AZ::Data::AssetManager::Instance().GetAsset<AzFramework::Spawnable>(id, AZ::Data::AssetLoadBehavior::PreLoad);
+        }
+        AZ_Warning("NoclipProtocol", missing == 0, "Endless Level: %d clutter props not found (run Tools/Clutter/make_clutter.py)", missing);
     }
 
     bool EndlessLevelComponent::PieceAssetsReady() const
@@ -369,6 +435,13 @@ namespace NoclipProtocol
         for (const auto& asset : m_pickupAssets)
         {
             if (asset.GetId().IsValid() && !asset.IsReady())
+            {
+                return false;
+            }
+        }
+        for (const auto& asset : m_clutterAssets)
+        {
+            if (asset.GetId().IsValid() && !asset.IsReady() && !asset.IsError())
             {
                 return false;
             }
@@ -477,6 +550,29 @@ namespace NoclipProtocol
             }
         }
 
+        UpdateShifting(deltaTime, position, playerX, playerY);
+
+        // Testing switch: clutter off/on (noclip_clutter); every loaded chunk is rebuilt.
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            bool off = false;
+            registry->Get(off, "/NoclipProtocol/Level0/ClutterOff");
+            if (off != m_clutterOff)
+            {
+                m_clutterOff = off;
+                Level0::Settings styled; // the level's own clutter amounts, from a fresh copy of its style
+                styled.m_style = m_settings.m_style;
+                Level0::ApplyStyle(styled);
+                m_settings.m_clutterChance = off ? 0.0f : styled.m_clutterChance;
+                m_settings.m_scatterChance = off ? 0.0f : styled.m_scatterChance;
+                for (auto& entry : m_chunks)
+                {
+                    DespawnChunk(entry.second);
+                }
+                m_chunks.clear();
+            }
+        }
+
         // Unload chunks that are far away.
         for (auto it = m_chunks.begin(); it != m_chunks.end();)
         {
@@ -574,13 +670,129 @@ namespace NoclipProtocol
         }
     }
 
+    bool EndlessLevelComponent::ChunkInView(int chunkX, int chunkY, const AZ::Vector3& eye, const AZ::Vector3& forward) const
+    {
+        // Conservative: walls don't hide anything here. A chunk counts as seen if any point of it lies within a wide
+        // cone (70 degrees either side, wider than the screen), or the player is close enough to glimpse it sideways.
+        const float size = m_settings.m_cellSize * static_cast<float>(m_settings.m_chunkCells);
+        const float x0 = static_cast<float>(chunkX) * size;
+        const float y0 = static_cast<float>(chunkY) * size;
+        const float nearX = AZStd::clamp(eye.GetX(), x0, x0 + size);
+        const float nearY = AZStd::clamp(eye.GetY(), y0, y0 + size);
+        const float dx0 = nearX - eye.GetX();
+        const float dy0 = nearY - eye.GetY();
+        if (dx0 * dx0 + dy0 * dy0 < 3.0f * 3.0f)
+        {
+            return true;
+        }
+        constexpr int steps = 8;
+        const float cosHalf = 0.342f; // cos 70 degrees
+        for (int i = 0; i <= steps; ++i)
+        {
+            for (int j = 0; j <= steps; ++j)
+            {
+                const float dx = x0 + size * static_cast<float>(i) / steps - eye.GetX();
+                const float dy = y0 + size * static_cast<float>(j) / steps - eye.GetY();
+                const float length = std::sqrt(dx * dx + dy * dy);
+                if (length < 0.01f || (dx * forward.GetX() + dy * forward.GetY()) / length > cosHalf)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    void EndlessLevelComponent::UpdateShifting(float deltaTime, const AZ::Vector3& eye, int playerX, int playerY)
+    {
+        if (m_settings.m_style > 2 || m_mainMenu || !m_followEntity.IsValid())
+        {
+            return;
+        }
+        auto* registry = AZ::SettingsRegistry::Get();
+        if (!registry)
+        {
+            return;
+        }
+        double sanity = 1.0;
+        registry->Get(sanity, "/NoclipProtocol/Hud/player.sanity");
+        bool forced = false;
+        registry->Get(forced, "/NoclipProtocol/Level0/ForceShift");
+        if (forced)
+        {
+            registry->Set("/NoclipProtocol/Level0/ForceShift", false);
+        }
+        // Below half sanity the rooms start to move: every 18 s at first, every 3 s when almost gone.
+        constexpr double startsBelow = 0.5;
+        if (!forced)
+        {
+            if (sanity >= startsBelow)
+            {
+                m_shiftClock = 0.0f;
+                return;
+            }
+            const float t = AZStd::clamp(static_cast<float>((startsBelow - sanity) / 0.45), 0.0f, 1.0f);
+            const float interval = 18.0f + (3.0f - 18.0f) * t;
+            m_shiftClock += deltaTime;
+            if (m_shiftClock < interval)
+            {
+                return;
+            }
+            m_shiftClock = 0.0f;
+        }
+
+        AZ::Quaternion rotation = AZ::Quaternion::CreateIdentity();
+        AZ::TransformBus::EventResult(rotation, m_followEntity, &AZ::TransformBus::Events::GetWorldRotationQuaternion);
+        AZ::Vector3 forward = rotation.TransformVector(AZ::Vector3::CreateAxisY());
+        forward.SetZ(0.0f);
+        forward = forward.GetLengthSq() > 1.0e-4f ? forward.GetNormalized() : AZ::Vector3::CreateAxisY();
+
+        // Out-of-sight chunks near enough to be rebuilt straight away (the load loop puts them back next frame).
+        AZStd::vector<AZ::u64> hidden;
+        for (const auto& [key, chunk] : m_chunks)
+        {
+            const int distance = AZStd::max(abs(chunk.m_x - playerX), abs(chunk.m_y - playerY));
+            if (distance == 0 || distance > m_loadRadius || ChunkInView(chunk.m_x, chunk.m_y, eye, forward))
+            {
+                continue;
+            }
+            hidden.push_back(key);
+        }
+        if (hidden.empty())
+        {
+            return;
+        }
+        // One at a time (all of them when forced from the console), so the change creeps rather than jumps.
+        const size_t first = forced ? 0 : static_cast<size_t>(m_shiftsDone * 2654435761u) % hidden.size();
+        const size_t count = forced ? hidden.size() : 1;
+        for (size_t i = 0; i < count; ++i)
+        {
+            const AZ::u64 key = hidden[(first + i) % hidden.size()];
+            auto it = m_chunks.find(key);
+            if (it == m_chunks.end())
+            {
+                continue;
+            }
+            ++m_chunkShifts[key];
+            ++m_shiftsDone;
+            AZ_Printf("NoclipProtocol", "Endless Level: chunk %d, %d shifted (%d) at sanity %.0f%%", it->second.m_x, it->second.m_y,
+                m_chunkShifts[key], sanity * 100.0);
+            DespawnChunk(it->second);
+            m_chunks.erase(it);
+        }
+        registry->Set("/NoclipProtocol/Level0/ShiftsDone", static_cast<AZ::s64>(m_shiftsDone));
+    }
+
     void EndlessLevelComponent::SpawnChunk(int chunkX, int chunkY)
     {
-        const Level0::ChunkLayout layout = Level0::GenerateChunk(m_settings, chunkX, chunkY);
+        const auto shifted = m_chunkShifts.find(Key(chunkX, chunkY));
+        const int shift = shifted == m_chunkShifts.end() ? 0 : shifted->second;
+        const Level0::ChunkLayout layout = Level0::GenerateChunk(m_settings, chunkX, chunkY, shift);
 
         Chunk chunk;
         chunk.m_x = chunkX;
         chunk.m_y = chunkY;
+        chunk.m_shift = shift;
         chunk.m_tickets.reserve(PieceCount);
         const int piecesBefore = m_spawnedPieces;
         for (int i = 0; i < PieceCount; ++i)
@@ -657,6 +869,25 @@ namespace NoclipProtocol
                 // Stains are paper-thin see-through patches lying on the carpet (a few mm up, so they never z-fight).
                 SpawnBox(chunk.m_tickets[piece],
                     Level0::Box{ decal.m_position.m_x, decal.m_position.m_y, 0.01f, decal.m_size, decal.m_size, 0.01f }, true, decal.m_yawRadians);
+            }
+        }
+
+        // Clutter: authored at real size, so placed and turned, never stretched.
+        if (!layout.m_clutter.empty() && static_cast<int>(m_clutterAssets.size()) == Clutter::KindCount)
+        {
+            chunk.m_clutter.resize(Clutter::KindCount);
+            for (const auto& item : layout.m_clutter)
+            {
+                const int k = item.m_kind;
+                if (k < 0 || k >= Clutter::KindCount || !m_clutterAssets[k].IsReady())
+                {
+                    continue;
+                }
+                if (!chunk.m_clutter[k].IsValid())
+                {
+                    chunk.m_clutter[k] = AzFramework::EntitySpawnTicket(m_clutterAssets[k]);
+                }
+                SpawnBox(chunk.m_clutter[k], Level0::Box{ item.m_at.m_x, item.m_at.m_y, item.m_at.m_z, 1.0f, 1.0f, 1.0f }, false, item.m_yaw);
             }
         }
 
@@ -1206,6 +1437,17 @@ namespace NoclipProtocol
             }
         }
         chunk.m_pickups.clear();
+        if (auto* spawner = AzFramework::SpawnableEntitiesInterface::Get())
+        {
+            for (auto& ticket : chunk.m_clutter)
+            {
+                if (ticket.IsValid())
+                {
+                    spawner->DespawnAllEntities(ticket);
+                }
+            }
+        }
+        chunk.m_clutter.clear();
     }
 
     void EndlessLevelComponent::UpdatePickups(const AZ::Vector3& at)

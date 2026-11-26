@@ -82,6 +82,8 @@ namespace NoclipProtocol
                 AzFramework::EntitySpawnTicket m_ticket;
             };
             AZStd::vector<LivePickup> m_pickups; // supplies still lying here
+            AZStd::vector<AzFramework::EntitySpawnTicket> m_clutter; // one per clutter kind in use (empty = none here)
+            int m_shift = 0;                     // how many times this chunk has rearranged itself (low sanity)
         };
 
         static AZ::u64 Key(int x, int y);
@@ -103,6 +105,9 @@ namespace NoclipProtocol
 
         // Supplies to gather (scrap, wire, fuel, Almond Water): [E] picks one up.
         AZ::Data::Asset<AzFramework::Spawnable> m_pickupAssets[4];
+        // Clutter (ClutterCatalog.h): everything that has ended up in the Backrooms.
+        AZStd::vector<AZ::Data::Asset<AzFramework::Spawnable>> m_clutterAssets;
+        void LoadClutterAssets();
         AZStd::unordered_set<AZ::u64> m_collected; // chunk key ^ index: picked up this run, so they don't come back
         AZ::u64 m_promptPickup = 0;                 // which pickup the "[E] Pick up" prompt is for (0: none)
         bool m_pickupPrompt = false;
@@ -164,6 +169,14 @@ namespace NoclipProtocol
         // Runtime state
         AZ::Data::Asset<AzFramework::Spawnable> m_pieceAssets[PieceCount];
         AZStd::unordered_map<AZ::u64, Chunk> m_chunks;
+
+        // Shifting rooms: at low sanity, chunks the player can't see rearrange themselves (Level0Layout's shift).
+        AZStd::unordered_map<AZ::u64, int> m_chunkShifts; // chunk key -> times it has shifted this run (kept when unloaded)
+        float m_shiftClock = 0.0f;
+        int m_shiftsDone = 0;
+        bool m_clutterOff = false;      // noclip_clutter 0 (testing)
+        bool ChunkInView(int chunkX, int chunkY, const AZ::Vector3& eye, const AZ::Vector3& forward) const;
+        void UpdateShifting(float deltaTime, const AZ::Vector3& eye, int playerX, int playerY);
 
         // Light hum: only some lights hum, each starting at its own moment so the loops don't line up into one drone.
         struct PendingHum
