@@ -295,9 +295,18 @@ namespace NoclipProtocol::Base
                 text += AZStd::string::format("%s\"%s\": %d", i ? ", " : "", m_gear[i].first.c_str(), m_gear[i].second);
             }
             text += "},\n  \"placed\": [";
-            for (size_t i = 0; i < m_placed.size(); ++i)
+            // What stands, and what is still waiting to be put back up (a save right after loading must not lose those).
+            AZStd::vector<Placed> all = m_placed;
+            for (const Request& r : m_requests)
             {
-                const Placed& p = m_placed[i];
+                if (r.m_place && r.m_restore)
+                {
+                    all.push_back(Placed{ r.m_kind, r.m_x, r.m_y, r.m_yaw });
+                }
+            }
+            for (size_t i = 0; i < all.size(); ++i)
+            {
+                const Placed& p = all[i];
                 text += AZStd::string::format("%s\n    { \"kind\": %d, \"x\": %.2f, \"y\": %.2f, \"yaw\": %.4f }", i ? "," : "",
                     static_cast<int>(p.m_kind), p.m_x, p.m_y, p.m_yaw);
             }

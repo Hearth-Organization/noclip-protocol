@@ -223,6 +223,68 @@ namespace NoclipProtocol
             }
         }
         AZ_CONSOLEFREEFUNC("noclip_clutter", NoclipClutter, AZ::ConsoleFunctorFlags::Null, "noclip_clutter 0 hides the clutter, 1 shows it");
+
+        // Testing the forward base (DEV BUILD).
+        int ArgInt(const AZ::ConsoleCommandContainer& arguments, size_t i, int fallback)
+        {
+            return i < arguments.size() ? std::atoi(AZStd::string(arguments[i]).c_str()) : fallback;
+        }
+        float ArgFloat(const AZ::ConsoleCommandContainer& arguments, size_t i, float fallback)
+        {
+            return i < arguments.size() ? static_cast<float>(std::atof(AZStd::string(arguments[i]).c_str())) : fallback;
+        }
+        // base_give scrap wire fuel docs samples rp: adds to the base's storage.
+        void BaseGive(const AZ::ConsoleCommandContainer& arguments)
+        {
+            Base::State& base = Base::Get();
+            base.m_scrap += ArgInt(arguments, 0, 50);
+            base.m_wire += ArgInt(arguments, 1, 30);
+            base.m_fuel += ArgInt(arguments, 2, 5);
+            base.m_docs += ArgInt(arguments, 3, 0);
+            base.m_samples += ArgInt(arguments, 4, 0);
+            base.m_rp += ArgInt(arguments, 5, 0);
+        }
+        AZ_CONSOLEFREEFUNC("base_give", BaseGive, AZ::ConsoleFunctorFlags::Null, "base_give scrap wire fuel docs samples rp (testing)");
+        // base_place kind x y [yaw degrees]: puts a piece up without the checks or the cost.
+        void BasePlace(const AZ::ConsoleCommandContainer& arguments)
+        {
+            Base::Request request{ true, static_cast<Base::Kind>(AZStd::clamp(ArgInt(arguments, 0, 0), 0, Base::KindCount - 1)), ArgFloat(arguments, 1, 0.0f),
+                                   ArgFloat(arguments, 2, 0.0f), AZ::DegToRad(ArgFloat(arguments, 3, 0.0f)) };
+            request.m_restore = true;
+            Base::Get().m_requests.push_back(request);
+        }
+        AZ_CONSOLEFREEFUNC("base_place", BasePlace, AZ::ConsoleFunctorFlags::Null, "base_place kind x y [yaw] (testing: no checks, no cost)");
+        // base_clear: takes every piece down (no refund).
+        void BaseClear([[maybe_unused]] const AZ::ConsoleCommandContainer& arguments)
+        {
+            Base::State& base = Base::Get();
+            for (const Base::Placed& p : base.m_placed)
+            {
+                base.m_requests.push_back(Base::Request{ false, p.m_kind, p.m_x, p.m_y, 0.0f });
+            }
+        }
+        AZ_CONSOLEFREEFUNC("base_clear", BaseClear, AZ::ConsoleFunctorFlags::Null, "base_clear takes every piece down (testing)");
+        // base_research 0/1/2: finishes Power II (1), Storage II too (2), and 3 adds Weapons I.
+        void BaseResearch(const AZ::ConsoleCommandContainer& arguments)
+        {
+            Base::State& base = Base::Get();
+            const int level = ArgInt(arguments, 0, 2);
+            base.m_studied[0][0] = level >= 1 ? 12 : 0;
+            base.m_studied[1][0] = level >= 2 ? 8 : 0;
+            base.m_studied[1][1] = level >= 2 ? 2 : 0;
+            base.m_weaponsI = level >= 3;
+        }
+        AZ_CONSOLEFREEFUNC("base_research", BaseResearch, AZ::ConsoleFunctorFlags::Null, "base_research 0-3 (testing)");
+        // base_deliver: the next delivery comes now.
+        void BaseDeliver([[maybe_unused]] const AZ::ConsoleCommandContainer& arguments)
+        {
+            Base::State& base = Base::Get();
+            if (!base.m_deliveries.empty())
+            {
+                base.m_deliveries.front().m_left = 0.0f;
+            }
+        }
+        AZ_CONSOLEFREEFUNC("base_deliver", BaseDeliver, AZ::ConsoleFunctorFlags::Null, "base_deliver brings the next Foundation crate now (testing)");
     } // namespace
 
     void EndlessLevelComponent::Activate()
@@ -362,6 +424,7 @@ namespace NoclipProtocol
             {
                 asset.Release();
             }
+            m_seamAsset.Release();
             m_buildEnabled = false;
         }
         for (auto& asset : m_pickupAssets)
@@ -1250,6 +1313,7 @@ namespace NoclipProtocol
                 load(prefab, m_kindAssets[k]);
             }
         }
+        load("prefabs/base/piece_breachseam.spawnable", m_seamAsset);
         m_seamShown = -1.0f;
         m_crateUp = false;
     }
@@ -1510,15 +1574,15 @@ namespace NoclipProtocol
             }
         }
         // Breach 4-A: sealed, a glowing seam down the middle; a delivery opens it a crack.
-        const auto& tear = m_pieceAssets[PieceNoclip];
-        const float width = 0.05f + 0.85f * AZStd::clamp(base.m_breachOpen, 0.0f, 1.0f);
+        const auto& tear = m_seamAsset;
+        const float width = 0.04f + 0.86f * AZStd::clamp(base.m_breachOpen, 0.0f, 1.0f);
         if (tear.IsReady() && !m_seamTicket.IsValid())
         {
             m_seamTicket = AzFramework::EntitySpawnTicket(tear);
             m_seamEntities.clear();
             AzFramework::SpawnAllEntitiesOptionalArgs args;
-            const AZ::Vector3 place(base.m_breachX, base.m_breachY - 0.24f, 1.35f);
-            const AZ::Vector3 scale(width, 0.1f, 2.7f);
+            const AZ::Vector3 place(base.m_breachX, base.m_breachY - 0.26f, 1.35f);
+            const AZ::Vector3 scale(width, 0.06f, 2.6f);
             args.m_preInsertionCallback = [place, scale](AzFramework::EntitySpawnTicket::Id, AzFramework::SpawnableEntityContainerView view)
             {
                 if (view.empty())
@@ -1557,7 +1621,7 @@ namespace NoclipProtocol
         {
             for (const AZ::EntityId& id : m_seamEntities)
             {
-                AZ::NonUniformScaleRequestBus::Event(id, &AZ::NonUniformScaleRequests::SetScale, AZ::Vector3(width, 0.1f, 2.7f));
+                AZ::NonUniformScaleRequestBus::Event(id, &AZ::NonUniformScaleRequests::SetScale, AZ::Vector3(width, 0.06f, 2.6f));
             }
             m_seamShown = width;
         }

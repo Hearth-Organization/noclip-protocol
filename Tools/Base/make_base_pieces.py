@@ -48,6 +48,10 @@ BASE_MATERIALS = {
     "piece_foundation":  ([0.14, 0.14, 0.13], 0.5, 0.45, None),
     "piece_999":         ([0.95, 0.55, 0.10], 0.0, 0.2, ([1.0, 0.6, 0.15], 0.8)),
     "piece_flare":       ([0.85, 0.15, 0.08], 0.0, 0.4, None),
+    "piece_sandbag":     ([0.25, 0.19, 0.09], 0.0, 0.95, None),   # linear: a khaki canvas under Level 0's lights
+    "piece_sandbag_dark": ([0.16, 0.12, 0.06], 0.0, 0.95, None),
+    "piece_olive":       ([0.06, 0.07, 0.03], 0.4, 0.55, None),
+    "piece_seam":        ([0.55, 0.50, 1.00], 0.0, 0.2, ([0.6, 0.55, 1.0], 10.0)),
 }
 
 
@@ -67,6 +71,16 @@ def write_materials():
                 "materialTypeVersion": 5, "propertyValues": props}
         with open(path(f"Assets/Materials/Base/{name}.material"), "w") as f:
             json.dump(data, f, indent=4)
+
+
+def life_size(parts, sx, sy=None, sz=None):
+    """Scales a piece about its origin (centres and sizes), so it comes out at its real-world size."""
+    sy = sx if sy is None else sy
+    sz = sx if sz is None else sz
+    out = []
+    for shape, (cx, cy, cz), (a, b, c), mat, rot in parts:
+        out.append((shape, (cx * sx, cy * sy, cz * sz), (a * sx, b * sy, c * sz), mat, rot))
+    return out
 
 
 # ----------------------------------------------------------------------------- the pieces' parts
@@ -105,9 +119,38 @@ def light_tower():
 
 
 def barricade():
-    return [F(-0.9, 0, 0, 0.12, 0.12, 1.6, "wood_dark"), F(0.9, 0, 0, 0.12, 0.12, 1.6, "wood_dark"),
-            F(0, -0.08, 0.35, 2.0, 0.05, 0.2, "wood_light"), F(0, -0.08, 0.8, 2.0, 0.05, 0.2, "wood_light"),
-            F(0, -0.08, 1.25, 2.0, 0.05, 0.2, "wood_light"), F(0, -0.11, 0.6, 1.9, 0.04, 0.12, "wood_dark", [0, 22, 0])]
+    """A military barricade: a sandbag wall on a steel frame, concertina wire along the top."""
+    p = [F(0, 0, 0, 2.2, 0.5, 0.04, "piece_olive"),                     # the frame's foot
+         F(-1.1, -0.12, 0, 0.1, 0.1, 1.25, "piece_olive"), F(1.1, -0.12, 0, 0.1, 0.1, 1.25, "piece_olive"),
+         F(0, -0.12, 1.15, 2.3, 0.08, 0.08, "piece_olive"),              # top rail
+         F(-1.1, -0.18, 0.5, 0.11, 0.02, 0.25, "piece_hazard"), F(1.1, -0.18, 0.5, 0.11, 0.02, 0.25, "piece_hazard")]
+    # Five courses of sandbags, staggered like a real wall, two tones of canvas.
+    for row in range(5):
+        z = 0.04 + row * 0.152
+        offset = 0.25 if row % 2 else 0.0
+        n = 4 if row % 2 else 5
+        width = 2.0 / 4.2
+        for k in range(n):
+            x = -0.95 + offset + k * width + (0.0 if row % 2 else -0.03)
+            if abs(x) > 1.0:
+                continue
+            tone = "piece_sandbag" if (row + k) % 3 else "piece_sandbag_dark"
+            turn = ((row * 7 + k * 3) % 5 - 2) * 2.0
+            p.append(F(x, 0.05, z, width * 0.96, 0.34, 0.15, tone, [0, 0, turn]))
+            p.append(F(x, 0.05, z + 0.13, width * 0.8, 0.28, 0.03, tone, [0, 0, turn]))   # the bag's rounded top
+    # Concertina wire: coils of razor wire along the top rail.
+    r = 0.17
+    for ring in range(10):
+        x = -1.05 + ring * 0.233
+        for side in range(8):
+            m = side * 45 + 22.5 + ring * 9          # the middle of this side of the ring
+            a = math.radians(m)
+            cy, cz = r * math.cos(math.radians(22.5)) * math.cos(a), 1.4 + r * math.cos(math.radians(22.5)) * math.sin(a)
+            p.append(B(x + 0.04 * math.sin(a), -0.12 + cy, cz, 0.012, 0.012, 2 * r * math.sin(math.radians(22.5)) + 0.01, "metal", [m, 0, 0]))
+    # A steel plate over the top course, with a firing slit.
+    p += [F(-0.6, -0.1, 0.8, 1.0, 0.05, 0.32, "piece_olive"), F(0.6, -0.1, 0.8, 1.0, 0.05, 0.32, "piece_olive"),
+          F(0, -0.1, 0.8, 0.2, 0.05, 0.12, "piece_olive"), F(0, -0.1, 1.04, 0.2, 0.05, 0.08, "piece_olive")]
+    return p
 
 
 def shutter():
@@ -373,7 +416,7 @@ TILES = [
     ("FlareTrap", "Flare trap", "FLARE TRAP", "Scrap 2 · Fuel 1", 2, 0, 1, "flaretrap", flare_trap(), "FlareTrap", dict(collide=False)),
     ("UvTrap", "UV light trap", "UV LIGHT TRAP", "Scrap 6 · Wire 4 · 2 kW", 6, 4, 0, "uvtrap", uv_trap(), "UvTrap",
      dict(power=2.0, light=L_UV, light_z=1.0)),
-    ("Turret", "Sentry turret", "SENTRY TURRET", "Scrap 14 \u00b7 Wire 10 \u00b7 2 kW", 14, 10, 0, "turret", turret(), "Turret",
+    ("Turret", "Sentry turret", "SENTRY TURRET", "Scrap 14 \u00b7 Wire 10 \u00b7 2 kW", 14, 10, 0, "turret", life_size(turret(), 1.35), "Turret",
      dict(power=2.0, unlock=WEAPONS1, lock="Research: Weapons I")),
     # POWER
     ("Generator", "Fuel generator", "FUEL GENERATOR", "Scrap 10 · Wire 4 → +6 kW", 10, 4, 0, "generator", generator(), "Generator",
@@ -383,13 +426,13 @@ TILES = [
      dict(battery=20.0, node=True)),
     ("CableRun", "Cable run", "CABLE RUN", "Wire 1 per 4 m", 0, 1, 0, "cable", cable_run(), "CableRun", dict(node=True, collide=False)),
     ("Breaker", "Breaker box", "BREAKER BOX", "Scrap 4 · Wire 3", 4, 3, 0, "breaker", breaker_box(), "Breaker", dict(node=True)),
-    ("HeavyGenerator", "Power II", "HEAVY GENERATOR", "Scrap 16 \u00b7 Wire 8 \u2192 +10 kW", 16, 8, 0, "solar", heavy_generator(), "HeavyGenerator",
+    ("HeavyGenerator", "Power II", "HEAVY GENERATOR", "Scrap 16 \u00b7 Wire 8 \u2192 +10 kW", 16, 8, 0, "solar", life_size(heavy_generator(), 1.3, 1.1, 1.0), "HeavyGenerator",
      dict(supply=10.0, node=True, unlock=POWER2, lock="Research: Power II", note="LOUD", clear=2.6, fuel_min=10.0)),
     # STORAGE
-    ("SupplyCrate", "Supply crate", "SUPPLY CRATE", "Scrap 6 · holds 40", 6, 0, 0, "crate", supply_crate(), "SupplyCrate",
+    ("SupplyCrate", "Supply crate", "SUPPLY CRATE", "Scrap 6 · holds 40", 6, 0, 0, "crate", life_size(supply_crate(), 1.12), "SupplyCrate",
      dict(holds=40, use=USE_STORE)),
     ("Workbench", "Workbench", "WORKBENCH", "Scrap 12 · Wire 4", 12, 4, 0, "workbench", workbench(), "Workbench", dict(use=USE_CRAFT, comfort=1)),
-    ("Still", "Almond Water still", "ALMOND WATER STILL", "Scrap 8 · Wire 6 · 1 kW", 8, 6, 0, "still", still(), "Still",
+    ("Still", "Almond Water still", "ALMOND WATER STILL", "Scrap 8 · Wire 6 · 1 kW", 8, 6, 0, "still", life_size(still(), 1.4), "Still",
      dict(power=1.0, comfort=1)),
     ("GearLocker", "Gear locker", "GEAR LOCKER", "Scrap 8", 8, 0, 0, "locker", gear_locker(), "GearLocker", dict(comfort=1)),
     ("ArmyCot", "Army cot", "ARMY COT", "Scrap 4 · rest here", 4, 0, 0, "cot", army_cot(), "ArmyCot", dict(use=USE_REST, comfort=2)),
@@ -405,14 +448,14 @@ TILES = [
     ("StudyStorageII", "Storage II", "STORAGE II", "8 documents · 2 samples", 0, 0, 0, "rack", [], None, dict(project=(8, 2))),
     ("WeaponsI", "Weapons I", "WEAPONS I", None, 0, 0, 0, "turret", [], None, dict(project=(0, 0), unlock=WEAPONS1, lock="Order from the main base")),
     # CONTAINMENT
-    ("ContainmentCell", "Containment cell", "CONTAINMENT CELL", "Scrap 20 · Wire 10 · 3 kW", 20, 10, 0, "cell", containment_cell(), "ContainmentCell",
+    ("ContainmentCell", "Containment cell", "CONTAINMENT CELL", "Scrap 20 · Wire 10 · 3 kW", 20, 10, 0, "cell", life_size(containment_cell(), 1.44, 1.4, 1.08), "ContainmentCell",
      dict(power=3.0)),
-    ("LightCage", "Light cage", "LIGHT CAGE", "Scrap 12 · Wire 8 · 2 kW", 12, 8, 0, "lightcage", light_cage(), "LightCage",
-     dict(power=2.0, light=L_WARM, light_z=2.05)),
+    ("LightCage", "Light cage", "LIGHT CAGE", "Scrap 12 · Wire 8 · 2 kW", 12, 8, 0, "lightcage", life_size(light_cage(), 1.25, 1.25, 1.13), "LightCage",
+     dict(power=2.0, light=L_WARM, light_z=2.32)),
     ("Camera", "Observation camera", "OBSERVATION CAMERA", "Wire 4 · 1 kW", 0, 4, 0, "camera", camera(), "Camera", dict(power=1.0, collide=False)),
     ("BlastDoor", "Blast door", "BLAST DOOR", "Scrap 16 · Wire 6", 16, 6, 0, "door", blast_door(), "BlastDoor", dict(cover=True, collide=False)),
-    ("Pen999", "SCP-999 pen", "SCP-999 PEN", "Scrap 10 \u00b7 Wire 4", 10, 4, 0, "cell", pen_999(), "Pen999", dict(unlock=CAPTURE999, lock="Capture SCP-999")),
-    ("Scp914", "SCP-914", "SCP-914", "Scrap 30 \u00b7 Wire 20 \u00b7 3 kW", 30, 20, 0, "workbench", scp_914(), "Scp914", dict(power=3.0, unlock=TIER3, lock="Research: Tier III")),
+    ("Pen999", "SCP-999 pen", "SCP-999 PEN", "Scrap 10 \u00b7 Wire 4", 10, 4, 0, "cell", life_size(pen_999(), 1.5, 1.5, 1.2), "Pen999", dict(unlock=CAPTURE999, lock="Capture SCP-999")),
+    ("Scp914", "SCP-914", "SCP-914", "Scrap 30 \u00b7 Wire 20 \u00b7 3 kW", 30, 20, 0, "workbench", life_size(scp_914(), 1.6, 1.5, 1.1), "Scp914", dict(power=3.0, unlock=TIER3, lock="Research: Tier III")),
 ]
 assert len(TILES) == 36
 
@@ -707,6 +750,9 @@ def main():
         spec = {"parts": pp, "size": mc.bounds(pp), "collide": o.get("collide", True)}
         mc.build_prefab(f"Piece_{prefab}", spec, template, folder="Prefabs/Base", mat_guid=mat_guid)
         built += 1
+    # Breach 4-A sealed: its glowing seam (the level stretches it, wider while it opens for a delivery).
+    mc.build_prefab("Piece_BreachSeam", {"parts": [B(0, 0, 0, 1.0, 1.0, 1.0, "piece_seam")], "size": (1, 1, 1), "collide": False},
+                    template, folder="Prefabs/Base", mat_guid=mat_guid)
     write_catalog()
     write_icons()
     print(f"wrote {built} piece prefabs, {len(BASE_MATERIALS)} materials, the catalog ({len(TILES)} tiles) and {len(ICONS)} icons")

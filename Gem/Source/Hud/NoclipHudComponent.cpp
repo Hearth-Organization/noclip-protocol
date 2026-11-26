@@ -51,6 +51,8 @@ namespace NoclipProtocol
 
 AZ_CVAR(float, hud_term_alpha, 0.5f, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Terminal page: alpha of each layer of its shapes (text over shapes of alpha much above 0.5 gets white boxes)");
+AZ_CVAR(int, hud_orders_layers, 3, nullptr, AZ::ConsoleFunctorFlags::Null,
+    "Foundation requisitions page: half-alpha layers over its dark backdrop");
 AZ_CVAR(int, hud_term_layers, 7, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Terminal page: how many times its shapes are laid down (7 at 0.5 alpha covers 99% of the game behind)");
 AZ_CVAR(int, hud_page, -1, nullptr, AZ::ConsoleFunctorFlags::Null,
@@ -1892,8 +1894,22 @@ namespace NoclipProtocol
                         for (int c = 1; c < 4; ++c) { n0 = sy[c] > sy[n0] ? c : n0; }
                         int n1 = n0 == 0 ? 1 : 0;
                         for (int c = 0; c < 4; ++c) { n1 = c != n0 && sy[c] > sy[n1] ? c : n1; }
-                        const float lx = AZStd::clamp(AZStd::min(sx[n0], sx[n1]), 20.0f * s, W - 420.0f * s);
+                        const char* note = blocked ? nullptr : base.PlaceNote(kind, ax, ay, m_buildYaw);
+                        const AZStd::string label = AZStd::string(info.m_upper) + " \xc2\xb7 " +
+                            (blocked ? AZStd::string(blocked) : (note ? AZStd::string(note) : AZStd::string("placement OK \xc2\xb7 [R] rotate")));
+                        const float labelW = 20.0f * s + measure(Face::Mono, label, 12.0f, 1.0f);
+                        float lx = AZStd::clamp(AZStd::min(sx[n0], sx[n1]), 20.0f * s, W - labelW - 20.0f * s);
                         const float ly = AZStd::min(AZStd::max(sy[n0], sy[n1]) + 14.0f * s, Y(486.0f));
+                        // Keep clear of the tab's side panel.
+                        static const float panelWidths[6] = { 0.0f, 300.0f, 300.0f, 300.0f, 420.0f, 320.0f };
+                        if (panelWidths[m_buildTab] > 0.0f && ly < Y(600.0f))
+                        {
+                            const float panelLeft = R(1240.0f - panelWidths[m_buildTab]);
+                            if (lx + labelW > panelLeft - 12.0f * s)
+                            {
+                                lx = AZStd::max(20.0f * s, panelLeft - 12.0f * s - labelW);
+                            }
+                        }
                         const AZ::Color tc = blocked ? badText : okText;
                         if (blocked)
                         {
@@ -1905,9 +1921,6 @@ namespace NoclipProtocol
                             lline(lx + 2.0f * s, ly + 6.0f * s, lx + 5.0f * s, ly + 9.0f * s, 2.0f * s, tc);
                             lline(lx + 5.0f * s, ly + 9.0f * s, lx + 10.0f * s, ly + 3.0f * s, 2.0f * s, tc);
                         }
-                        const char* note = blocked ? nullptr : base.PlaceNote(kind, ax, ay, m_buildYaw);
-                        const AZStd::string label = AZStd::string(info.m_upper) + " \xc2\xb7 " +
-                            (blocked ? AZStd::string(blocked) : (note ? AZStd::string(note) : AZStd::string("placement OK \xc2\xb7 [R] rotate")));
                         text(Face::Mono, label, lx + 20.0f * s, ly - 1.2f * s, 12.0f, tc, 0, 1.0f);
                     }
                 }
@@ -2242,29 +2255,66 @@ namespace NoclipProtocol
                 }
             }
 
-            // Bottom: category tabs, the tile panel, the key hints.
+            // Bottom: category tabs, the tile panel, the key hints. A tile's second line wraps like the mockup's (the
+            // grid row grows, and the block, anchored to the bottom, grows upward).
             {
+                const float panelX = L(40.0f);
+                const float panelW = R(1240.0f) - panelX;
+                const float tileW = (panelW - 28.0f * s - 50.0f * s) / 6.0f;
+                AZStd::vector<AZStd::string> costLines[6];
+                int maxLines = 1;
+                for (int i = 0; i < 6; ++i)
+                {
+                    const Base::Kind tileKind = Base::KindAt(m_buildTab, i);
+                    const Base::ItemInfo& tile = Base::Info(tileKind);
+                    AZStd::string cost;
+                    if (base.Locked(tileKind))
+                    {
+                        cost = tile.m_lockNote;
+                    }
+                    else if (tile.m_project && base.ResearchDone(tileKind == Base::Kind::StudyPowerII ? 0 : 1))
+                    {
+                        cost = "done";
+                    }
+                    else if (tile.m_costText)
+                    {
+                        cost = tile.m_costText;
+                    }
+                    else
+                    {
+                        auto add = [&](const char* name, int n)
+                        {
+                            if (n > 0)
+                            {
+                                cost += (cost.empty() ? "" : " \xc2\xb7 ") + AZStd::string::format("%s %d", name, n);
+                            }
+                        };
+                        add("Scrap", tile.m_scrap);
+                        add("Wire", tile.m_wire);
+                        add("Fuel", tile.m_fuel);
+                    }
+                    costLines[i] = wrap(Face::Mono, cost, 11.0f, tileW - 26.0f * s);
+                    maxLines = AZStd::max(maxLines, static_cast<int>(costLines[i].size()));
+                }
+                const float grow = 14.0f * (maxLines - 1); // design px
                 float x = L(40.0f);
                 for (int i = 0; i < Base::TabCount; ++i)
                 {
                     const bool on = i == m_buildTab;
                     const float w = measure(Face::Mono, Base::TabNames[i], 12.0f, 2.0f) + 2.0f * s + 32.0f * s;
-                    lrect(x, Y(510.0f), w, 31.0f * s, on ? gold : Hex(0x0a0906, 0.75f));
-                    textIn(on ? Face::MonoSemiBold : Face::Mono, Base::TabNames[i], x + 16.0f * s, 518.0f, 12.0f, 1.25f, on ? Hex(0x0b0a07) : cream, 0, 2.0f);
+                    lrect(x, Y(510.0f - grow), w, 31.0f * s, on ? gold : Hex(0x0a0906, 0.75f));
+                    textIn(on ? Face::MonoSemiBold : Face::Mono, Base::TabNames[i], x + 16.0f * s, 518.0f - grow, 12.0f, 1.25f, on ? Hex(0x0b0a07) : cream, 0, 2.0f);
                     x += w + 4.0f * s;
                 }
-                const float panelX = L(40.0f);
-                const float panelW = R(1240.0f) - panelX;
-                lrect(panelX, Y(545.0f), panelW, 125.0f * s, Hex(0x0a0906, 0.82f));
-                const float tileW = (panelW - 28.0f * s - 50.0f * s) / 6.0f;
+                lrect(panelX, Y(545.0f - grow), panelW, (125.0f + grow) * s, Hex(0x0a0906, 0.82f));
                 for (int i = 0; i < 6; ++i)
                 {
                     const Base::Kind tileKind = Base::KindAt(m_buildTab, i);
                     const Base::ItemInfo& tile = Base::Info(tileKind);
                     const bool tileLocked = base.Locked(tileKind);
                     const float tx = panelX + 14.0f * s + i * (tileW + 10.0f * s);
-                    const float ty = Y(559.0f);
-                    const float th = 97.0f * s;
+                    const float ty = Y(559.0f - grow);
+                    const float th = (97.0f + grow) * s;
                     const bool selected = i == m_buildTile && !tileLocked;
                     const AZ::Color stroke = tileLocked ? grey : (selected ? gold : cream);
                     const float bw = AZStd::max(1.0f, 1.5f * s);
@@ -2294,7 +2344,7 @@ namespace NoclipProtocol
                     }
                     // The 28 x 28 icon (the mockups' SVGs, 1.6 px strokes), 13 px in from the tile's corner.
                     const float ix = tx + 13.0f * s;
-                    const float iy = Y(572.0f);
+                    const float iy = Y(572.0f - grow);
                     auto il = [&](float x0, float y0, float x1, float y1, float w = 1.6f) { lline(ix + x0 * s, iy + y0 * s, ix + x1 * s, iy + y1 * s, w * s, stroke); };
                     auto irect = [&](float x0, float y0, float w, float h) { il(x0, y0, x0 + w, y0); il(x0 + w, y0, x0 + w, y0 + h); il(x0 + w, y0 + h, x0, y0 + h); il(x0, y0 + h, x0, y0); };
                     auto icircle = [&](float cx, float cy, float r, float from = 0.0f, float to = 6.2831853f)
@@ -2369,34 +2419,11 @@ namespace NoclipProtocol
                         default: irect(5, 22, 18, 1); il(9, 22, 14, 4); il(19, 22, 14, 4); il(10, 16, 18, 16); break; // the light tower, once unlocked
                         }
                     }
-                    textIn(Face::MonoSemiBold, tile.m_name, tx + 13.0f * s, 606.0f, 13.0f, 17.0f / 13.0f, tileLocked ? grey : cream);
-                    AZStd::string cost;
-                    if (tileLocked)
+                    textIn(Face::MonoSemiBold, tile.m_name, tx + 13.0f * s, 606.0f - grow, 13.0f, 17.0f / 13.0f, tileLocked ? grey : cream);
+                    for (size_t l = 0; l < costLines[i].size(); ++l)
                     {
-                        cost = tile.m_lockNote;
+                        textIn(Face::Mono, costLines[i][l], tx + 13.0f * s, 629.0f - grow + 14.0f * l, 11.0f, 14.0f / 11.0f, tileLocked ? grey : soft);
                     }
-                    else if (tile.m_project && base.ResearchDone(tileKind == Base::Kind::StudyPowerII ? 0 : 1))
-                    {
-                        cost = "done";
-                    }
-                    else if (tile.m_costText)
-                    {
-                        cost = tile.m_costText;
-                    }
-                    else
-                    {
-                        auto add = [&](const char* name, int n)
-                        {
-                            if (n > 0)
-                            {
-                                cost += (cost.empty() ? "" : " \xc2\xb7 ") + AZStd::string::format("%s %d", name, n);
-                            }
-                        };
-                        add("Scrap", tile.m_scrap);
-                        add("Wire", tile.m_wire);
-                        add("Fuel", tile.m_fuel);
-                    }
-                    textIn(Face::Mono, cost, tx + 13.0f * s, 629.0f, 11.0f, 14.0f / 11.0f, tileLocked ? grey : soft);
                 }
                 static const char* const hints[4] = { "[LMB] place", "[R] rotate", "[X] demolish", "[TAB] close" };
                 float hx = L(40.0f);
@@ -2749,9 +2776,17 @@ namespace NoclipProtocol
                     textIn(Face::Mono, w2, X(ax), ay, 11.0f, 1.5f, TermMuted);
                     ay += 16.5f;
                 }
-                textIn(Face::Mono, "[E] request \xc2\xb7 [TAB] sections \xc2\xb7 [ESC] close", X(ax), 720.0f - 22.0f - 11.0f * 1.3f, 11.0f, 1.3f, TermMuted, 0, 1.0f);
+                {
+                    const auto keys = wrap(Face::Mono, "[E] request \xc2\xb7 [TAB] sections \xc2\xb7 [ESC] close", 11.0f, aw * s);
+                    float ky = 720.0f - 22.0f - keys.size() * 11.0f * 1.3f;
+                    for (const AZStd::string& k : keys)
+                    {
+                        textIn(Face::Mono, k, X(ax), ky, 11.0f, 1.3f, TermMuted);
+                        ky += 11.0f * 1.3f;
+                    }
+                }
             }
-            for (int layer = 0; layer < AZStd::clamp(static_cast<int>(hud_term_layers), 1, 8); ++layer)
+            for (int layer = 0; layer < AZStd::clamp(static_cast<int>(hud_orders_layers), 1, 8); ++layer)
             {
                 AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments args;
                 args.m_verts = tv.data();

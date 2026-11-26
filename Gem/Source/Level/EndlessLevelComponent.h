@@ -114,6 +114,7 @@ namespace NoclipProtocol
         void SpawnPieceLight(int index); // the piece's light (again, when the power comes back)
         void UpdateBase(float deltaTime, const AZ::Vector3& at); // the base ticking over, the breach seam, delivered crates
         // Breach 4-A sealed: a glowing seam that opens a crack for a delivery.
+        AZ::Data::Asset<AzFramework::Spawnable> m_seamAsset;
         AzFramework::EntitySpawnTicket m_seamTicket;
         AZStd::vector<AZ::EntityId> m_seamEntities;
         float m_seamShown = -1.0f;
