@@ -57,6 +57,7 @@ namespace NoclipProtocol
             PieceDecalMold,
             PieceDecalWorn,
             PieceLightDying,
+            PieceProp,
             PieceCount
         };
 
@@ -95,6 +96,8 @@ namespace NoclipProtocol
         AZStd::string m_decalMoldPrefab = "prefabs/level0/l0_decalmold.spawnable";
         AZStd::string m_decalWornPrefab = "prefabs/level0/l0_decalworn.spawnable";
         AZStd::string m_lightDyingPrefab = "prefabs/level0/l0_lightdying.spawnable";
+        AZStd::string m_propPrefab;       // Level 1 crate / Level 2 pipe (empty = no props)
+        int m_styleField = 0;             // 0 = Level 0, 1 = Level 1, 2 = Level 2
         // Feature switches (for finding problems and for performance)
         bool m_enablePillars = true;
         bool m_enableLightBulbs = true;     // real point lights (off = glowing panels only)

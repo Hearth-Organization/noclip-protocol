@@ -70,6 +70,7 @@ namespace NoclipProtocol::Level0
             TagDecal = 16,
             TagSmallRoom = 17,
             TagSpawnLight = 18,
+            TagProp = 19,
         };
 
         float Smooth(float t) { return t * t * (3.0f - 2.0f * t); }
@@ -113,6 +114,47 @@ namespace NoclipProtocol::Level0
         const float chunkSize = settings.m_cellSize * static_cast<float>(settings.m_chunkCells);
         chunkX = static_cast<int>(std::floor(x / chunkSize));
         chunkY = static_cast<int>(std::floor(y / chunkSize));
+    }
+
+    void ApplyStyle(Settings& settings)
+    {
+        if (settings.m_style == 1)
+        {
+            // Level 1: a huge, damp concrete warehouse / parking garage. Big 8 m bays, a column on almost every
+            // corner, few walls (concrete partitions), high ceiling, long strip lights, crates stacked about.
+            settings.m_chunkCells = 6;
+            settings.m_cellSize = 8.0f;
+            settings.m_ceilingHeight = 5.0f;
+            settings.m_wallThickness = 0.3f;
+            settings.m_openFraction = 0.8f;
+            settings.m_borderExtraOpen = 0.5f;
+            settings.m_roomChance = 0.5f;
+            settings.m_pillarChance = 0.9f;
+            settings.m_pillarSize = 0.9f;
+            settings.m_spawnRoomRadius = 1;
+            settings.m_darkZoneScale = 3.0f;
+            settings.m_decalChance = 0.45f;
+            settings.m_lightSpacing = 1;
+            settings.m_propChance = 0.2f;
+        }
+        else if (settings.m_style == 2)
+        {
+            // Level 2: cramped maintenance tunnels. 3 m cells, almost no loops, low ceiling, pipes along the walls,
+            // a caged bulb every other cell at most.
+            settings.m_chunkCells = 8;
+            settings.m_cellSize = 3.0f;
+            settings.m_ceilingHeight = 2.6f;
+            settings.m_wallThickness = 0.25f;
+            settings.m_openFraction = 0.06f;
+            settings.m_borderExtraOpen = 0.1f;
+            settings.m_roomChance = 0.12f;
+            settings.m_pillarChance = 0.0f;
+            settings.m_spawnRoomRadius = 1;
+            settings.m_darkZoneScale = 4.0f;
+            settings.m_decalChance = 0.35f;
+            settings.m_lightSpacing = 2;
+            settings.m_propChance = 0.65f;
+        }
     }
 
     Point SpawnPoint(const Settings& settings)
@@ -377,6 +419,10 @@ namespace NoclipProtocol::Level0
                 const int gx = baseX + x;
                 const int gy = baseY + y;
                 const Point at{ (static_cast<float>(gx) + 0.5f) * cell, (static_cast<float>(gy) + 0.5f) * cell, height };
+                if (settings.m_lightSpacing > 1 && Mod(gx + gy, settings.m_lightSpacing) != 0 && !(gx == 0 && gy == 0))
+                {
+                    continue; // no fixture in this cell (Level 2's bulbs are spread out)
+                }
                 if (inRoom(gx, gy))
                 {
                     // Mostly lit, but it has been here a while: about one light in five is dead and a few flicker.
@@ -431,8 +477,74 @@ namespace NoclipProtocol::Level0
                 layout.m_decals.push_back(Decal{
                     Point{ (static_cast<float>(gx) + 0.5f) * cell + ox, (static_cast<float>(gy) + 0.5f) * cell + oy, 0.0f },
                     Unit(Mix(hd ^ 4)) * 6.2831853f,
-                    1.5f + Unit(Mix(hd ^ 5)) * 1.8f,
+                    (1.5f + Unit(Mix(hd ^ 5)) * 1.8f) * (settings.m_style == 1 ? 1.6f : 1.0f), // Level 1: big puddles
                     type });
+            }
+        }
+
+        // 9. Props. Their own random stream per cell or wall, so they never shift the rest of the layout.
+        if (settings.m_style == 1 && settings.m_propChance > 0.0f)
+        {
+            // Crates and pallets of crates standing about the bays, off the middle so the strip lights stay clear.
+            for (int x = 0; x < n; ++x)
+            {
+                for (int y = 0; y < n; ++y)
+                {
+                    const int gx = baseX + x;
+                    const int gy = baseY + y;
+                    if (inRoom(gx, gy))
+                    {
+                        continue; // the arrival area stays clear
+                    }
+                    const uint64_t hp = Hash(settings.m_seed, TagProp, gx, gy);
+                    if (Unit(hp) >= settings.m_propChance)
+                    {
+                        continue;
+                    }
+                    const int count = 1 + static_cast<int>(Unit(Mix(hp ^ 1)) * 3.0f); // 1-3 crates in a cluster
+                    const float cx = (static_cast<float>(gx) + 0.5f) * cell + (Unit(Mix(hp ^ 2)) - 0.5f) * cell * 0.45f;
+                    const float cy = (static_cast<float>(gy) + 0.5f) * cell + (Unit(Mix(hp ^ 3)) - 0.5f) * cell * 0.45f;
+                    for (int i = 0; i < count; ++i)
+                    {
+                        const float size = 1.0f + Unit(Mix(hp ^ (10 + i))) * 0.5f;
+                        const bool stacked = Unit(Mix(hp ^ (20 + i))) < 0.35f;
+                        const float px = cx + static_cast<float>(i % 2) * 1.6f;
+                        const float py = cy + static_cast<float>(i / 2) * 1.6f;
+                        layout.m_props.push_back(Box{ px, py, size * 0.5f, size, size, size });
+                        if (stacked)
+                        {
+                            const float top = size * 0.8f;
+                            layout.m_props.push_back(Box{ px, py, size + top * 0.5f, top, top, top });
+                        }
+                    }
+                }
+            }
+        }
+        else if (settings.m_style == 2 && settings.m_propChance > 0.0f)
+        {
+            // Pipes along the tunnel walls: a run near the ceiling on most walls, sometimes a second one low down.
+            const size_t wallCount = layout.m_walls.size();
+            for (size_t i = 0; i < wallCount; ++i)
+            {
+                const Box wall = layout.m_walls[i];
+                const uint64_t hp = Hash(settings.m_seed, TagProp,
+                    static_cast<int64_t>(std::floor(wall.m_cx * 2.0f)), static_cast<int64_t>(std::floor(wall.m_cy * 2.0f)));
+                if (Unit(hp) >= settings.m_propChance)
+                {
+                    continue;
+                }
+                const bool alongX = wall.m_sx > wall.m_sy;
+                const float side = Unit(Mix(hp ^ 1)) < 0.5f ? -1.0f : 1.0f;
+                const int runs = Unit(Mix(hp ^ 2)) < 0.3f ? 2 : 1;
+                for (int r2 = 0; r2 < runs; ++r2)
+                {
+                    const float pipe = r2 == 0 ? 0.22f : 0.14f;
+                    const float z = r2 == 0 ? height - 0.3f : 0.45f;
+                    const float offset = thick * 0.5f + pipe * 0.5f + 0.04f;
+                    layout.m_props.push_back(alongX
+                        ? Box{ wall.m_cx, wall.m_cy + side * offset, z, wall.m_sx, pipe, pipe }
+                        : Box{ wall.m_cx + side * offset, wall.m_cy, z, pipe, wall.m_sy, pipe });
+                }
             }
         }
 

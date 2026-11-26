@@ -36,7 +36,17 @@ namespace NoclipProtocol::Level0
         float m_darkZoneScale = 3.5f;  // dark zones are about this many cells across
         float m_decalChance = 0.3f;    // chance a cell gets a floor stain
         float m_workingLights = 0.66f; // share of lights in lit areas that work; lower = more dead and flickering (ray tracing uses 0.33)
+
+        // Which level this is: 0 = Level 0 (yellow rooms), 1 = Level 1 (concrete warehouse / garage),
+        // 2 = Level 2 (pipe tunnels). ApplyStyle sets the rest of the settings to match.
+        int m_style = 0;
+        int m_lightSpacing = 1;        // a light every N cells (in a checker pattern when 2)
+        float m_propChance = 0.0f;     // Level 1: crates per cell; Level 2: pipes per wall segment
     };
+
+    //! Level 1 and 2 presets: sizes, openness, pillars, rooms, lights and props for that level's look.
+    //! Leaves the seed, dark zone share and working lights as they are. Level 0 (style 0) is unchanged.
+    void ApplyStyle(Settings& settings);
 
     //! An axis-aligned box: center and full size, in world meters. Z is up; floor top is z = 0.
     struct Box
@@ -89,6 +99,7 @@ namespace NoclipProtocol::Level0
         Box m_ceiling{};
         std::vector<Light> m_lights; // cells with no light at all are simply absent
         std::vector<Decal> m_decals;
+        std::vector<Box> m_props;    // Level 1 crates, Level 2 pipes (one stretched box each)
     };
 
     //! Builds the layout of one chunk.

@@ -100,6 +100,18 @@
                         }
                     }
                 },
+                "AZ::Render::EditorFilmGrainComponent": {
+                    "$type": "AZ::Render::EditorFilmGrainComponent",
+                    "Id": 2670238523669740657,
+                    "Controller": {
+                        "Configuration": {
+                            "Enabled": true,
+                            "Intensity": 0.2199999988079071,
+                            "LuminanceDampening": 0.3499999940395355,
+                            "GrainPath": "assets/textures/level0/level0_film_grain.png.streamingimage"
+                        }
+                    }
+                },
                 "AZ::Render::EditorHDRColorGradingComponent": {
                     "$type": "AZ::Render::EditorHDRColorGradingComponent",
                     "Id": 16986494482885569353,
@@ -226,9 +238,7 @@
                             "Entity_[15441924182003]",
                             "Entity_[15446219149299]"
                         ],
-                        "LandSound": "Entity_[15450514116595]",
-                        "WalkStride": 1.600000023841858,
-                        "SprintStride": 2.0999999046325684
+                        "LandSound": "Entity_[15450514116595]"
                     }
                 },
                 "TransformComponent": {
@@ -1003,8 +1013,7 @@
                     "Id": 3894280127711864310,
                     "m_template": {
                         "$type": "EndlessLevelComponent",
-                        "FollowEntity": "Entity_[915853021226]",
-                        "WorkingLightsRayTraced": 0.33000001311302185
+                        "FollowEntity": "Entity_[915853021226]"
                     }
                 },
                 "TransformComponent": {

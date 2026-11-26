@@ -58,6 +58,7 @@ namespace NoclipProtocol::Level0
                 else if (key == "darkZoneScale") { s.m_darkZoneScale = static_cast<float>(number); }
                 else if (key == "decalChance") { s.m_decalChance = static_cast<float>(number); }
                 else if (key == "workingLights") { s.m_workingLights = static_cast<float>(number); }
+                else if (key == "style") { s.m_style = static_cast<int>(number); ApplyStyle(s); }
             }
         }
     }

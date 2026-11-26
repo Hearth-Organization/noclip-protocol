@@ -47,6 +47,8 @@ namespace NoclipProtocol
                 ->Field("WorkingLights", &EndlessLevelComponent::m_workingLightsField)
                 ->Field("WorkingLightsRayTraced", &EndlessLevelComponent::m_workingLightsRayTracedField)
                 ->Field("HumShare", &EndlessLevelComponent::m_humShareField)
+                ->Field("Style", &EndlessLevelComponent::m_styleField)
+                ->Field("PropPrefab", &EndlessLevelComponent::m_propPrefab)
                 ->Field("EnablePillars", &EndlessLevelComponent::m_enablePillars)
                 ->Field("EnableLightBulbs", &EndlessLevelComponent::m_enableLightBulbs)
                 ->Field("EnableFlicker", &EndlessLevelComponent::m_enableFlicker)
@@ -123,6 +125,10 @@ namespace NoclipProtocol
                         "Working lights (ray traced)", "Used instead when ray-traced bounce light is on: bounced light brightens rooms, so fewer lights work")
                         ->Attribute(AZ::Edit::Attributes::Min, 0.05f)
                         ->Attribute(AZ::Edit::Attributes::Max, 0.9f)
+                    ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_styleField, "Level",
+                        "Which Backrooms level this generates: 0 = yellow rooms, 1 = concrete warehouse, 2 = pipe tunnels")
+                        ->Attribute(AZ::Edit::Attributes::Min, 0)
+                        ->Attribute(AZ::Edit::Attributes::Max, 2)
                     ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_humShareField, "Humming lights",
                         "Share of working lights that hum (flickering ones always buzz while lit)")
                         ->Attribute(AZ::Edit::Attributes::Min, 0.0f)
@@ -159,7 +165,8 @@ namespace NoclipProtocol
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_decalWetPrefab, "Wet spot", "Spawnable product path")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_decalMoldPrefab, "Mold", "Spawnable product path")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_decalWornPrefab, "Worn patch", "Spawnable product path")
-                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_lightDyingPrefab, "Dying light", "Spawnable product path");
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_lightDyingPrefab, "Dying light", "Spawnable product path")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_propPrefab, "Prop", "Spawnable product path: Level 1 crate, Level 2 pipe (empty = none)");
             }
         }
     }
@@ -190,6 +197,8 @@ namespace NoclipProtocol
         m_settings.m_spawnRoomRadius = AZStd::clamp(m_spawnRoomRadiusField, 0, 5);
         m_settings.m_darkZoneScale = AZStd::max(1.0f, m_darkZoneScaleField);
         m_settings.m_seed = m_seed;
+        m_settings.m_style = m_styleField;
+        Level0::ApplyStyle(m_settings);
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
             registry->Get(m_shiftsSeen, "/NoclipProtocol/Level0/Shifts");
@@ -251,10 +260,14 @@ namespace NoclipProtocol
     {
         const AZStd::string* paths[PieceCount] = { &m_wallPrefab, &m_pillarPrefab, &m_floorPrefab, &m_ceilingPrefab, &m_lightPrefab,
                                                    &m_lightFlickerPrefab, &m_lightDeadPrefab, &m_decalWetPrefab, &m_decalMoldPrefab,
-                                                   &m_decalWornPrefab, &m_lightDyingPrefab };
+                                                   &m_decalWornPrefab, &m_lightDyingPrefab, &m_propPrefab };
         bool allFound = true;
         for (int i = 0; i < PieceCount; ++i)
         {
+            if (paths[i]->empty())
+            {
+                continue; // optional piece (props) not used by this level
+            }
             AZ::Data::AssetId id;
             AZ::Data::AssetCatalogRequestBus::BroadcastResult(id, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath,
                 paths[i]->c_str(), azrtti_typeid<AzFramework::Spawnable>(), false);
@@ -274,7 +287,7 @@ namespace NoclipProtocol
     {
         for (const auto& asset : m_pieceAssets)
         {
-            if (!asset.IsReady())
+            if (asset.GetId().IsValid() && !asset.IsReady())
             {
                 return false;
             }
@@ -455,7 +468,14 @@ namespace NoclipProtocol
         const int piecesBefore = m_spawnedPieces;
         for (int i = 0; i < PieceCount; ++i)
         {
-            chunk.m_tickets.emplace_back(m_pieceAssets[i]);
+            if (m_pieceAssets[i].GetId().IsValid())
+            {
+                chunk.m_tickets.emplace_back(m_pieceAssets[i]);
+            }
+            else
+            {
+                chunk.m_tickets.emplace_back(); // unused piece: an empty ticket that never spawns
+            }
         }
 
         for (const Level0::Box& wall : layout.m_walls)
@@ -512,6 +532,14 @@ namespace NoclipProtocol
                 // Stains are paper-thin see-through patches lying on the carpet (a few mm up, so they never z-fight).
                 SpawnBox(chunk.m_tickets[piece],
                     Level0::Box{ decal.m_position.m_x, decal.m_position.m_y, 0.01f, decal.m_size, decal.m_size, 0.01f }, true, decal.m_yawRadians);
+            }
+        }
+
+        if (chunk.m_tickets[PieceProp].IsValid())
+        {
+            for (const Level0::Box& prop : layout.m_props)
+            {
+                SpawnBox(chunk.m_tickets[PieceProp], prop, true);
             }
         }
 
