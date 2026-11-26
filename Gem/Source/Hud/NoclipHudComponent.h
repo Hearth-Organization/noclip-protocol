@@ -41,8 +41,8 @@ namespace NoclipProtocol
         bool OnInputChannelEventFiltered(const AzFramework::InputChannel& inputChannel) override;
 
     private:
-        enum class Face { Mono, MonoMedium, MonoSemiBold, Oswald, OswaldLarge };
-        enum class Page { None, Pause, Settings, Terminal };
+        enum class Face { Mono, MonoMedium, MonoSemiBold, Oswald, OswaldLarge, OswaldMedium };
+        enum class Page { None, Pause, Settings, Terminal, MainMenu };
 
         struct Button
         {
@@ -59,7 +59,13 @@ namespace NoclipProtocol
         void DoAction(int action);
 
         bool m_show = true;
-        int m_terminalFile = 0; // the intro terminal's open file (0 = Operation Noclip Protocol)
+        int m_terminalFile = 0;
+        bool m_inMenu = false;      // the main menu level is loaded (/NoclipProtocol/Menu/Active)
+        int m_menuSelected = 0;     // main menu item with the highlight (keyboard / mouse)
+        AZStd::string m_menuNotice; // a short line under the main menu (co-op not in yet...)
+        float m_menuNoticeUntil = 0.0f;
+        AZStd::string m_lastLevel;  // the last level played (saved with the settings), for CONTINUE
+        AZStd::string m_lastWhen;   // when it was last played, "Nov 26 04:20" // the intro terminal's open file (0 = Operation Noclip Protocol)
         float m_time = 0.0f;
         Page m_page = Page::None;
         AZStd::vector<Button> m_buttons;
@@ -68,7 +74,7 @@ namespace NoclipProtocol
         bool m_fontsLoaded = false;
         int m_fontKey = -1; // hud_font_smooth * 10 + hud_font_amount the faces were loaded with
         AzFramework::ViewportId m_viewportId = AzFramework::InvalidViewportId; // the viewport the HUD draws into (fonts measure against it)
-        AzFramework::FontDrawInterface* m_fonts[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+        AzFramework::FontDrawInterface* m_fonts[6] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
 
         // Settings (saved to the project's user/Registry/noclip_settings.setreg)

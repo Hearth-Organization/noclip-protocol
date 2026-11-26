@@ -12,6 +12,7 @@
 #include <AzCore/Console/IConsole.h>
 #include <AzCore/Asset/AssetManagerBus.h>
 #include <AzCore/Component/TransformBus.h>
+#include <AzCore/Math/MathUtils.h>
 #include <AzCore/Math/Quaternion.h>
 #include <AzCore/Math/Transform.h>
 #include <AzCore/Serialization/EditContext.h>
@@ -54,6 +55,7 @@ namespace NoclipProtocol
                 ->Field("PropPrefab", &EndlessLevelComponent::m_propPrefab)
                 ->Field("NoclipPrefab", &EndlessLevelComponent::m_noclipPrefab)
                 ->Field("FramePrefab", &EndlessLevelComponent::m_framePrefab)
+                ->Field("MainMenu", &EndlessLevelComponent::m_mainMenu)
                 ->Field("ScreenPrefab", &EndlessLevelComponent::m_screenPrefab)
                 ->Field("NoclipTarget", &EndlessLevelComponent::m_noclipTarget)
                 ->Field("EnablePillars", &EndlessLevelComponent::m_enablePillars)
@@ -175,6 +177,8 @@ namespace NoclipProtocol
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_lightDyingPrefab, "Dying light", "Spawnable product path")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_propPrefab, "Prop", "Spawnable product path: Level 1 crate, Level 2 pipe (empty = none)")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_noclipPrefab, "Noclip spot", "Spawnable product path (empty = no noclip spots)")
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_mainMenu, "Main menu",
+                        "This level is the main menu's backdrop: the player stays put and the HUD shows the main menu")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_framePrefab, "Breach frame", "Spawnable product path: Breach 4-A's hazard frame (empty = none)")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_screenPrefab, "Terminal screen", "Spawnable product path (empty = none)")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &EndlessLevelComponent::m_noclipTarget, "Noclip leads to",
@@ -255,6 +259,12 @@ namespace NoclipProtocol
             if (m_settings.m_style == 3)
             {
                 registry->Set("/NoclipProtocol/Intro/Accepted", false); // every run of the intro starts with the briefing
+            }
+            registry->Set("/NoclipProtocol/Menu/Active", m_mainMenu);
+            if (!m_mainMenu)
+            {
+                static const char* const levels[] = { "Level0", "Level1", "Level2", "Intro" };
+                registry->Set("/NoclipProtocol/Save/Level", AZStd::string(levels[AZStd::clamp(m_settings.m_style, 0, 3)]));
             }
         }
 
@@ -356,6 +366,12 @@ namespace NoclipProtocol
             {
                 // Stepped out of Breach 4-A: in front of the hole in the spawn room's south wall, facing into the room.
                 player->Teleport(AZ::Vector3(Level0::Level0Breach::ArriveX, Level0::Level0Breach::ArriveY, start.GetZ()), 0.0f, 0.0f, true, true);
+            }
+            else if (m_mainMenu && player)
+            {
+                // The main menu's backdrop: inside Level 0's spawn room, looking at Breach 4-A in its south wall.
+                player->Teleport(AZ::Vector3(Level0::Level0Breach::X + 1.2f, Level0::Level0Breach::Y + 6.5f, start.GetZ()),
+                    AZ::DegToRad(172.0f), AZ::DegToRad(2.0f), true, true);
             }
             else if (m_settings.m_style == 3 && player)
             {

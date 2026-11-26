@@ -104,6 +104,7 @@ namespace NoclipProtocol
         AZStd::string m_propPrefab;       // Level 1 crate / Level 2 pipe (empty = no props)
         int m_styleField = 0;             // 0 = Level 0, 1 = Level 1, 2 = Level 2, 3 = the intro facility
         AZStd::string m_noclipPrefab = "prefabs/levels/noclipspot.spawnable";
+        bool m_mainMenu = false;          // this level is the main menu's backdrop (the player stays put, the HUD shows the menu)
         AZStd::string m_framePrefab;      // breach frame (empty = none)
         AZStd::string m_screenPrefab;     // terminal screen (empty = none)
         bool m_terminalPrompt = false;    // the intro's "Access terminal" prompt is showing

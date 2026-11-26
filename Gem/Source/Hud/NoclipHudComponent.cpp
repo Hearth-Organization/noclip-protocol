@@ -18,6 +18,7 @@
 #include <ISystem.h>
 
 #include <cmath>
+#include <ctime>
 
 AZ_CVAR(bool, hud_mockup, false, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Fill every HUD element with the approved mockup's values (to compare the HUD against the design)");
@@ -40,7 +41,7 @@ namespace NoclipProtocol
             }
         }
         AZ_CONSOLEFREEFUNC("hud_key", HudKey, AZ::ConsoleFunctorFlags::Null,
-            "Press a HUD key without a keyboard (for testing): hud_key E | Y | N | Esc");
+            "Press a HUD key without a keyboard (for testing): hud_key E | Y | N | Esc | Up | Down | Enter");
     } // namespace
 } // namespace NoclipProtocol
 
@@ -49,7 +50,7 @@ AZ_CVAR(float, hud_term_alpha, 0.5f, nullptr, AZ::ConsoleFunctorFlags::Null,
 AZ_CVAR(int, hud_term_layers, 7, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Terminal page: how many times its shapes are laid down (7 at 0.5 alpha covers 99% of the game behind)");
 AZ_CVAR(int, hud_page, -1, nullptr, AZ::ConsoleFunctorFlags::Null,
-    "Open a menu page without a keyboard (for testing): 0 none, 1 pause, 2 settings, 3 terminal");
+    "Open a menu page without a keyboard (for testing): 0 none, 1 pause, 2 settings, 3 terminal, 4 main menu");
 
 namespace NoclipProtocol
 {
@@ -76,7 +77,8 @@ namespace NoclipProtocol
         const AZ::Color SegmentEdge(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.4f);
         const AZ::Color Shadow(0.0f, 0.0f, 0.0f, 0.9f);
 
-        enum Action { ActResume = 1, ActSettings, ActQuit, ActBack, ActAccept, ActReview, ActFile, ActRayTracing = ActFile + 16, ActSensDown,
+        enum Action { ActResume = 1, ActSettings, ActQuit, ActBack, ActAccept, ActReview, ActContinue, ActNew, ActCoop, ActArchive,
+                      ActFile, ActRayTracing = ActFile + 16, ActSensDown,
                       ActSensUp, ActVolDown, ActVolUp };
 
         // ---- the intro's briefing terminal (Terminal.dc.html) ----
@@ -146,6 +148,28 @@ namespace NoclipProtocol
             return files;
         }
 
+        // Loads a level on the next frame (loading tears down the HUD's own entity).
+        void LoadLevelLater(const AZStd::string& level)
+        {
+            AZ::TickBus::QueueFunction([level]()
+            {
+                if (auto* console = AZ::Interface<AZ::IConsole>::Get())
+                {
+                    console->PerformCommand(AZStd::string::format("LoadLevel %s", level.c_str()).c_str());
+                }
+            });
+        }
+
+        // "Level0" -> "Level 0", "Intro" -> "Sublevel 4"
+        AZStd::string LevelLabel(const AZStd::string& level)
+        {
+            if (level.size() == 6 && level.substr(0, 5) == "Level")
+            {
+                return AZStd::string("Level ") + level.substr(5);
+            }
+            return level == "Intro" ? AZStd::string("Sublevel 4") : level;
+        }
+
         AZStd::string RegString(const char* path, const char* fallback = "")
         {
             AZStd::string value;
@@ -170,16 +194,20 @@ namespace NoclipProtocol
         // lays text out itself. IBM Plex Mono is 0.6 em for every character; Oswald Bold per character (ASCII 32..126).
         static const float OswaldAdvance[95] = {0.256f, 0.257f, 0.36f, 0.534f, 0.485f, 1.006f, 0.57f, 0.17f, 0.338f, 0.328f, 0.423f, 0.449f, 0.238f, 0.324f, 0.244f, 0.422f, 0.55f, 0.385f, 0.514f, 0.514f, 0.524f, 0.509f, 0.538f, 0.439f, 0.521f, 0.538f, 0.278f, 0.285f, 0.398f, 0.442f, 0.398f, 0.483f, 0.95f, 0.551f, 0.588f, 0.563f, 0.586f, 0.447f, 0.434f, 0.582f, 0.61f, 0.301f, 0.349f, 0.567f, 0.443f, 0.704f, 0.561f, 0.586f, 0.571f, 0.586f, 0.6f, 0.514f, 0.445f, 0.588f, 0.526f, 0.697f, 0.515f, 0.493f, 0.433f, 0.332f, 0.422f, 0.324f, 0.476f, 0.368f, 0.307f, 0.46f, 0.506f, 0.468f, 0.503f, 0.47f, 0.32f, 0.502f, 0.509f, 0.265f, 0.269f, 0.51f, 0.274f, 0.753f, 0.507f, 0.483f, 0.505f, 0.504f, 0.383f, 0.424f, 0.351f, 0.504f, 0.421f, 0.597f, 0.442f, 0.448f, 0.392f, 0.374f, 0.262f, 0.379f, 0.481f};
 
-        float AdvanceEm(bool oswald, const AZStd::string& ch)
+        // Oswald Medium (weight 500, the main menu's items), same way.
+        static const float OswaldMediumAdvance[95] = {0.243f, 0.233f, 0.315f, 0.511f, 0.488f, 0.95f, 0.587f, 0.149f, 0.319f, 0.295f, 0.411f, 0.433f, 0.213f, 0.314f, 0.217f, 0.396f, 0.534f, 0.382f, 0.497f, 0.496f, 0.504f, 0.493f, 0.521f, 0.413f, 0.51f, 0.521f, 0.239f, 0.251f, 0.386f, 0.429f, 0.386f, 0.483f, 0.928f, 0.522f, 0.557f, 0.54f, 0.557f, 0.428f, 0.413f, 0.559f, 0.586f, 0.275f, 0.326f, 0.532f, 0.421f, 0.683f, 0.545f, 0.563f, 0.527f, 0.564f, 0.561f, 0.494f, 0.43f, 0.566f, 0.516f, 0.712f, 0.499f, 0.487f, 0.425f, 0.336f, 0.396f, 0.317f, 0.46f, 0.356f, 0.293f, 0.435f, 0.477f, 0.44f, 0.473f, 0.446f, 0.304f, 0.472f, 0.478f, 0.248f, 0.25f, 0.471f, 0.252f, 0.718f, 0.474f, 0.455f, 0.476f, 0.474f, 0.353f, 0.4f, 0.33f, 0.473f, 0.404f, 0.593f, 0.416f, 0.421f, 0.37f, 0.338f, 0.251f, 0.351f, 0.465f};
+
+        // kind: 0 IBM Plex Mono, 1 Oswald Bold, 2 Oswald Medium
+        float AdvanceEm(int kind, const AZStd::string& ch)
         {
-            if (!oswald)
+            if (kind == 0)
             {
                 return 0.6f;
             }
             const unsigned char c = static_cast<unsigned char>(ch[0]);
             if (ch.size() == 1 && c >= 32 && c <= 126)
             {
-                return OswaldAdvance[c - 32];
+                return kind == 2 ? OswaldMediumAdvance[c - 32] : OswaldAdvance[c - 32];
             }
             return ch == "\xc2\xb7" ? 0.226f : 0.5f;
         }
@@ -252,12 +280,13 @@ namespace NoclipProtocol
             return;
         }
         struct Spec { const char* name; const char* file; unsigned int texture; unsigned int slots; };
-        const Spec specs[5] = {
+        const Spec specs[6] = {
             { "noclip-plexmono", "@products@/fonts/noclip/ibmplexmono-regular.ttf", 1024, 32 },        // 32 px glyph slots
             { "noclip-plexmono-medium", "@products@/fonts/noclip/ibmplexmono-medium.ttf", 1024, 32 },
             { "noclip-plexmono-semibold", "@products@/fonts/noclip/ibmplexmono-semibold.ttf", 1024, 32 },
             { "noclip-oswald-bold", "@products@/fonts/noclip/oswald-bold.ttf", 1024, 32 },
-            { "noclip-oswald-bold-large", "@products@/fonts/noclip/oswald-bold.ttf", 1024, 32 },      // same slots: the ammo count
+            { "noclip-oswald-bold-large", "@products@/fonts/noclip/oswald-bold.ttf", 1024, 8 },       // 128 px slots: titles, the ammo count
+            { "noclip-oswald-medium", "@products@/fonts/noclip/oswald-medium.ttf", 1024, 32 },        // the main menu's items
         };
         const int smooth = AZStd::clamp(static_cast<int>(hud_font_smooth), 0, 2);
         const int amount = AZStd::clamp(static_cast<int>(hud_font_amount), 0, 2);
@@ -278,7 +307,7 @@ namespace NoclipProtocol
         {
             flags |= TTFLAG_SMOOTH_AMOUNT_4X;
         }
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < 6; ++i)
         {
             const AZStd::string name = AZStd::string::format("%s-s%d", specs[i].name, m_fontKey);
             IFFont* font = env->pCryFont->GetFont(name.c_str());
@@ -338,6 +367,8 @@ namespace NoclipProtocol
             registry->Get(volume, "/Hearth/Audio/Buses/Master");
             m_mouseSensitivity = static_cast<float>(sensitivity);
             m_volumeDb = static_cast<float>(volume);
+            registry->Get(m_lastLevel, "/NoclipProtocol/Save/Level");
+            registry->Get(m_lastWhen, "/NoclipProtocol/Save/When");
         }
     }
 
@@ -365,9 +396,10 @@ namespace NoclipProtocol
         }
         const AZStd::string text = AZStd::string::format(
             "{\n    \"NoclipProtocol\": {\n        \"Graphics\": { \"RayTracing\": %s },\n"
-            "        \"Player\": { \"MouseSensitivity\": %.2f }\n    },\n"
+            "        \"Player\": { \"MouseSensitivity\": %.2f },\n"
+            "        \"Save\": { \"Level\": \"%s\", \"When\": \"%s\" }\n    },\n"
             "    \"Hearth\": { \"Audio\": { \"Buses\": { \"Master\": %.1f } } }\n}\n",
-            m_rayTracing ? "true" : "false", m_mouseSensitivity, m_volumeDb);
+            m_rayTracing ? "true" : "false", m_mouseSensitivity, m_lastLevel.c_str(), m_lastWhen.c_str(), m_volumeDb);
         AZ::IO::HandleType handle = AZ::IO::InvalidHandle;
         if (io->Open("@projectroot@/user/Registry/noclip_settings.setreg", AZ::IO::OpenMode::ModeWrite | AZ::IO::OpenMode::ModeText, handle))
         {
@@ -382,13 +414,27 @@ namespace NoclipProtocol
         switch (action)
         {
         case ActResume:
-            m_page = Page::None;
+            m_page = m_inMenu ? Page::MainMenu : Page::None;
+            break;
+        case ActContinue:
+            LoadLevelLater(m_lastLevel.empty() ? AZStd::string("Intro") : m_lastLevel);
+            break;
+        case ActNew:
+            LoadLevelLater("Intro");
+            break;
+        case ActCoop:
+            m_menuNotice = "co-op isn't in yet";
+            m_menuNoticeUntil = m_time + 3.0f;
+            break;
+        case ActArchive:
+            m_page = Page::Terminal;
+            m_terminalFile = 0;
             break;
         case ActSettings:
             m_page = Page::Settings;
             break;
         case ActBack:
-            m_page = Page::Pause;
+            m_page = m_inMenu ? Page::MainMenu : Page::Pause;
             break;
         case ActQuit:
             if (auto* console = AZ::Interface<AZ::IConsole>::Get())
@@ -397,6 +443,11 @@ namespace NoclipProtocol
             }
             break;
         case ActAccept:
+            if (m_inMenu)
+            {
+                LoadLevelLater("Intro"); // the archive from the main menu: accepting starts a new expedition
+                break;
+            }
             m_page = Page::None;
             if (registry)
             {
@@ -486,6 +537,35 @@ namespace NoclipProtocol
                 return true;
             }
         }
+        // The main menu: up / down to move, Enter to choose.
+        if (m_page == Page::MainMenu)
+        {
+            if (id == InputDeviceKeyboard::Key::NavigationArrowUp || id == InputDeviceKeyboard::Key::AlphanumericW)
+            {
+                m_menuSelected = (m_menuSelected + 5) % 6;
+                return true;
+            }
+            if (id == InputDeviceKeyboard::Key::NavigationArrowDown || id == InputDeviceKeyboard::Key::AlphanumericS)
+            {
+                m_menuSelected = (m_menuSelected + 1) % 6;
+                return true;
+            }
+            if (id == InputDeviceKeyboard::Key::EditEnter || id == InputDeviceKeyboard::Key::NumPadEnter)
+            {
+                static const int actions[6] = { ActContinue, ActNew, ActCoop, ActArchive, ActSettings, ActQuit };
+                DoAction(actions[AZStd::clamp(m_menuSelected, 0, 5)]);
+                return true;
+            }
+            if (id == InputDeviceKeyboard::Key::Escape || id == InputDeviceKeyboard::Key::AlphanumericP)
+            {
+                return true; // nothing to go back to
+            }
+        }
+        if (m_inMenu && m_page == Page::Settings && (id == InputDeviceKeyboard::Key::Escape || id == InputDeviceKeyboard::Key::AlphanumericP))
+        {
+            DoAction(ActBack);
+            return true;
+        }
         // Esc in the game; P too, because Esc leaves Play in the editor.
         if (id == InputDeviceKeyboard::Key::Escape || id == InputDeviceKeyboard::Key::AlphanumericP)
         {
@@ -518,12 +598,15 @@ namespace NoclipProtocol
             else if (key == "Y" || key == "y") { HandleKey(InputDeviceKeyboard::Key::AlphanumericY); }
             else if (key == "N" || key == "n") { HandleKey(InputDeviceKeyboard::Key::AlphanumericN); }
             else if (key == "Esc" || key == "esc") { HandleKey(InputDeviceKeyboard::Key::Escape); }
+            else if (key == "Up") { HandleKey(InputDeviceKeyboard::Key::NavigationArrowUp); }
+            else if (key == "Down") { HandleKey(InputDeviceKeyboard::Key::NavigationArrowDown); }
+            else if (key == "Enter") { HandleKey(InputDeviceKeyboard::Key::EditEnter); }
         }
         auto* registry = AZ::SettingsRegistry::Get();
         if (static_cast<int>(hud_page) >= 0)
         {
             const int page = static_cast<int>(hud_page);
-            m_page = page == 1 ? Page::Pause : (page == 2 ? Page::Settings : (page == 3 ? Page::Terminal : Page::None));
+            m_page = page == 1 ? Page::Pause : (page == 2 ? Page::Settings : (page == 3 ? Page::Terminal : (page == 4 ? Page::MainMenu : Page::None)));
             hud_page = -1;
             if (registry)
             {
@@ -533,6 +616,30 @@ namespace NoclipProtocol
         if (registry)
         {
             registry->Set("/NoclipProtocol/Hud/time", static_cast<double>(m_time));
+            bool menu = false;
+            registry->Get(menu, "/NoclipProtocol/Menu/Active");
+            if (menu != m_inMenu)
+            {
+                m_inMenu = menu;
+                m_page = menu ? Page::MainMenu : Page::None;
+                registry->Set("/NoclipProtocol/Paused", m_page != Page::None);
+            }
+            // The level being played, for CONTINUE: saved with the settings whenever it changes.
+            AZStd::string level;
+            registry->Get(level, "/NoclipProtocol/Save/Level");
+            if (!level.empty() && level != m_lastLevel)
+            {
+                m_lastLevel = level;
+                char when[32] = {};
+                const std::time_t now = std::time(nullptr);
+                if (const std::tm* local = std::localtime(&now))
+                {
+                    std::strftime(when, sizeof(when), "%b %d %H:%M", local);
+                }
+                m_lastWhen = when;
+                registry->Set("/NoclipProtocol/Save/When", m_lastWhen);
+                SaveSettings();
+            }
         }
         if (!m_show || !static_cast<bool>(hud_show))
         {
@@ -631,7 +738,7 @@ namespace NoclipProtocol
         // Text. size = CSS font size in design px; spacing = CSS letter-spacing; x/y = top-left (screen px);
         // align 0 left, 1 centre, 2 right (x is then the centre or right edge). Returns the width drawn.
         auto pick = [&](Face face, float size) { return face == Face::Oswald && size >= 30.0f ? Face::OswaldLarge : face; };
-        auto isOswald = [](Face face) { return face == Face::Oswald || face == Face::OswaldLarge; };
+        auto advanceKind = [](Face face) { return face == Face::OswaldMedium ? 2 : ((face == Face::Oswald || face == Face::OswaldLarge) ? 1 : 0); };
         // Width in screen px of text at a CSS font size with CSS letter-spacing.
         auto measure = [&](Face face, const AZStd::string& text, float size, float spacing) -> float
         {
@@ -639,7 +746,7 @@ namespace NoclipProtocol
             int count = 0;
             for (const AZStd::string& ch : Characters(text))
             {
-                width += AdvanceEm(isOswald(face), ch) * size * s;
+                width += AdvanceEm(advanceKind(face), ch) * size * s;
                 ++count;
             }
             return width + AZStd::max(0, count - 1) * spacing * s;
@@ -649,7 +756,7 @@ namespace NoclipProtocol
                         int align = 0, float spacing = 0.0f, bool shadow = true) -> float
         {
             const float width = measure(face, value, size, spacing);
-            const bool oswald = isOswald(face);
+            const int kind = advanceKind(face);
             face = pick(face, size);
             AzFramework::FontDrawInterface* font = Font(face);
             if (!font || value.empty())
@@ -660,7 +767,10 @@ namespace NoclipProtocol
             AzFramework::TextDrawParameters params;
             params.m_drawViewportId = viewport->GetId();
             // With 32 px slots and no supersampling the engine draws glyphs at about 1.4x the asked size, so ask for 0.7x.
-            params.m_textSizeFactor = size * s * static_cast<float>(hud_text_scale) * (static_cast<int>(hud_font_smooth) == 2 ? 2.0f : 1.0f);
+            // Glyphs come out in proportion to the slot size: the large face's 128 px slots draw 4x bigger than 32 px ones.
+            const float slotScale = face == Face::OswaldLarge ? 0.25f : 1.0f;
+            params.m_textSizeFactor = size * s * static_cast<float>(hud_text_scale) * slotScale *
+                (static_cast<int>(hud_font_smooth) == 2 ? 2.0f : 1.0f);
             params.m_hAlign = AzFramework::TextHorizontalAlignment::Left;
             params.m_vAlign = AzFramework::TextVerticalAlignment::Top;
             const float top = y + size * 0.1f * s; // CSS centres the glyphs in a 1.2 line box
@@ -675,7 +785,7 @@ namespace NoclipProtocol
                         params.m_position = AZ::Vector3(cursor, py, 1.0f);
                         font->DrawScreenAlignedText2d(params, ch);
                     }
-                    cursor += AdvanceEm(oswald, ch) * size * s + spacing * s;
+                    cursor += AdvanceEm(kind, ch) * size * s + spacing * s;
                 }
             };
             if (shadow)
@@ -719,7 +829,7 @@ namespace NoclipProtocol
         };
 
         // The HUD itself; the terminal covers the whole screen (and text always draws over shapes), so not under it.
-        if (m_page != Page::Terminal)
+        if (m_page != Page::Terminal && !m_inMenu)
         {
             // ---- vignette: radial-gradient(ellipse at center, transparent 55%, rgba(8,7,4,0.55) 100%) ----
             {
@@ -978,6 +1088,57 @@ namespace NoclipProtocol
             }
 
         }
+
+        // Menu pages' shapes: collected into one mesh and laid down in several lighter layers. Text drawn over shapes
+        // whose alpha is much above 0.5 comes out in white boxes (the engine's text blending goes by what's already on
+        // screen), and separate see-through batches can come out in any order, so each page is one mesh, drawn in order.
+        AZStd::vector<AZ::Vector3> lv;
+        AZStd::vector<AZ::Color> lc;
+        auto lquad = [&](float x0, float y0, float x1, float y1, const AZ::Color& c0, const AZ::Color& c1)
+        {
+            // c0 on the left edge, c1 on the right
+            const AZ::Vector3 a = P(x0, y0), b = P(x1, y0), c = P(x1, y1), d = P(x0, y1);
+            lv.push_back(a); lc.push_back(c0);
+            lv.push_back(b); lc.push_back(c1);
+            lv.push_back(c); lc.push_back(c1);
+            lv.push_back(a); lc.push_back(c0);
+            lv.push_back(c); lc.push_back(c1);
+            lv.push_back(d); lc.push_back(c0);
+        };
+        auto lrect = [&](float x, float y, float w, float h, const AZ::Color& c) { lquad(x, y, x + w, y + h, c, c); };
+        auto loutline = [&](float x, float y, float w, float h, float t, const AZ::Color& c)
+        {
+            lrect(x, y, w, t, c);
+            lrect(x, y + h - t, w, t, c);
+            lrect(x, y, t, h, c);
+            lrect(x + w - t, y, t, h, c);
+        };
+        auto lflush = [&](int layers)
+        {
+            if (lv.empty())
+            {
+                return;
+            }
+            for (AZ::Color& c : lc)
+            {
+                c.SetA(1.0f - std::pow(AZStd::max(0.0f, 1.0f - c.GetA()), 1.0f / static_cast<float>(layers)));
+            }
+            for (int layer = 0; layer < layers; ++layer)
+            {
+                AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments args;
+                args.m_verts = lv.data();
+                args.m_vertCount = static_cast<uint32_t>(lv.size());
+                args.m_colors = lc.data();
+                args.m_colorCount = static_cast<uint32_t>(lc.size());
+                args.m_opacityType = AZ::RPI::AuxGeomDraw::OpacityType::Translucent;
+                args.m_depthTest = AZ::RPI::AuxGeomDraw::DepthTest::Off;
+                args.m_depthWrite = AZ::RPI::AuxGeomDraw::DepthWrite::Off;
+                args.m_viewProjectionOverrideIndex = overlay;
+                draw->DrawTriangles(args);
+            }
+            lv.clear();
+            lc.clear();
+        };
 
         // ---- the intro's briefing terminal: Terminal.dc.html, the whole screen ----
         if (m_page == Page::Terminal)
@@ -1292,10 +1453,160 @@ namespace NoclipProtocol
             }
             m_click = false;
         }
+        // ---- main menu: Main.dc.html (the live Level 0 behind it instead of the mockup's still) ----
+        else if (m_page == Page::MainMenu)
+        {
+            const AZ::Vector2 cursor(m_cursor.GetX() * W, m_cursor.GetY() * H);
+            const AZ::Color dim = Hex(0xb8ad86);
+            const AZ::Color menuText = Hex(0xe8dfc0);
+            const AZ::Color menuBright = Hex(0xfff1b0);
+            const AZ::Color menuGold = Hex(0xd8c35a);
+            const AZ::Color menuMuted = Hex(0x7d7560);
+            // Text in a CSS line box of lineHeight x size (see the terminal's textIn).
+            auto textIn = [&](Face face, const AZStd::string& value, float x, float top, float size, float lineHeight,
+                              const AZ::Color& c, int align = 0, float spacing = 0.0f)
+            { return text(face, value, x, Y(top + (lineHeight - 1.2f) * size * 0.5f), size, c, align, spacing, true); };
+
+            // linear-gradient(90deg, rgba(10,9,6,.94) 0%, .86 34%, .25 62%, .55 100%) across the window.
+            {
+                const float stops[4][2] = { { 0.0f, 0.94f }, { 0.34f, 0.86f }, { 0.62f, 0.25f }, { 1.0f, 0.55f } };
+                for (int k = 0; k < 3; ++k)
+                {
+                    lquad(W * stops[k][0], 0.0f, W * stops[k + 1][0], H, Hex(0x0a0906, stops[k][1]), Hex(0x0a0906, stops[k + 1][1]));
+                }
+                // Scanlines: rgba(0,0,0,.12), 1 px every 3 px.
+                for (float y = 0.0f; y < DesignH; y += 3.0f)
+                {
+                    lrect(0.0f, Y(y), W, AZStd::max(1.0f, s), AZ::Color(0.0f, 0.0f, 0.0f, 0.12f));
+                }
+            }
+
+            // Left column: x 72, from 64 down to 664, 460 wide.
+            // Header: the Foundation square and "FOUNDATION · MTF DEPLOYMENT TERMINAL".
+            {
+                const float k = 22.0f / 22.0f;
+                loutline(L(72.0f + 1.5f * k - 0.75f), Y(64.0f + 1.5f * k - 0.75f), 19.5f * s, 19.5f * s, AZStd::max(1.0f, 1.5f * s), menuGold);
+                lrect(L(72.0f + 7.0f), Y(64.0f + 7.0f), 8.0f * s, 8.0f * s, menuGold);
+                textIn(Face::Mono, "FOUNDATION \xc2\xb7 MTF DEPLOYMENT TERMINAL", L(106.0f), 75.0f - 7.8f, 12.0f, 1.3f, dim, 0, 3.0f);
+            }
+            // NOCLIP / PROTOCOL: Oswald 700, 72 px, line-height 0.92, letter-spacing 2.
+            textIn(Face::Oswald, "NOCLIP", L(72.0f), 110.0f, 72.0f, 0.92f, Hex(0xf1e6b8), 0, 2.0f);
+            textIn(Face::Oswald, "PROTOCOL", L(72.0f), 110.0f + 66.24f, 72.0f, 0.92f, Hex(0xf1e6b8), 0, 2.0f);
+            // The line under it: 14 px, line-height 1.6, at most 440 wide.
+            float y = 110.0f + 2.0f * 66.24f + 16.0f;
+            for (const AZStd::string& lineText : wrap(Face::Mono,
+                     "Breach confirmed beneath Site-[REDACTED]. Mobile Task Force cleared to enter Level 0 and establish a forward base.",
+                     14.0f, 440.0f * s))
+            {
+                textIn(Face::Mono, lineText, L(72.0f), y, 14.0f, 1.6f, dim);
+                y += 14.0f * 1.6f;
+            }
+
+            // The menu: six items, 2 px apart, each 8 px padding around a 21 px Oswald line.
+            y += 24.0f;
+            struct Item { const char* label; const char* note; int action; bool muted; };
+            const AZStd::string continueNote = m_lastLevel.empty() ? AZStd::string("no expedition yet")
+                : (m_lastWhen.empty() ? AZStd::string("") : m_lastWhen + " \xc2\xb7 ") + LevelLabel(m_lastLevel);
+            const Item items[6] = { { "CONTINUE", "", ActContinue, false }, { "NEW EXPEDITION", nullptr, ActNew, false },
+                                    { "CO-OP", "host or join a squad", ActCoop, false }, { "FOUNDATION ARCHIVE", nullptr, ActArchive, false },
+                                    { "SETTINGS", nullptr, ActSettings, false }, { "QUIT", nullptr, ActQuit, true } };
+            const float itemH = 8.0f + 21.0f * 1.482f + 8.0f;
+            for (int i = 0; i < 6; ++i)
+            {
+                const float top = y + i * (itemH + 2.0f);
+                const bool hover = cursor.GetX() >= L(72.0f) && cursor.GetX() <= L(532.0f) && cursor.GetY() >= Y(top) && cursor.GetY() <= Y(top + itemH);
+                if (hover)
+                {
+                    m_menuSelected = i;
+                }
+                const bool selected = i == m_menuSelected;
+                if (selected)
+                {
+                    // The mockup's highlighted item: gold left border, rgba(232,210,110,.12).
+                    lrect(L(72.0f), Y(top), 460.0f * s, itemH * s, AZ::Color(232 / 255.0f, 210 / 255.0f, 110 / 255.0f, 0.12f));
+                    lrect(L(72.0f), Y(top), 3.0f * s, itemH * s, menuGold);
+                }
+                const AZ::Color c = selected ? menuBright : (hover ? Hex(0xfff4c4) : (items[i].muted ? Hex(0x9c9274) : menuText));
+                textIn(Face::OswaldMedium, items[i].label, L(91.0f), top + 8.0f, 21.0f, 1.482f, c, 0, 2.0f);
+                const bool notice = i == 2 && !m_menuNotice.empty() && m_time < m_menuNoticeUntil; // "co-op isn't in yet"
+                const AZStd::string note = i == 0 ? continueNote : (notice ? m_menuNotice : AZStd::string(items[i].note ? items[i].note : ""));
+                if (!note.empty())
+                {
+                    // Baseline-aligned with the label: Oswald's baseline sits 25 px down its 31 px line.
+                    textIn(Face::Mono, note, L(516.0f), top + 8.0f + 25.05f - 12.3f, 12.0f, 1.3f, notice ? menuGold : dim, 2);
+                }
+                if (hover && m_click)
+                {
+                    m_click = false;
+                    DoAction(items[i].action);
+                }
+            }
+
+            // Footer, 11 px, line-height 1.7: at the column's foot (664), or right under the menu when that runs longer
+            // (as in the mockup at 1280 x 720, where it starts at 641.6).
+            const float footer = AZStd::max(664.0f - 2.0f * 18.7f, y + 6.0f * itemH + 5.0f * 2.0f);
+            textIn(Face::Mono, "DEV BUILD \xc2\xb7 Hearth Engine", L(72.0f), footer, 11.0f, 1.7f, Hex(0x968c6c));
+            textIn(Face::Mono, "Based on the SCP Foundation, scp-wiki.wikidot.com \xc2\xb7 CC BY-SA 3.0", L(72.0f), footer + 18.7f, 11.0f, 1.7f,
+                Hex(0x968c6c));
+
+            // Squad panel, top right: 300 wide inside 16 / 18 px padding, 1 px border.
+            {
+                const float x0 = R(1280.0f - 56.0f - 338.0f);
+                const float panelH = 1.0f + 16.0f + 11.0f * 1.3f + 12.0f + 4.0f * 13.0f * 1.3f + 3.0f * 8.0f + 16.0f + 1.0f;
+                lrect(x0, Y(64.0f), 338.0f * s, panelH * s, AZ::Color(10 / 255.0f, 9 / 255.0f, 6 / 255.0f, 0.78f));
+                loutline(x0, Y(64.0f), 338.0f * s, panelH * s, AZStd::max(1.0f, s), AZ::Color(216 / 255.0f, 195 / 255.0f, 90 / 255.0f, 0.35f));
+                const float cx = x0 + 19.0f * s;
+                const float right = x0 + (338.0f - 19.0f) * s;
+                textIn(Face::Mono, "SQUAD", cx, 81.0f, 11.0f, 1.3f, dim, 0, 2.0f);
+                textIn(Face::Mono, "1 / 4", right, 81.0f, 11.0f, 1.3f, dim, 2, 2.0f);
+                const AZStd::string name = RegString("/NoclipProtocol/Player/Name", "Dragongamer9");
+                float rowY = 81.0f + 11.0f * 1.3f + 12.0f;
+                for (int r = 0; r < 4; ++r)
+                {
+                    const float mid = rowY + 13.0f * 1.3f * 0.5f;
+                    if (r == 0)
+                    {
+                        lrect(cx, Y(mid - 4.0f), 8.0f * s, 8.0f * s, menuGold);
+                        textIn(Face::Mono, name, cx + 18.0f * s, rowY, 13.0f, 1.3f, menuText);
+                        textIn(Face::Mono, "LEAD", right, rowY + 1.0f, 11.0f, 1.3f, dim, 2);
+                    }
+                    else
+                    {
+                        // 8 px box plus its 1 px border: 10 x 10, the name 10 px after it.
+                        loutline(cx, Y(mid - 5.0f), 10.0f * s, 10.0f * s, AZStd::max(1.0f, s), menuMuted);
+                        textIn(Face::Mono, "open slot", cx + 20.0f * s, rowY, 13.0f, 1.3f, menuMuted);
+                    }
+                    rowY += 13.0f * 1.3f + 8.0f;
+                }
+            }
+
+            // Bottom right: red dot, "SIGNAL LOST · LEVEL 0".
+            {
+                const AZStd::string signal = "SIGNAL LOST \xc2\xb7 LEVEL 0";
+                const float right = R(1280.0f - 56.0f - 2.0f);
+                const float w = measure(Face::Mono, signal, 12.0f, 2.0f);
+                textIn(Face::Mono, signal, right, 664.0f - 15.6f, 12.0f, 1.3f, menuGold, 2, 2.0f);
+                // An 8 px circle, 10 px before the text.
+                const float dcx = right - w - 10.0f * s - 4.0f * s;
+                const float dcy = Y(664.0f - 7.8f);
+                const float rr = 4.0f * s;
+                for (int k = 0; k < 16; ++k)
+                {
+                    const float a0 = 6.2831853f * k / 16.0f;
+                    const float a1 = 6.2831853f * (k + 1) / 16.0f;
+                    const AZ::Color red = Hex(0xc4412f);
+                    lv.push_back(P(dcx, dcy)); lc.push_back(red);
+                    lv.push_back(P(dcx + std::cos(a0) * rr, dcy + std::sin(a0) * rr)); lc.push_back(red);
+                    lv.push_back(P(dcx + std::cos(a1) * rr, dcy + std::sin(a1) * rr)); lc.push_back(red);
+                }
+            }
+            lflush(4);
+            m_click = false;
+        }
         // ---- pause menu and settings ----
         else if (m_page != Page::None)
         {
-            rect(0.0f, 0.0f, W, H, AZ::Color(8 / 255.0f, 7 / 255.0f, 4 / 255.0f, 0.78f));
+            lrect(0.0f, 0.0f, W, H, AZ::Color(8 / 255.0f, 7 / 255.0f, 4 / 255.0f, 0.78f));
             m_buttons.clear();
             const AZ::Vector2 cursor(m_cursor.GetX() * W, m_cursor.GetY() * H);
             auto button = [&](const AZStd::string& label, float y, int action, bool primary = false)
@@ -1304,8 +1615,8 @@ namespace NoclipProtocol
                 const float w = 300.0f * s;
                 const float h = 44.0f * s;
                 const bool hover = cursor.GetX() >= x && cursor.GetX() <= x + w && cursor.GetY() >= Y(y) && cursor.GetY() <= Y(y) + h;
-                rect(x, Y(y), w, h, hover ? AZ::Color(Gold.GetR(), Gold.GetG(), Gold.GetB(), 0.25f) : Panel);
-                rect(x, Y(y), 3.0f * s, h, primary || hover ? Gold : Line);
+                lrect(x, Y(y), w, h, hover ? AZ::Color(Gold.GetR(), Gold.GetG(), Gold.GetB(), 0.25f) : Panel);
+                lrect(x, Y(y), 3.0f * s, h, primary || hover ? Gold : Line);
                 text(Face::MonoMedium, label, x + 20.0f * s, Y(y + 13.0f), 14.0f, hover ? Bright : Cream, 0, 2.0f);
                 if (hover && m_click)
                 {
@@ -1317,12 +1628,12 @@ namespace NoclipProtocol
             {
                 text(Face::Mono, label, C(490), Y(y + 4.0f), 12.0f, Muted, 0, 2.0f);
                 const float bw = 32.0f * s;
-                const float bx0 = C(790) - bw * 2.0f - 90.0f * s;
+                const float bx0 = C(830) - bw * 2.0f - 90.0f * s;
                 for (int k = 0; k < (up ? 2 : 1); ++k)
                 {
-                    const float bx = k == 0 ? (up ? bx0 : C(790) - 90.0f * s) : C(790) - bw;
+                    const float bx = k == 0 ? (up ? bx0 : C(830) - 90.0f * s) : C(830) - bw;
                     const bool hover = cursor.GetX() >= bx && cursor.GetX() <= bx + bw && cursor.GetY() >= Y(y) && cursor.GetY() <= Y(y) + 24.0f * s;
-                    outline(bx, Y(y), up ? bw : 90.0f * s, 24.0f * s, AZStd::max(1.0f, 1.5f * s), hover ? Gold : Line);
+                    loutline(bx, Y(y), up ? bw : 90.0f * s, 24.0f * s, AZStd::max(1.0f, 1.5f * s), hover ? Gold : Line);
                     text(Face::MonoSemiBold, up ? (k == 0 ? "-" : "+") : value, bx + (up ? bw : 90.0f * s) * 0.5f, Y(y + 5.0f), 12.0f, Bright, 1);
                     if (hover && m_click)
                     {
@@ -1358,6 +1669,7 @@ namespace NoclipProtocol
                 setting("VOLUME", AZStd::string::format("%+.0f dB", m_volumeDb), 350, ActVolDown, ActVolUp);
                 button("BACK", 420, ActBack, true);
             }
+            lflush(3);
             m_click = false;
         }
     }

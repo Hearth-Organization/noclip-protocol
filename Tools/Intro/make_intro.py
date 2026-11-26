@@ -11,7 +11,8 @@ Level 0's spawn room):
   The level: Levels/Intro/Intro.prefab, a copy of Level 0 with the generator set to style 3 (the fixed facility in
   Gem/Source/Level/Level0Layout.cpp) and concrete footsteps (Level 1's).
   Level 0 gets Breach 4-A's frame too (the generator puts it against the spawn room's south wall).
-  Registry/load_level.setreg starts the game in the intro.
+  Levels/MainMenu: Level 0 as the main menu's live backdrop (the generator's Main menu switch).
+  Registry/load_level.setreg starts the game at the main menu (NEW EXPEDITION loads the intro).
 
 Prefabs are copies of the Level 0 pieces with materials and lights swapped, the same way as Levels 1 and 2.
 """
@@ -302,13 +303,31 @@ def level0_breach(names):
     print("Level 0: Breach 4-A frame set")
 
 
-def start_in_intro():
+def main_menu_level():
+    """Levels/MainMenu: Level 0 (with Breach 4-A's frame) as the main menu's live backdrop."""
+    with open(path("Levels/Level0/Level0.prefab")) as f:
+        data = json.load(f)
+
+    def fix(node):
+        if node.get("$type") == "EndlessLevelComponent":
+            node["MainMenu"] = True
+
+    lv.walk(data, fix)
+    for entity in data["Entities"].values():
+        if entity.get("Name") == "Level0Generator":
+            entity["Name"] = "MainMenuGenerator"
+    with open(path("Levels/MainMenu/MainMenu.prefab"), "w") as f:
+        json.dump(data, f, indent=4)
+    print("wrote Levels/MainMenu/MainMenu.prefab")
+
+
+def start_in_main_menu():
     full = path("Registry/load_level.setreg")
-    data = {"O3DE": {"Autoexec": {"ConsoleCommands": {"LoadLevel": "Intro"}}}}
+    data = {"O3DE": {"Autoexec": {"ConsoleCommands": {"LoadLevel": "MainMenu"}}}}
     with open(full, "w") as f:
         json.dump(data, f, indent=4)
         f.write("\n")
-    print("the game now starts in the intro")
+    print("the game now starts at the main menu")
 
 
 def main():
@@ -319,7 +338,8 @@ def main():
     print("screen colliders removed:", strip_colliders("Prefabs/Intro/Intro_Screen.prefab"))
     level_file(names)
     level0_breach(names)
-    start_in_intro()
+    main_menu_level()
+    start_in_main_menu()
 
 
 if __name__ == "__main__":
