@@ -35,7 +35,7 @@ namespace NoclipProtocol::Level0
         float m_darkZoneShare = 0.4f;  // share of the world inside dark zones (dead / missing lights)
         float m_darkZoneScale = 3.5f;  // dark zones are about this many cells across
         float m_decalChance = 0.3f;    // chance a cell gets a floor stain
-        float m_workingLights = 0.66f; // share of lights in lit areas that work; lower = more dead and flickering (ray tracing uses 0.4)
+        float m_workingLights = 0.66f; // share of lights in lit areas that work; lower = more dead and flickering (ray tracing uses 0.33)
     };
 
     //! An axis-aligned box: center and full size, in world meters. Z is up; floor top is z = 0.
