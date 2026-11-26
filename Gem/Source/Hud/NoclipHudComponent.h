@@ -20,6 +20,7 @@
 #include <AzCore/std/containers/unordered_map.h>
 #include <AzCore/std/containers/vector.h>
 #include <AzCore/std/string/string.h>
+#include <AzCore/std/utils.h>
 #include <AzFramework/Font/FontInterface.h>
 #include <AzFramework/Input/Events/InputChannelEventListener.h>
 
@@ -79,6 +80,8 @@ namespace NoclipProtocol
         AZStd::string m_lastWhen;
         bool m_savedThisLevel = false;   // when it was last played, "Nov 26 04:20" // the intro terminal's open file (0 = Operation Noclip Protocol)
         float m_time = 0.0f;
+        AZStd::vector<AZStd::pair<AZStd::string, float>> m_feed; // the pickup feed: text, when
+        AZStd::string m_feedLast;
         Page m_page = Page::None;
         AZStd::vector<Button> m_buttons;
         AZ::Vector2 m_cursor = AZ::Vector2::CreateZero(); // design pixels

@@ -203,6 +203,17 @@ namespace NoclipProtocol::Base
         float m_breachOpen = 0.0f; // 0 sealed .. 1 a crack open (the level animates the seam from this)
         float m_breachTimer = 0.0f;
         AZStd::string m_toast;     // the latest thing to tell the player (the level shows it)
+        // The radio (the HUD's CH 3 feed): the last message, who sent it and when (m_clock seconds)
+        float m_clock = 0.0f;
+        AZStd::string m_radioWho;
+        AZStd::string m_radioText;
+        float m_radioAt = -1000.0f;
+        void Radio(const char* who, const AZStd::string& text)
+        {
+            m_radioWho = who;
+            m_radioText = text;
+            m_radioAt = m_clock;
+        }
 
         static constexpr float FoundationLine = 4.0f; // kW through the breach, from the start
         static constexpr int PackMax = 20;
@@ -767,6 +778,22 @@ namespace NoclipProtocol::Base
             default: return 0.0f;
             }
         }
+        //! "1 / 3", "6 / 10 kW"... for an open order's row.
+        AZStd::string OrderProgressText(int order) const
+        {
+            switch (order)
+            {
+            case 0: return AZStd::string::format("%g / 10 kW", AZStd::min(10.0f, m_supply));
+            case 1: return AZStd::string::format("%d / 3", AZStd::min(3, m_docsFound));
+            case 2: return "not started";
+            case 3: return m_beaconUp ? "1 / 1" : "0 / 1";
+            case 4: return AZStd::string::format("%d dark corner%s", m_darkCorners, m_darkCorners == 1 ? "" : "s");
+            case 5: return AZStd::string::format("%d / 100", AZStd::min(100, Stored()));
+            case 6: return AZStd::string::format("%d / 2", AZStd::min(2, m_samplesFound));
+            default: return AZStd::string();
+            }
+        }
+
         //! The open orders shown (the first three not done).
         int OpenOrders(int* out, int max = 3) const
         {
@@ -863,6 +890,7 @@ namespace NoclipProtocol::Base
         //! deliveries, orders. inBase: the player is in the forward base (the backpack empties into storage).
         void Simulate(float dt, bool inBase)
         {
+            m_clock += dt;
             // Power: what's made, what's wanted.
             m_capacity = PowerMax();
             m_batteryMax = 0.0f;
@@ -945,6 +973,7 @@ namespace NoclipProtocol::Base
             if (m_blackout && !wasBlackout)
             {
                 m_toast = "POWER OUT \xc2\xb7 THE BASE IS DARK \xc2\xb7 BUILD A BREAKER BOX";
+                Radio("COMMAND", "Your base just went dark. Get the power back before you lose the cells.");
             }
             else if (!m_blackout && m_off > wasOff && breaker)
             {
@@ -1016,6 +1045,7 @@ namespace NoclipProtocol::Base
                 m_deliveries.erase(m_deliveries.begin());
                 m_breachTimer = 5.0f;
                 m_toast = "BREACH 4-A OPENING \xc2\xb7 A FOUNDATION CRATE CAME THROUGH";
+                Radio("COMMAND", "Crate is through Breach 4-A. Collect it before something else finds it.");
                 Save();
             }
             m_breachTimer = AZStd::max(0.0f, m_breachTimer - dt);
@@ -1082,6 +1112,7 @@ namespace NoclipProtocol::Base
                     }
                     m_weaponsI = m_weaponsI || order.m_weapons;
                     m_toast = AZStd::string::format("FOUNDATION ORDER DONE \xc2\xb7 %s", order.m_reward);
+                    Radio("COMMAND", AZStd::string::format("Order complete: %s. Requisition credited.", order.m_title));
                     Save();
                 }
             }

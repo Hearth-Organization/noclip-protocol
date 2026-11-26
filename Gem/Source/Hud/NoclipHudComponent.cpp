@@ -7,6 +7,7 @@
 #include <Atom/RPI.Public/View.h>
 #include "../Base/BaseBuilding.h"
 #include "BuildIcons.h"
+#include "HudIcons.h"
 #include <AzCore/Console/IConsole.h>
 #include <AzCore/IO/FileIO.h>
 #include <AzCore/Math/MathUtils.h>
@@ -22,6 +23,7 @@
 #include <ISystem.h>
 
 #include <cmath>
+#include <cstdlib>
 #include <ctime>
 
 AZ_CVAR(bool, hud_mockup, false, nullptr, AZ::ConsoleFunctorFlags::Null,
@@ -75,12 +77,8 @@ namespace NoclipProtocol
         const AZ::Color Muted = Hex(0xe3d9b4);
         const AZ::Color Gold = Hex(0xf0cf5a);
         const AZ::Color Alarm = Hex(0xff8a78);
-        const AZ::Color SanityText = Hex(0xffb3a6);
-        const AZ::Color SanityBar = Hex(0xe0624f);
-        const AZ::Color Track(10 / 255.0f, 9 / 255.0f, 6 / 255.0f, 0.6f);
         const AZ::Color Panel(10 / 255.0f, 9 / 255.0f, 6 / 255.0f, 0.62f);
         const AZ::Color Line(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.5f);
-        const AZ::Color SegmentEdge(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.4f);
         const AZ::Color Shadow(0.0f, 0.0f, 0.0f, 0.9f);
 
         enum Action { ActResume = 1, ActSettings, ActQuit, ActBack, ActAccept, ActReview, ActContinue, ActNew, ActCoop, ActArchive,
@@ -298,8 +296,8 @@ namespace NoclipProtocol
             { "noclip-oswald-bold-large", "@products@/fonts/noclip/oswald-bold.ttf", 1024, 8 },       // 128 px slots: titles, the ammo count
             { "noclip-oswald-medium", "@products@/fonts/noclip/oswald-medium.ttf", 1024, 32 },        // the main menu's items
         };
-        const int smooth = AZStd::clamp(static_cast<int>(hud_font_smooth), 0, 2);
-        const int amount = AZStd::clamp(static_cast<int>(hud_font_amount), 0, 2);
+        const int smooth = AZ::GetClamp(static_cast<int>(hud_font_smooth), 0, 2);
+        const int amount = AZ::GetClamp(static_cast<int>(hud_font_amount), 0, 2);
         unsigned int flags = 0;
         if (smooth == 1)
         {
@@ -717,7 +715,7 @@ namespace NoclipProtocol
             if (id == InputDeviceKeyboard::Key::EditEnter || id == InputDeviceKeyboard::Key::NumPadEnter)
             {
                 static const int actions[6] = { ActContinue, ActNew, ActCoop, ActArchive, ActSettings, ActQuit };
-                DoAction(actions[AZStd::clamp(m_menuSelected, 0, 5)]);
+                DoAction(actions[AZ::GetClamp(m_menuSelected, 0, 5)]);
                 return true;
             }
             if (id == InputDeviceKeyboard::Key::Escape || id == InputDeviceKeyboard::Key::AlphanumericP)
@@ -862,22 +860,52 @@ namespace NoclipProtocol
         auto C = [&](float x) { return W * 0.5f + (x - DesignW * 0.5f) * s; };
         auto Y = [&](float y) { return y * s; };
 
+        // Every HUD shape goes into one draw for the frame. AuxGeom sorts each see-through draw by the camera depth of its
+        // centre (an unstable sort), so separate draws at the same depth come out in any order and a panel can land on top
+        // of its own bars; inside one draw the triangles keep the order they were made in.
+        AZStd::vector<AZ::Vector3> frameVerts;
+        AZStd::vector<AZ::Color> frameColours;
+        frameVerts.reserve(32768);
+        frameColours.reserve(32768);
+        struct FlushAtEnd
+        {
+            AZ::RPI::AuxGeomDrawPtr& m_draw;
+            AZStd::vector<AZ::Vector3>& m_verts;
+            AZStd::vector<AZ::Color>& m_colours;
+            int32_t m_overlay;
+            ~FlushAtEnd()
+            {
+                if (m_verts.empty() || !m_draw)
+                {
+                    return;
+                }
+                AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments args;
+                args.m_verts = m_verts.data();
+                args.m_vertCount = static_cast<uint32_t>(m_verts.size());
+                args.m_colors = m_colours.data();
+                args.m_colorCount = static_cast<uint32_t>(m_colours.size());
+                args.m_opacityType = AZ::RPI::AuxGeomDraw::OpacityType::Translucent;
+                args.m_depthTest = AZ::RPI::AuxGeomDraw::DepthTest::Off;
+                args.m_depthWrite = AZ::RPI::AuxGeomDraw::DepthWrite::Off;
+                args.m_viewProjectionOverrideIndex = m_overlay;
+                m_draw->DrawTriangles(args);
+            }
+        } flushAtEnd{ draw, frameVerts, frameColours, overlay };
         auto triangles = [&](const AZStd::vector<AZ::Vector3>& points, const AZStd::vector<AZ::Color>& colours)
         {
-            if (points.empty())
+            if (points.empty() || colours.empty())
             {
                 return;
             }
-            AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments args;
-            args.m_verts = points.data();
-            args.m_vertCount = static_cast<uint32_t>(points.size());
-            args.m_colors = colours.data();
-            args.m_colorCount = static_cast<uint32_t>(colours.size());
-            args.m_opacityType = AZ::RPI::AuxGeomDraw::OpacityType::Translucent;
-            args.m_depthTest = AZ::RPI::AuxGeomDraw::DepthTest::Off;
-            args.m_depthWrite = AZ::RPI::AuxGeomDraw::DepthWrite::Off;
-            args.m_viewProjectionOverrideIndex = overlay;
-            draw->DrawTriangles(args);
+            frameVerts.insert(frameVerts.end(), points.begin(), points.end());
+            if (colours.size() == points.size())
+            {
+                frameColours.insert(frameColours.end(), colours.begin(), colours.end());
+            }
+            else
+            {
+                frameColours.insert(frameColours.end(), points.size(), colours[0]);
+            }
         };
         auto P = [&](float px, float py) { return AZ::Vector3(px / W, py / H, 0.0f); };
         // A filled rectangle in screen pixels.
@@ -1049,102 +1077,323 @@ namespace NoclipProtocol
                 triangles(points, colours);
             }
 
-            // ---- top left: level badge and forward base ----
+            // ==== The player HUD: PlayerHUD.dc.html (approved Nov 26; every block at 85%, shrunk toward its own corner) ====
+            const float K = 0.85f;
+            struct Anchor { float ox, oy; int hx; }; // origin (design px) and which edge x follows: 0 left, 1 centre, 2 right
+            const Anchor TL{ 0.0f, 0.0f, 0 }, TC{ 640.0f, 0.0f, 1 }, TR{ 1280.0f, 0.0f, 2 }, BL{ 0.0f, 720.0f, 0 }, BR{ 1280.0f, 720.0f, 2 },
+                MID{ 640.0f, 360.0f, 1 };
+            auto AX = [&](const Anchor& a, float x) { const float d = a.ox + (x - a.ox) * K; return a.hx == 0 ? L(d) : (a.hx == 2 ? R(d) : C(d)); };
+            auto AY = [&](const Anchor& a, float y) { return Y(a.oy + (y - a.oy) * K); };
+            auto AS = [&](float v) { return v * s * K; }; // a size in design px
+            const AZ::Color Olive = Hex(0x9aa36a);
+            const AZ::Color Green = Hex(0x7fe0a0);
+            const AZ::Color Violet = Hex(0xc9a0ff);
+            auto atext = [&](const Anchor& a, Face face, const AZStd::string& value, float x, float top, float size, const AZ::Color& c,
+                             int align = 0, float spacing = 0.0f)
+            { return text(face, value, AX(a, x), AY(a, top), size * K, c, align, spacing * K); };
+            // A 24 x 24 icon (HudIcons) at screen (x, y), drawn size px.
+            auto hudIcon = [&](int index, float x, float y, float size, const AZ::Color& c)
+            {
+                if (index < 0)
+                {
+                    return;
+                }
+                const float u = size / 24.0f;
+                const HudIcons::Icon& ic = HudIcons::Icons[index];
+                for (int k = 0; k < ic.m_strokes; ++k)
+                {
+                    const HudIcons::Stroke& st = HudIcons::Strokes[ic.m_firstStroke + k];
+                    for (int p = 0; p + 1 < st.m_count; ++p)
+                    {
+                        const float* a = HudIcons::Points[st.m_first + p];
+                        const float* b = HudIcons::Points[st.m_first + p + 1];
+                        line(x + a[0] * u, y + a[1] * u, x + b[0] * u, y + b[1] * u, AZStd::max(1.0f, st.m_width * u), c);
+                    }
+                }
+                for (int k = 0; k < ic.m_fills; ++k)
+                {
+                    const HudIcons::Fill& f = HudIcons::Fills[ic.m_firstFill + k];
+                    AZStd::vector<AZ::Vector3> tri;
+                    for (int q = 0; q < 12; ++q)
+                    {
+                        const float a0 = AZ::Constants::TwoPi * q / 12, a1 = AZ::Constants::TwoPi * (q + 1) / 12;
+                        tri.push_back(P(x + f.m_x * u, y + f.m_y * u));
+                        tri.push_back(P(x + (f.m_x + std::cos(a0) * f.m_r) * u, y + (f.m_y + std::sin(a0) * f.m_r) * u));
+                        tri.push_back(P(x + (f.m_x + std::cos(a1) * f.m_r) * u, y + (f.m_y + std::sin(a1) * f.m_r) * u));
+                    }
+                    triangles(tri, { c });
+                }
+            };
+            const Base::State& kit = Base::Get();
+            const float health = mock ? 0.82f : static_cast<float>(AZ::GetClamp(RegNumber("/NoclipProtocol/Hud/player.health", 1.0), 0.0, 1.0));
+            const float stamina = mock ? 0.64f : static_cast<float>(AZ::GetClamp(RegNumber("/NoclipProtocol/Hud/player.stamina", 1.0), 0.0, 1.0));
+            const float sanity = mock ? 0.71f : static_cast<float>(AZ::GetClamp(RegNumber("/NoclipProtocol/Hud/player.sanity", 1.0), 0.0, 1.0));
+
+            // ---- the visor's corners: angled brackets, gold ticks (full size: they frame the screen) ----
+            {
+                const AZ::Color c(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.35f);
+                const float t = AZStd::max(1.0f, 1.5f * s);
+                // top left, top right, bottom left, bottom right: x0 = the edge, then the bracket
+                line(L(22), Y(120), L(22), Y(40), t, c); line(L(22), Y(40), L(42), Y(20), t, c); line(L(42), Y(20), L(170), Y(20), t, c);
+                line(R(1258), Y(120), R(1258), Y(40), t, c); line(R(1258), Y(40), R(1238), Y(20), t, c); line(R(1238), Y(20), R(1110), Y(20), t, c);
+                line(L(22), Y(600), L(22), Y(680), t, c); line(L(22), Y(680), L(42), Y(700), t, c); line(L(42), Y(700), L(170), Y(700), t, c);
+                line(R(1258), Y(600), R(1258), Y(680), t, c); line(R(1258), Y(680), R(1238), Y(700), t, c); line(R(1238), Y(700), R(1110), Y(700), t, c);
+                const float g = 2.0f * s;
+                line(L(32), Y(40), L(40), Y(32), g, Gold); line(R(1248), Y(40), R(1240), Y(32), g, Gold);
+                line(L(32), Y(680), L(40), Y(688), g, Gold); line(R(1248), Y(680), R(1240), Y(688), g, Gold);
+            }
+
+            // Where the camera looks, and where the base is.
+            const AZ::Transform view = camera;
+            const AZ::Vector3 eye = view.GetTranslation();
+            const AZ::Vector3 ahead = view.GetBasisY();
+            float yaw = AZ::RadToDeg(std::atan2(ahead.GetX(), ahead.GetY())); // degrees clockwise from north (+Y)
+            const double baseDistance = mock ? 34.0 : RegNumber("/NoclipProtocol/Hud/base.distance", -1.0);
+            float baseBearing = 0.0f;
+            if (baseDistance >= 0.0)
+            {
+                const float bx = static_cast<float>(RegNumber("/NoclipProtocol/Hud/base.x", 0.0));
+                const float by = static_cast<float>(RegNumber("/NoclipProtocol/Hud/base.y", 0.0));
+                baseBearing = AZ::RadToDeg(std::atan2(bx - eye.GetX(), by - eye.GetY()));
+            }
+            // A room shifting out of sight makes the compass drift for a moment (PlayerEffects).
+            const double drift = RegNumber("/NoclipProtocol/Hud/fx.shiftUntil", 0.0) - m_time;
+            if (drift > 0.0)
+            {
+                yaw += 8.0f * std::sin(m_time * 5.0f) * static_cast<float>(AZStd::min(1.0, drift / 3.0));
+            }
+            if (sanity < 0.35f)
+            {
+                yaw += (0.35f - sanity) * 40.0f * std::sin(m_time * 0.7f); // the compass lies
+            }
+            if (mock)
+            {
+                yaw = 354.0f;
+                baseBearing = 336.0f;
+            }
+            auto compassWord = [](float bearing)
+            {
+                static const char* const words[8] = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+                const int i = static_cast<int>(std::floor(std::fmod(bearing + 360.0f + 22.5f, 360.0f) / 45.0f)) % 8;
+                return words[i];
+            };
+
+            // ---- top left: Foundation mark, LEVEL 0, THE LOBBY · UNSTABLE · DEPTH 1, FORWARD BASE · 34 m · NW; the pickup feed ----
             {
                 const AZStd::string title = mock ? "LEVEL 0" : RegString("/NoclipProtocol/Hud/level.title", "LEVEL 0");
                 const AZStd::string subtitle = mock ? "THE LOBBY · UNSTABLE" : RegString("/NoclipProtocol/Hud/level.subtitle", "THE LOBBY · UNSTABLE");
-                const double baseDistance = mock ? 34.0 : RegNumber("/NoclipProtocol/Hud/base.distance", -1.0);
-                text(Face::Oswald, title, L(40), Y(32), 22.0f, Bright, 0, 3.0f);
-                text(Face::Mono, subtitle, L(40), Y(62), 12.0f, Muted, 0, 2.0f);
-                if (baseDistance >= 0.0)
+                const int depth = mock ? 1 : static_cast<int>(RegNumber("/NoclipProtocol/Hud/level.depth", 1.0));
+                hudIcon(HudIcons::Icon_foundation, AX(TL, 40), AY(TL, 33), AS(22), Bright);
+                atext(TL, Face::Oswald, title, 72, 32, 22.0f, Bright, 0, 3.0f);
+                atext(TL, Face::Mono, depth > 0 ? subtitle + AZStd::string::format(" \xc2\xb7 DEPTH %d", depth) : subtitle, 40, 64, 12.0f, Muted, 0, 2.0f);
+                if (baseDistance >= 0.0 && (mock || kit.m_beaconUp))
                 {
-                    diamond(L(47), Y(97), 6.0f * s, Bright, false, 1.5f * s);
-                    text(Face::Mono, AZStd::string::format("FORWARD BASE · %.0f m", baseDistance), L(62), Y(89), 13.0f, Bright);
+                    diamond(AX(TL, 47), AY(TL, 96), AS(6.0f), Gold, false, AS(1.5f));
+                    atext(TL, Face::Mono, AZStd::string::format("FORWARD BASE \xc2\xb7 %.0f m \xc2\xb7 %s", baseDistance, compassWord(baseBearing)), 62, 88, 13.0f, Bright);
                 }
-            }
-
-            // ---- top centre: compass (W .. N .. E across 500 px, the base marked with a gold diamond) ----
-            {
-                const float left = C(390);
-                const float width = 500.0f * s;
-                rect(left, Y(61), width, AZStd::max(1.0f, 1.0f * s), Line); // border-bottom
-                float yaw = 0.0f; // degrees clockwise from north (+Y)
-                AZ::Vector3 eye = AZ::Vector3::CreateZero();
-                const AZ::Transform camera = viewport->GetCameraTransform();
-                const AZ::Vector3 forward = camera.GetBasisY();
-                eye = camera.GetTranslation();
-                yaw = AZ::RadToDeg(std::atan2(forward.GetX(), forward.GetY()));
+                // The feed: what was just picked up (the newest on top, the older one fading).
+                const AZStd::string toast = RegString("/NoclipProtocol/Hud/toast", "");
+                if (!toast.empty() && toast != m_feedLast)
+                {
+                    m_feedLast = toast;
+                    if (toast[0] == '+' || toast.find("DOCUMENT") != AZStd::string::npos || toast.find("SAMPLE") != AZStd::string::npos)
+                    {
+                        m_feed.insert(m_feed.begin(), AZStd::pair<AZStd::string, float>(toast, m_time));
+                        if (m_feed.size() > 2)
+                        {
+                            m_feed.pop_back();
+                        }
+                    }
+                }
                 if (mock)
                 {
-                    yaw = 8.0f;
+                    m_feed.clear();
+                    m_feed.push_back({ "+3 SCRAP \xc2\xb7 BACKPACK 14 / 20", m_time });
+                    m_feed.push_back({ "FOUNDATION DOCUMENT \xc2\xb7 1 / 3", m_time });
+                    m_feedLast.clear();
                 }
-                const float inner = width - 32.0f * s; // padding 0 16px
-                const float span = 180.0f;             // the strip shows W (-90) to E (+90) around the heading
-                auto toX = [&](float bearing) -> float
+                float y = 150.0f;
+                for (size_t i = 0; i < m_feed.size(); ++i)
                 {
-                    float d = std::fmod(bearing - yaw + 540.0f, 360.0f) - 180.0f;
-                    return d < -span * 0.5f || d > span * 0.5f ? -1.0f : left + 16.0f * s + (d / span + 0.5f) * inner;
-                };
-                static const char* const names[] = { "N", "·", "·", "E", "·", "·", "S", "·", "·", "W", "·", "·" };
-                for (int i = 0; i < 12; ++i)
-                {
-                    const float x = toX(i * 30.0f);
-                    if (x < 0.0f)
+                    const float age = m_time - m_feed[i].second;
+                    if (age > 8.0f)
                     {
                         continue;
                     }
-                    const bool north = i == 0;
-                    text(north ? Face::MonoSemiBold : Face::Mono, names[i], x, Y(37), 12.0f, north ? Bright : Muted, 1);
+                    const float alpha = (i == 0 ? 1.0f : 0.7f) * AZStd::min(1.0f, (8.0f - age) / 1.5f);
+                    const float w = measure(Face::Mono, m_feed[i].first, 12.0f * K, 0.0f) + AS(20);
+                    rect(AX(TL, 40), AY(TL, y), w, AS(24), Hex(0x0a0906, (i == 0 ? 0.55f : 0.4f) * alpha));
+                    rect(AX(TL, 40), AY(TL, y), AS(2), AS(24), i == 0 ? Green : Gold);
+                    AZ::Color c = Cream;
+                    c.SetA(alpha);
+                    atext(TL, Face::Mono, m_feed[i].first, 50, y + 5.0f, 12.0f, c);
+                    y += 30.0f;
                 }
-                double bx = 0.0;
-                double by = 0.0;
-                if (mock || (RegNumber("/NoclipProtocol/Hud/base.distance", -1.0) >= 0.0))
+            }
+
+            // ---- top centre: the heading tape (120 degrees across 500 px), the base and squad marks, 354° under it ----
+            {
+                const float left = 390.0f, width = 500.0f, top = 26.0f;
+                const float px = width / 120.0f;
+                const int first = static_cast<int>(std::ceil((yaw - 60.0f) / 5.0f)) * 5;
+                for (int mark = first; mark <= yaw + 60.0f; mark += 5)
                 {
-                    bx = RegNumber("/NoclipProtocol/Hud/base.x", 0.0);
-                    by = RegNumber("/NoclipProtocol/Hud/base.y", 0.0);
-                    const float bearing = mock ? 50.0f
-                        : AZ::RadToDeg(std::atan2(static_cast<float>(bx) - eye.GetX(), static_cast<float>(by) - eye.GetY()));
-                    const float x = toX(bearing);
+                    const float d = mark - yaw;
+                    const int deg = ((mark % 360) + 360) % 360;
+                    const bool major = deg % 45 == 0;
+                    const float h = major ? 12.0f : (deg % 15 == 0 ? 7.0f : 4.0f);
+                    const float x = left + width * 0.5f + d * px;
+                    rect(AX(TC, x), AY(TC, top), AZStd::max(1.0f, AS(1)), AS(h), AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, major ? 0.85f : 0.45f));
+                    if (major)
+                    {
+                        const char* name = compassWord(static_cast<float>(deg));
+                        const bool north = deg == 0;
+                        atext(TC, north ? Face::MonoSemiBold : Face::Mono, name, x, top + 14.0f, 12.0f, north ? Bright : Muted, 1, 1.0f);
+                    }
+                }
+                auto mark = [&](float bearing) -> float
+                {
+                    float d = std::fmod(bearing - yaw + 540.0f, 360.0f) - 180.0f;
+                    return std::fabs(d) > 58.0f ? -1.0f : left + width * 0.5f + d * px;
+                };
+                if (baseDistance >= 0.0 && (mock || kit.m_beaconUp))
+                {
+                    const float x = mark(baseBearing);
                     if (x >= 0.0f)
                     {
-                        diamond(x, Y(45), 6.0f * s, Gold, true, 0.0f);
+                        diamond(AX(TC, x), AY(TC, top + 36.0f), AS(6.0f), Gold, true, 0.0f);
                     }
                 }
+                {
+                    const AZStd::string bearings = mock ? "18" : RegString("/NoclipProtocol/Hud/squad.bearings", "");
+                    size_t at = 0;
+                    while (!bearings.empty() && at < bearings.size())
+                    {
+                        size_t end = bearings.find(';', at);
+                        if (end == AZStd::string::npos)
+                        {
+                            end = bearings.size();
+                        }
+                        const float b0 = static_cast<float>(std::atof(bearings.substr(at, end - at).c_str()));
+                        const float x = mark(mock ? yaw + b0 : b0);
+                        if (x >= 0.0f)
+                        {
+                            const float tx = AX(TC, x), ty = AY(TC, top + 31.0f), r = AS(5.0f);
+                            triangles({ P(tx, ty - r), P(tx + r, ty + r), P(tx - r, ty + r) }, { Green });
+                        }
+                        at = end + 1;
+                    }
+                }
+                rect(AX(TC, left + width * 0.5f - 0.5f), AY(TC, top), AZStd::max(1.0f, AS(1)), AS(44), Gold);
+                const int heading = (static_cast<int>(std::round(yaw)) % 360 + 360) % 360;
+                rect(AX(TC, 610), AY(TC, top + 46.0f), AS(60), AS(17), Hex(0x0a0906, 0.55f));
+                atext(TC, Face::MonoSemiBold, AZStd::string::format("%03d\xc2\xb0", heading), 640, top + 47.0f, 12.0f, Bright, 1);
             }
 
-            // ---- top right: objective panel ----
+            // ---- top right: the order card, the radio, the squad ----
             {
-                const AZStd::string objective = mock ? "Place the Foundation beacon in the spawn room"
-                    : RegString("/NoclipProtocol/Hud/game.objective", "");
-                const AZStd::string progress = mock ? "Supplies recovered 2 / 5" : RegString("/NoclipProtocol/Hud/game.progress", "");
-                if (!objective.empty())
+                float y = 32.0f;
+                const float x0 = 920.0f, w = 320.0f;
+                // The order: before the beacon goes up it's the objective; after, the first open Foundation order.
+                AZStd::string head, reward, title, progressText;
+                float frac = -1.0f;
+                const AZStd::string objective = mock ? "" : RegString("/NoclipProtocol/Hud/game.objective", "");
+                int open[3];
+                const int openCount = kit.OpenOrders(open);
+                if (mock)
                 {
-                    const float x = R(940);
-                    const float w = 300.0f * s;
-                    const AZStd::vector<AZStd::string> lines = wrap(Face::Mono, objective, 14.0f, (300.0f - 3.0f - 28.0f) * s);
-                    const float lineH = 21.0f; // 14px * 1.5
-                    const float h = 12.0f + 13.2f + 6.0f + lineH * lines.size() + (progress.empty() ? 0.0f : 8.0f + 14.4f) + 12.0f;
-                    rect(x, Y(32), w, h * s, Panel);
-                    rect(x, Y(32), 3.0f * s, h * s, Gold);
-                    const float tx = x + 17.0f * s;
-                    text(Face::Mono, "OBJECTIVE", tx, Y(44), 11.0f, Muted, 0, 2.0f);
-                    float y = 44.0f + 13.2f + 6.0f;
+                    head = "FOUNDATION ORDER"; reward = "+60 RP"; title = "Recover 3 Foundation documents"; progressText = "1 / 3"; frac = 0.33f;
+                }
+                else if (!kit.m_beaconUp && !objective.empty())
+                {
+                    head = "OBJECTIVE";
+                    title = objective;
+                    progressText = RegString("/NoclipProtocol/Hud/game.progress", "");
+                }
+                else if (openCount > 0)
+                {
+                    head = "FOUNDATION ORDER";
+                    reward = AZStd::string::format("+%d RP", Base::Order(open[0]).m_rp);
+                    title = Base::Order(open[0]).m_title;
+                    progressText = kit.OrderProgressText(open[0]);
+                    frac = kit.OrderProgress(open[0]);
+                }
+                if (!title.empty())
+                {
+                    const AZStd::vector<AZStd::string> lines = wrap(Face::Mono, title, 14.0f * K, AS(w - 31.0f));
+                    const AZStd::vector<AZStd::string> notes = (frac < 0.0f && !progressText.empty())
+                        ? wrap(Face::Mono, progressText, 12.0f * K, AS(w - 31.0f)) : AZStd::vector<AZStd::string>{};
+                    const float h = 10.0f + 13.0f + 6.0f + 20.3f * lines.size() +
+                        (progressText.empty() ? 0.0f : 8.0f + (frac >= 0.0f ? 15.6f : 17.0f * notes.size())) + 10.0f;
+                    rect(AX(TR, x0), AY(TR, y), AS(w), AS(h), Hex(0x0a0906, 0.62f));
+                    rect(AX(TR, x0), AY(TR, y), AS(3), AS(h), Gold);
+                    atext(TR, Face::Mono, head, x0 + 17.0f, y + 10.0f, 10.0f, Muted, 0, 2.0f);
+                    if (!reward.empty())
+                    {
+                        atext(TR, Face::Mono, reward, x0 + w - 14.0f, y + 10.0f, 10.0f, Muted, 2, 2.0f);
+                    }
+                    float ty = y + 10.0f + 13.0f + 6.0f;
                     for (const AZStd::string& l : lines)
                     {
-                        text(Face::Mono, l, tx, Y(y + 3.5f), 14.0f, Bright);
-                        y += lineH;
+                        atext(TR, Face::Mono, l, x0 + 17.0f, ty, 14.0f, Bright);
+                        ty += 20.3f;
                     }
-                    if (!progress.empty())
+                    if (!progressText.empty())
                     {
-                        text(Face::Mono, progress, tx, Y(y + 8.0f), 12.0f, Muted);
+                        ty += 8.0f;
+                        if (frac >= 0.0f)
+                        {
+                            const float tw = measure(Face::Mono, progressText, 11.0f * K, 0.0f) / (s * K);
+                            const float barW = w - 31.0f - tw - 8.0f;
+                            rect(AX(TR, x0 + 17.0f), AY(TR, ty + 6.0f), AS(barW), AS(4), AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.15f));
+                            rect(AX(TR, x0 + 17.0f), AY(TR, ty + 6.0f), AS(barW * AZ::GetClamp(frac, 0.0f, 1.0f)), AS(4), Gold);
+                            atext(TR, Face::Mono, progressText, x0 + w - 14.0f, ty, 11.0f, Muted, 2);
+                        }
+                        else
+                        {
+                            for (const AZStd::string& l : notes)
+                            {
+                                atext(TR, Face::Mono, l, x0 + 17.0f, ty, 12.0f, Muted);
+                                ty += 17.0f;
+                            }
+                            ty -= 15.6f;
+                        }
+                        ty += 15.6f;
                     }
+                    y = ty + 10.0f + 8.0f;
                 }
-            }
-
-            // ---- right: squad ("Name|12 m" lines; NO SIGNAL rows in red) ----
-            {
-                AZStd::string squad = mock ? "Agent Hollis|12 m\nDr. ████|41 m\nAgent Reyes|NO SIGNAL" : RegString("/NoclipProtocol/Hud/squad", "");
-                float y = 176.0f;
+                // The radio: CH 3 · EPSILON-6, the last message (for a minute and a half).
+                const float age = mock ? 4.0f : kit.m_clock - kit.m_radioAt;
+                const AZStd::string who = mock ? "HOLLIS" : kit.m_radioWho;
+                const AZStd::string said = mock ? "Lights are dying past the east hall. Stay together." : kit.m_radioText;
+                if (!said.empty() && age < 90.0f)
+                {
+                    const AZStd::string lead = who + ": ";
+                    const AZStd::vector<AZStd::string> lines = wrap(Face::Mono, lead + said, 12.0f * K, AS(w - 28.0f));
+                    const float h = 9.0f + 13.0f + 4.0f + 18.0f * lines.size() + 9.0f;
+                    rect(AX(TR, x0), AY(TR, y), AS(w), AS(h), Hex(0x0a0906, 0.5f));
+                    hudIcon(HudIcons::Icon_radio, AX(TR, x0 + 14.0f), AY(TR, y + 9.0f), AS(12), Olive);
+                    atext(TR, Face::Mono, "CH 3 \xc2\xb7 EPSILON-6", x0 + 30.0f, y + 9.0f, 10.0f, Olive, 0, 2.0f);
+                    const int secs = static_cast<int>(age);
+                    atext(TR, Face::Mono, AZStd::string::format("%d:%02d AGO", secs / 60, secs % 60), x0 + w - 14.0f, y + 9.0f, 10.0f, Olive, 2, 2.0f);
+                    float ty = y + 9.0f + 13.0f + 4.0f;
+                    for (size_t i = 0; i < lines.size(); ++i)
+                    {
+                        AZStd::string l = lines[i];
+                        float lx = x0 + 14.0f;
+                        if (i == 0 && l.size() >= lead.size() && l.substr(0, lead.size()) == lead)
+                        {
+                            lx += atext(TR, Face::Mono, who + ":", lx, ty, 12.0f, Green) / (s * K) + 7.2f;
+                            l = l.substr(lead.size());
+                        }
+                        atext(TR, Face::Mono, l, lx, ty, 12.0f, Cream);
+                        ty += 18.0f;
+                    }
+                    y = ty + 9.0f + 8.0f;
+                }
+                // The squad: "Name|12 m · 94" lines (co-op), NO SIGNAL in red.
+                const AZStd::string squad = mock ? "Agt. Hollis|12 m \xc2\xb7 94\nDr. \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88|41 m \xc2\xb7 60\nAgt. Reyes|NO SIGNAL"
+                                                 : RegString("/NoclipProtocol/Hud/squad", "");
                 size_t start = 0;
                 while (!squad.empty() && start < squad.size())
                 {
@@ -1155,126 +1404,261 @@ namespace NoclipProtocol
                     }
                     const AZStd::string row = squad.substr(start, end - start);
                     const size_t bar = row.find('|');
-                    const AZStd::string name = row.substr(0, bar);
-                    const AZStd::string value = bar == AZStd::string::npos ? AZStd::string() : row.substr(bar + 1);
-                    const bool lost = value == "NO SIGNAL";
-                    text(Face::Mono, name, R(1012), Y(y), 12.0f, lost ? Alarm : Cream);
-                    text(Face::Mono, value, R(1240), Y(y), 12.0f, lost ? Alarm : Muted, 2);
-                    y += 14.4f + 8.0f;
+                    const bool lost = row.find("NO SIGNAL") != AZStd::string::npos;
+                    {
+                        const float tx = AX(TR, x0 + 8.0f), ty = AY(TR, y + 9.0f), r = AS(4.0f);
+                        triangles({ P(tx, ty - r), P(tx + r, ty + r * 0.8f), P(tx - r, ty + r * 0.8f) }, { lost ? Alarm : Green });
+                    }
+                    // A name with redacted letters (the block character): the font has no block, so each is a cream bar.
+                    {
+                        const AZStd::string name = row.substr(0, bar);
+                        const AZStd::string block = "\xe2\x96\x88";
+                        float nx = x0 + 4.0f + 7.2f + 7.2f;
+                        size_t p = 0;
+                        while (p < name.size())
+                        {
+                            const size_t hit = name.find(block, p);
+                            const AZStd::string part = name.substr(p, hit == AZStd::string::npos ? AZStd::string::npos : hit - p);
+                            if (!part.empty())
+                            {
+                                nx += atext(TR, Face::Mono, part, nx, y, 12.0f, lost ? Alarm : Cream) / (s * K);
+                            }
+                            if (hit == AZStd::string::npos)
+                            {
+                                break;
+                            }
+                            rect(AX(TR, nx), AY(TR, y + 2.0f), AS(7.2f), AS(13.0f), lost ? Alarm : Cream);
+                            nx += 7.2f;
+                            p = hit + block.size();
+                        }
+                    }
+                    if (bar != AZStd::string::npos)
+                    {
+                        atext(TR, Face::Mono, row.substr(bar + 1), x0 + w - 4.0f, y, 12.0f, lost ? Alarm : Muted, 2);
+                    }
+                    y += 19.0f;
                     start = end + 1;
                 }
             }
 
-            // ---- centre: dot and interaction prompt ----
-            rect(C(638), Y(358), 4.0f * s, 4.0f * s, Bright);
+            // ---- centre: the crosshair (a dot and four short arms) and the interaction prompt ----
             {
+                const AZ::Color armC(1.0f, 243 / 255.0f, 192 / 255.0f, 0.7f);
+                const float cx = C(640), cy = Y(360);
+                const float u = s;
+                AZStd::vector<AZ::Vector3> dot;
+                for (int q = 0; q < 12; ++q)
+                {
+                    const float a0 = AZ::Constants::TwoPi * q / 12, a1 = AZ::Constants::TwoPi * (q + 1) / 12;
+                    dot.push_back(P(cx, cy));
+                    dot.push_back(P(cx + std::cos(a0) * 1.6f * u, cy + std::sin(a0) * 1.6f * u));
+                    dot.push_back(P(cx + std::cos(a1) * 1.6f * u, cy + std::sin(a1) * 1.6f * u));
+                }
+                triangles(dot, { Bright });
+                const float t = AZStd::max(1.0f, 1.4f * u);
+                line(cx, cy - 11.0f * u, cx, cy - 6.0f * u, t, armC); line(cx, cy + 6.0f * u, cx, cy + 11.0f * u, t, armC);
+                line(cx - 11.0f * u, cy, cx - 6.0f * u, cy, t, armC); line(cx + 6.0f * u, cy, cx + 11.0f * u, cy, t, armC);
+
                 const AZStd::string verb = mock ? "Pick up" : RegString("/NoclipProtocol/Hud/interact.verb", "");
-                const AZStd::string item = mock ? "Almond Water" : RegString("/NoclipProtocol/Hud/interact.item", "");
+                AZStd::string item = mock ? "Almond Water \xc2\xb7 backpack 14 / 20" : RegString("/NoclipProtocol/Hud/interact.item", "");
                 const AZStd::string key = mock ? "E" : RegString("/NoclipProtocol/Hud/interact.key", "E");
                 if (!verb.empty())
                 {
-                    const float verbW = measure(Face::Mono, verb, 13.0f, 0.0f);
-                    const float rowW = 24.0f * s + 8.0f * s + verbW;
-                    const float x0 = C(640) - rowW * 0.5f;
-                    outline(x0, Y(400), 24.0f * s, 24.0f * s, 1.5f * s, Bright);
-                    text(Face::MonoSemiBold, key, x0 + 12.0f * s, Y(405), 13.0f, Cream, 1);
-                    text(Face::Mono, verb, x0 + 32.0f * s, Y(405), 13.0f, Cream);
+                    if (RegString("/NoclipProtocol/Hud/interact.target", "") == "pickup" && kit.Carried() > 0)
+                    {
+                        item += AZStd::string::format(" \xc2\xb7 backpack %d / %d", kit.Carried(), Base::State::PackMax);
+                    }
+                    const float verbW = measure(Face::Mono, verb, 13.0f * K, 0.0f) / (s * K);
+                    const float rowW = 24.0f + 10.0f + verbW;
+                    const float x0 = 640.0f - rowW * 0.5f;
+                    outline(AX(MID, x0), AY(MID, 396), AS(24), AS(24), AS(1.5f), Cream);
+                    atext(MID, Face::MonoSemiBold, key, x0 + 12.0f, 400.0f, 11.0f, Cream, 1);
+                    atext(MID, Face::Mono, verb, x0 + 34.0f, 400.0f, 13.0f, Cream);
+                    // Hold to use: a ring around the key fills up (interact.hold 0..1).
+                    const float hold = static_cast<float>(RegNumber("/NoclipProtocol/Hud/interact.hold", -1.0));
+                    if (hold >= 0.0f)
+                    {
+                        const float rcx = AX(MID, x0 + 12.0f), rcy = AY(MID, 408.0f), rr = AS(15.0f);
+                        for (int q = 0; q < 32; ++q)
+                        {
+                            const float a0 = -AZ::Constants::HalfPi + AZ::Constants::TwoPi * q / 32, a1 = -AZ::Constants::HalfPi + AZ::Constants::TwoPi * (q + 1) / 32;
+                            const bool on = q < hold * 32.0f;
+                            line(rcx + std::cos(a0) * rr, rcy + std::sin(a0) * rr, rcx + std::cos(a1) * rr, rcy + std::sin(a1) * rr, AS(2.0f),
+                                on ? Gold : AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.2f));
+                        }
+                    }
                     if (!item.empty())
                     {
-                        text(Face::Mono, item, C(640), Y(430), 12.0f, Muted, 1);
+                        atext(MID, Face::Mono, item, 640.0f, 428.0f, 12.0f, Muted, 1);
                     }
                 }
             }
 
-            // ---- bottom left: HEALTH / STAMINA / SANITY ----
+            // ---- bottom left: the wrist unit (FIELD UNIT · AGT. 4417, the pulse, HEALTH, STAMINA, SANITY, backpack / light / rad) ----
             {
-                struct Bar { const char* label; const char* bind; float mockValue; AZ::Color labelColour; AZ::Color fill; };
-                const Bar bars[3] = {
-                    { "HEALTH", "/NoclipProtocol/Hud/player.health", 0.82f, Cream, Cream },
-                    { "STAMINA", "/NoclipProtocol/Hud/player.stamina", 0.45f, Cream, Gold },
-                    { "SANITY", "/NoclipProtocol/Hud/player.sanity", 0.61f, SanityText, SanityBar },
-                };
-                float y = DesignH - 36.0f - (26.4f * 3 + 24.0f);
-                for (const Bar& bar : bars)
+                const float x0 = 40.0f, w = 330.0f, h = 207.0f;
+                const float y0 = 720.0f - 36.0f - h;
+                // background: linear-gradient(180deg, rgba(28,30,20,.86), rgba(14,15,10,.86)); 1px olive border; gold corner ticks
+                triangles({ P(AX(BL, x0), AY(BL, y0)), P(AX(BL, x0 + w), AY(BL, y0)), P(AX(BL, x0 + w), AY(BL, y0 + h)),
+                            P(AX(BL, x0), AY(BL, y0)), P(AX(BL, x0 + w), AY(BL, y0 + h)), P(AX(BL, x0), AY(BL, y0 + h)) },
+                    { Hex(0x1c1e14, 0.86f), Hex(0x1c1e14, 0.86f), Hex(0x0e0f0a, 0.86f), Hex(0x1c1e14, 0.86f), Hex(0x0e0f0a, 0.86f), Hex(0x0e0f0a, 0.86f) });
+                outline(AX(BL, x0), AY(BL, y0), AS(w), AS(h), AZStd::max(1.0f, AS(1)), AZ::Color(154 / 255.0f, 163 / 255.0f, 106 / 255.0f, 0.55f));
+                rect(AX(BL, x0 - 1), AY(BL, y0 - 1), AS(14), AS(2), Gold); rect(AX(BL, x0 - 1), AY(BL, y0 - 1), AS(2), AS(14), Gold);
+                rect(AX(BL, x0 + w - 13), AY(BL, y0 + h - 1), AS(14), AS(2), Gold); rect(AX(BL, x0 + w - 1), AY(BL, y0 + h - 13), AS(2), AS(14), Gold);
+                const float px0 = x0 + 14.0f;
+                float y = y0 + 12.0f;
+                hudIcon(HudIcons::Icon_foundation, AX(BL, px0), AY(BL, y), AS(14), Olive);
+                atext(BL, Face::Mono, "FIELD UNIT \xc2\xb7 AGT. 4417", px0 + 20.0f, y + 1.0f, 10.0f, Olive, 0, 2.0f);
                 {
-                    const float value = mock ? bar.mockValue : static_cast<float>(AZ::GetClamp(RegNumber(bar.bind, 1.0), 0.0, 1.0));
-                    text(Face::Mono, bar.label, L(40), Y(y), 11.0f, bar.labelColour, 0, 2.0f);
-                    text(Face::Mono, AZStd::string::format("%d", static_cast<int>(std::round(value * 100.0f))), L(340), Y(y), 11.0f,
-                        bar.labelColour, 2, 2.0f);
-                    rect(L(40), Y(y + 13.2f + 5.0f), 300.0f * s, 6.0f * s, Track);
-                    rect(L(40), Y(y + 13.2f + 5.0f), 300.0f * s * value, 6.0f * s, bar.fill);
-                    y += 26.4f + 12.0f;
+                    char clock[16] = {};
+                    const std::time_t now = std::time(nullptr);
+                    if (const std::tm* local = std::localtime(&now))
+                    {
+                        std::strftime(clock, sizeof(clock), "%H:%M", local);
+                    }
+                    atext(BL, Face::Mono, mock ? "21:42" : clock, x0 + w - 14.0f, y + 1.0f, 10.0f, Olive, 2, 2.0f);
                 }
+                y += 13.0f + 10.0f;
+                // The pulse: an ECG trace that scrolls with the heartbeat (faster when hurt, tired or frightened).
+                const float bpm = mock ? 88.0f : 66.0f + (1.0f - stamina) * 40.0f + (1.0f - sanity) * 35.0f + (1.0f - health) * 45.0f;
+                const AZ::Color pulse = health < 0.3f ? Alarm : Green;
+                {
+                    const float traceW = 236.0f, traceH = 32.0f;
+                    const float period = 70.0f; // design px between beats
+                    const float shift = std::fmod(m_time * bpm / 60.0f * period, period);
+                    auto beat = [&](float u) -> float // height 0..32 at u px into a period (the mockup's shape)
+                    {
+                        if (u < 6.0f) return 18.0f;
+                        if (u < 10.0f) return 18.0f - (u - 6.0f) * 3.0f;      // up to 6
+                        if (u < 14.0f) return 6.0f + (u - 10.0f) * 5.5f;      // down to 28
+                        if (u < 18.0f) return 28.0f - (u - 14.0f) * 3.5f;     // up to 14
+                        if (u < 22.0f) return 14.0f + (u - 18.0f);            // back to 18
+                        return 18.0f;
+                    };
+                    float lastX = px0, lastY = y + beat(std::fmod(shift, period));
+                    for (float u = 1.0f; u <= traceW; u += 1.0f)
+                    {
+                        const float v = beat(std::fmod(u + shift, period));
+                        const float nx = px0 + u, ny = y + v;
+                        line(AX(BL, lastX), AY(BL, lastY), AX(BL, nx), AY(BL, ny), AS(1.6f), pulse);
+                        lastX = nx;
+                        lastY = ny;
+                    }
+                    atext(BL, Face::MonoSemiBold, AZStd::string::format("%d", static_cast<int>(bpm)), x0 + w - 14.0f, y, 18.0f, pulse, 2);
+                    atext(BL, Face::Mono, "BPM", x0 + w - 14.0f, y + 20.0f, 9.0f, Muted, 2, 2.0f);
+                    y += traceH + 10.0f;
+                }
+                // HEALTH: ten segments
+                atext(BL, Face::Mono, "HEALTH", px0, y, 11.0f, Cream, 0, 2.0f);
+                atext(BL, Face::MonoSemiBold, AZStd::string::format("%d", static_cast<int>(std::round(health * 100))), x0 + w - 14.0f, y, 11.0f, Cream, 2);
+                y += 14.0f + 5.0f;
+                {
+                    const float segW = (w - 28.0f - 27.0f) / 10.0f;
+                    const int lit = static_cast<int>(std::round(health * 10.0f));
+                    for (int k = 0; k < 10; ++k)
+                    {
+                        rect(AX(BL, px0 + k * (segW + 3.0f)), AY(BL, y), AS(segW), AS(10),
+                            k < lit ? (health < 0.3f ? Alarm : Cream) : AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.15f));
+                    }
+                }
+                y += 10.0f + 10.0f;
+                atext(BL, Face::Mono, "STAMINA", px0, y, 11.0f, Cream, 0, 2.0f);
+                atext(BL, Face::MonoSemiBold, AZStd::string::format("%d", static_cast<int>(std::round(stamina * 100))), x0 + w - 14.0f, y, 11.0f, Cream, 2);
+                y += 14.0f + 5.0f;
+                rect(AX(BL, px0), AY(BL, y), AS(w - 28.0f), AS(5), AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.15f));
+                rect(AX(BL, px0), AY(BL, y), AS((w - 28.0f) * stamina), AS(5), Gold);
+                y += 5.0f + 10.0f;
+                // SANITY: STEADY · 71 (UNEASY, SLIPPING, BREAKING), a tick at the halfway mark (below it the rooms start to shift)
+                const char* word = sanity >= 0.6f ? "STEADY" : (sanity >= 0.4f ? "UNEASY" : (sanity >= 0.2f ? "SLIPPING" : "BREAKING"));
+                const AZ::Color sc = sanity >= 0.6f ? Green : (sanity >= 0.4f ? Gold : (sanity >= 0.2f ? Violet : Alarm));
+                atext(BL, Face::Mono, "SANITY", px0, y, 11.0f, Cream, 0, 2.0f);
+                atext(BL, Face::MonoSemiBold, AZStd::string::format("%s \xc2\xb7 %d", word, static_cast<int>(std::round(sanity * 100))), x0 + w - 14.0f, y, 11.0f, sc, 2, 2.0f);
+                y += 14.0f + 5.0f;
+                rect(AX(BL, px0), AY(BL, y), AS(w - 28.0f), AS(5), AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.15f));
+                rect(AX(BL, px0), AY(BL, y), AS((w - 28.0f) * sanity), AS(5), sc);
+                rect(AX(BL, px0 + (w - 28.0f) * 0.5f), AY(BL, y - 3.0f), AZStd::max(1.0f, AS(1)), AS(11), AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.6f));
+                y += 5.0f + 10.0f;
+                // BACKPACK 14 / 20 · LIGHT 3:00 · RAD 0.1
+                const double lightSecs = mock ? 180.0 : RegNumber("/NoclipProtocol/Hud/player.flashlight.seconds", 180.0);
+                const int ls = static_cast<int>(std::round(lightSecs));
+                const int style = static_cast<int>(RegNumber("/NoclipProtocol/Hud/level.depth", 1.0)) - 1;
+                const float rad = style <= 0 ? 0.1f : (style == 1 ? 0.2f : 0.6f);
+                atext(BL, Face::Mono, AZStd::string::format("BACKPACK %d / %d", mock ? 14 : kit.Carried(), Base::State::PackMax), px0, y, 10.0f, Muted, 0, 1.0f);
+                atext(BL, Face::Mono, AZStd::string::format("LIGHT %d:%02d", ls / 60, ls % 60), x0 + w * 0.5f + 12.0f, y, 10.0f, ls < 30 ? Alarm : Muted, 1, 1.0f);
+                atext(BL, Face::Mono, AZStd::string::format("RAD %.1f", rad), x0 + w - 14.0f, y, 10.0f, Muted, 2, 1.0f);
             }
 
-            // ---- bottom right: flashlight and weapon ----
+            // ---- bottom right: the weapon block (above) and the quick slots Q / B / G / H ----
             {
-                const AZStd::string weapon = mock ? "MTF CARBINE" : RegString("/NoclipProtocol/Hud/weapon.name", "");
-                float right = 1240.0f; // design x of the block's right edge
+                const AZStd::string weapon = mock ? "SERVICE PISTOL" : RegString("/NoclipProtocol/Hud/weapon.name", "");
                 if (!weapon.empty())
                 {
-                    const AZStd::string ammo = mock ? "24" : RegString("/NoclipProtocol/Hud/weapon.ammo", "0");
-                    const AZStd::string reserve = mock ? " / 90" : AZStd::string(" / ") + RegString("/NoclipProtocol/Hud/weapon.reserve", "0");
-                    const float reserveW = measure(Face::Oswald, reserve, 22.0f, 0.0f);
-                    const float ammoW = measure(Face::Oswald, ammo, 44.0f, 0.0f);
-                    const float blockW = AZStd::max(reserveW + ammoW, measure(Face::Mono, weapon, 11.0f, 2.0f)) / s;
-                    const float bottom = DesignH - 36.0f;
-                    text(Face::Mono, weapon, R(right), Y(bottom - 44.0f - 13.2f), 11.0f, Muted, 2, 2.0f);
-                    text(Face::Oswald, reserve, R(right), Y(bottom - 22.0f * 1.15f), 22.0f, Muted, 2);
-                    text(Face::Oswald, ammo, R(right) - reserveW, Y(bottom - 44.0f * 1.05f), 44.0f, Bright, 2);
-                    right -= blockW + 28.0f;
-                }
-                const double fraction = mock ? 0.6 : AZ::GetClamp(RegNumber("/NoclipProtocol/Hud/player.flashlight", 1.0), 0.0, 1.0);
-                const double seconds = mock ? 108.0 : RegNumber("/NoclipProtocol/Hud/player.flashlight.seconds", 180.0 * fraction);
-                const float bottom = DesignH - 36.0f;
-                // "1:48 left"
-                const int secs = static_cast<int>(std::round(seconds));
-                text(Face::Mono, AZStd::string::format("%d:%02d left", secs / 60, secs % 60), R(right), Y(bottom - 14.4f), 11.0f, Muted, 2);
-                // five segments, 16 x 10, gap 3
-                const int lit = static_cast<int>(std::ceil(fraction * 5.0 - 0.001));
-                for (int i = 0; i < 5; ++i)
-                {
-                    const float x = R(right - (5 - i) * 16.0f - (4 - i) * 3.0f);
-                    const float y = Y(bottom - 14.4f - 6.0f - 10.0f);
-                    if (i < lit)
+                    // right 40, bottom 104, 300 wide, padding 12 14: mode + icon, the name, mag / reserve, the magazine's pips, the state line
+                    const int mag = mock ? 9 : static_cast<int>(RegNumber("/NoclipProtocol/Hud/weapon.mag", 0.0));
+                    const int cap = mock ? 12 : AZ::GetClamp(static_cast<int>(RegNumber("/NoclipProtocol/Hud/weapon.cap", 1.0)), 1, 40);
+                    const int reserve = mock ? 36 : static_cast<int>(RegNumber("/NoclipProtocol/Hud/weapon.reserve", 0.0));
+                    const AZStd::string mode = mock ? "SEMI" : RegString("/NoclipProtocol/Hud/weapon.mode", "SEMI");
+                    const AZStd::string iconName = mock ? "pistol" : RegString("/NoclipProtocol/Hud/weapon.icon", "pistol");
+                    const AZStd::string roundsName = mock ? "rounds" : RegString("/NoclipProtocol/Hud/weapon.rounds", "rounds");
+                    const AZStd::string state = mock ? "" : RegString("/NoclipProtocol/Hud/weapon.state", "");
+                    const AZStd::string extra = mock ? "" : RegString("/NoclipProtocol/Hud/weapon.note", "");
+                    const bool low = !mock && RegNumber("/NoclipProtocol/Hud/weapon.low", 0.0) > 0.5;
+                    const float right = 1240.0f, w = 300.0f;
+                    const float h = 12.0f + 30.0f + 2.0f + 21.0f + 4.0f + 40.0f + 6.0f + 16.0f + (state.empty() ? 0.0f : 6.0f + 15.0f) +
+                        (extra.empty() ? 0.0f : 6.0f + 15.0f) + 12.0f;
+                    const float bottom = 720.0f - 104.0f, top = bottom - h, x0 = right - w;
+                    // linear-gradient(270deg, .72 at the right to .2 at the left); border-right 3px gold
+                    const AZ::Color dark = Hex(0x0a0906, 0.72f), light = Hex(0x0a0906, 0.2f);
+                    triangles({ P(AX(BR, x0), AY(BR, top)), P(AX(BR, right), AY(BR, top)), P(AX(BR, right), AY(BR, bottom)),
+                                P(AX(BR, x0), AY(BR, top)), P(AX(BR, right), AY(BR, bottom)), P(AX(BR, x0), AY(BR, bottom)) },
+                        { light, dark, dark, light, dark, light });
+                    rect(AX(BR, right - 3.0f), AY(BR, top), AS(3), AS(h), Gold);
+                    const float px = right - 3.0f - 14.0f;
+                    float y = top + 12.0f;
+                    hudIcon(HudIcons::Find(iconName.c_str()), AX(BR, px - 30.0f), AY(BR, y), AS(30), Cream);
+                    atext(BR, Face::Mono, mode, px - 40.0f, y + 8.0f, 11.0f, Muted, 2, 2.0f);
+                    y += 30.0f + 2.0f;
+                    atext(BR, Face::Oswald, weapon, px, y, 16.0f, Cream, 2, 3.0f);
+                    y += 21.0f + 4.0f;
+                    hudIcon(HudIcons::Find(roundsName.c_str()), AX(BR, px - 18.0f), AY(BR, y + 20.0f), AS(18), Muted);
+                    const float resW = atext(BR, Face::Mono, AZStd::string::format("/ %d", reserve), px - 18.0f - 8.0f, y + 19.0f, 16.0f, Muted, 2) / (s * K);
+                    atext(BR, Face::Oswald, AZStd::string::format("%d", mag), px - 18.0f - 8.0f - resW - 8.0f, y - 4.0f, 40.0f, low ? Alarm : Bright, 2);
+                    y += 40.0f + 6.0f;
+                    for (int k = 0; k < cap; ++k)
                     {
-                        rect(x, y, 16.0f * s, 10.0f * s, Gold);
+                        const float x = px - (cap - k) * 6.0f - (cap - 1 - k) * 3.0f;
+                        rect(AX(BR, x), AY(BR, y), AS(6), AS(16), k < mag ? (low ? Alarm : Cream) : AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.15f));
                     }
-                    else
+                    y += 16.0f;
+                    if (!state.empty())
                     {
-                        rect(x, y, 16.0f * s, 10.0f * s, Track);
-                        outline(x, y, 16.0f * s, 10.0f * s, AZStd::max(1.0f, s), SegmentEdge);
+                        atext(BR, Face::Mono, state, px, y + 6.0f, 11.0f, Gold, 2, 2.0f);
+                        y += 21.0f;
+                    }
+                    if (!extra.empty())
+                    {
+                        atext(BR, Face::Mono, extra, px, y + 6.0f, 11.0f, Muted, 2);
                     }
                 }
-                // icon + "FLASHLIGHT [F]"
-                const float labelY = bottom - 14.4f - 6.0f - 10.0f - 6.0f - 16.0f;
-                const float labelW = text(Face::Mono, "FLASHLIGHT [F]", R(right), Y(labelY + 1.5f), 11.0f, Cream, 2, 2.0f);
-                const float ix = R(right) - labelW - 8.0f * s - 16.0f * s;
-                const float iy = Y(labelY);
-                const float u = s; // icon path is in a 16 x 16 box: M2 6 H9 L14 3 V13 L9 10 H2 Z
-                const float px[6] = { 2, 9, 14, 14, 9, 2 };
-                const float py[6] = { 6, 6, 3, 13, 10, 10 };
-                for (int i = 0; i < 6; ++i)
+                struct Slot { int icon; int count; const char* key; };
+                const Slot slots[4] = { { HudIcons::Icon_water, mock ? 5 : kit.m_almondWater, "Q" },
+                                        { HudIcons::Icon_battery, mock ? 2 : kit.m_batteries, "B" },
+                                        { HudIcons::Icon_flare, mock ? 3 : kit.GearCount("Flares"), "G" },
+                                        { HudIcons::Icon_medkit, mock ? 1 : kit.GearCount("Medkit"), "H" } };
+                for (int k = 0; k < 4; ++k)
                 {
-                    const int j = (i + 1) % 6;
-                    line(ix + px[i] * u, iy + py[i] * u, ix + px[j] * u, iy + py[j] * u, 1.4f * s, Cream);
-                }
-                // Almond Water in the pack: always visible, so the player knows whether [Q] will do anything.
-                const int water = Base::Get().m_almondWater;
-                text(Face::Mono, AZStd::string::format("ALMOND WATER  %d  [Q]", water), R(right), Y(labelY - 22.0f), 11.0f,
-                    water > 0 ? Cream : Muted, 2, 2.0f);
-                // Carried supplies and spare batteries, once there are any.
-                const Base::State& carry = Base::Get();
-                float extraY = labelY - 40.0f;
-                if (carry.m_batteries > 0)
-                {
-                    text(Face::Mono, AZStd::string::format("BATTERIES  %d  [B]", carry.m_batteries), R(right), Y(extraY), 11.0f, Cream, 2, 2.0f);
-                    extraY -= 18.0f;
-                }
-                if (carry.Carried() > 0)
-                {
-                    text(Face::Mono, AZStd::string::format("BACKPACK  %d / %d", carry.Carried(), Base::State::PackMax), R(right), Y(extraY), 11.0f,
-                        carry.Carried() >= Base::State::PackMax ? Gold : Cream, 2, 2.0f);
+                    const float x = 1240.0f - 52.0f - (3 - k) * 58.0f;
+                    const float y = 720.0f - 36.0f - 52.0f;
+                    rect(AX(BR, x), AY(BR, y), AS(52), AS(52), Hex(0x0a0906, 0.62f));
+                    outline(AX(BR, x), AY(BR, y), AS(52), AS(52), AZStd::max(1.0f, AS(1)), AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.25f));
+                    hudIcon(slots[k].icon, AX(BR, x + 14.0f), AY(BR, y + 14.0f), AS(24), slots[k].count > 0 ? Cream : Muted);
+                    atext(BR, Face::MonoSemiBold, AZStd::string::format("%d", slots[k].count), x + 48.0f, y + 36.0f, 11.0f, slots[k].count > 0 ? Cream : Muted, 2);
+                    const float kw = measure(Face::MonoSemiBold, slots[k].key, 10.0f * K, 0.0f) + AS(8);
+                    for (int layer = 0; layer < 4; ++layer)
+                    {
+                        rect(AX(BR, x - 1.0f), AY(BR, y - 1.0f), kw, AS(14), Hex(0xf0cf5a, 0.5f));
+                    }
+                    atext(BR, Face::MonoSemiBold, slots[k].key, x + 3.0f, y, 10.0f, Hex(0x0b0a07));
                 }
             }
 
@@ -1522,7 +1906,7 @@ namespace NoclipProtocol
 
             // The open document.
             {
-                const TermFile& file = files[AZStd::clamp(m_terminalFile, 0, static_cast<int>(files.size()) - 1)];
+                const TermFile& file = files[AZ::GetClamp(m_terminalFile, 0, static_cast<int>(files.size()) - 1)];
                 labelText(file.m_label, 304.0f, 75.0f, 11.0f, TermMuted, 2.0f);
                 textIn(Face::Oswald, file.m_title, textX(304.0f), 99.3f, 40.0f, 1.482f, file.m_locked ? TermThreatValue : TermTitle, 0, 2.0f);
                 float y = 158.6f;
@@ -1642,7 +2026,7 @@ namespace NoclipProtocol
             }
             // Laid down several times at half alpha: text drawn over shapes whose alpha is near 1 comes out in white boxes
             // (the engine's text blending goes by what's already there), so the page is built up from half-alpha layers.
-            for (int layer = 0; layer < AZStd::clamp(static_cast<int>(hud_term_layers), 1, 8); ++layer)
+            for (int layer = 0; layer < AZ::GetClamp(static_cast<int>(hud_term_layers), 1, 8); ++layer)
             {
                 AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments args;
                 args.m_verts = tv.data();
@@ -1662,8 +2046,8 @@ namespace NoclipProtocol
         else if (m_page == Page::Build)
         {
             Base::State& base = Base::Get();
-            m_buildTab = AZStd::clamp(m_buildTab, 0, Base::TabCount - 1);
-            m_buildTile = AZStd::clamp(m_buildTile, 0, 5);
+            m_buildTab = AZ::GetClamp(m_buildTab, 0, Base::TabCount - 1);
+            m_buildTile = AZ::GetClamp(m_buildTile, 0, 5);
             const Base::Kind kind = Base::KindAt(m_buildTab, m_buildTile);
             const Base::ItemInfo& info = Base::Info(kind);
             const bool locked = base.Locked(kind);
@@ -1898,7 +2282,7 @@ namespace NoclipProtocol
                         const AZStd::string label = AZStd::string(info.m_upper) + " \xc2\xb7 " +
                             (blocked ? AZStd::string(blocked) : (note ? AZStd::string(note) : AZStd::string("placement OK \xc2\xb7 [R] rotate")));
                         const float labelW = 20.0f * s + measure(Face::Mono, label, 12.0f, 1.0f);
-                        float lx = AZStd::clamp(AZStd::min(sx[n0], sx[n1]), 20.0f * s, W - labelW - 20.0f * s);
+                        float lx = AZ::GetClamp(AZStd::min(sx[n0], sx[n1]), 20.0f * s, W - labelW - 20.0f * s);
                         const float ly = AZStd::min(AZStd::max(sy[n0], sy[n1]) + 14.0f * s, Y(486.0f));
                         // Keep clear of the tab's side panel.
                         static const float panelWidths[6] = { 0.0f, 300.0f, 300.0f, 300.0f, 420.0f, 320.0f };
@@ -2182,7 +2566,7 @@ namespace NoclipProtocol
                         {
                             y += 5.0f;
                             lrect(px + 16.0f * s, Y(y), innerW * s, 6.0f * s, AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.15f));
-                            lrect(px + 16.0f * s, Y(y), innerW * s * AZStd::clamp(line.frac, 0.0f, 1.0f), 6.0f * s, line.colour);
+                            lrect(px + 16.0f * s, Y(y), innerW * s * AZ::GetClamp(line.frac, 0.0f, 1.0f), 6.0f * s, line.colour);
                             y += 6.0f;
                         }
                     }
@@ -2584,7 +2968,7 @@ namespace NoclipProtocol
                     textIn(Face::Mono, order.m_title, X(mainX), y, 12.0f, 1.3f, TermText);
                     const float barX = mainX + mainW - 170.0f - 14.0f - 160.0f;
                     trect(X(barX), Y(y + 5.0f), 160.0f * s, 6.0f * s, goldTrack);
-                    trect(X(barX), Y(y + 5.0f), 160.0f * s * AZStd::clamp(frac, 0.0f, 1.0f), 6.0f * s, TermGold);
+                    trect(X(barX), Y(y + 5.0f), 160.0f * s * AZ::GetClamp(frac, 0.0f, 1.0f), 6.0f * s, TermGold);
                     textIn(Face::Mono, done ? AZStd::string("done \xc2\xb7 ") + order.m_reward : AZStd::string(order.m_reward), X(mainX + mainW), y, 12.0f, 1.3f,
                         TermGold, 2);
                     y += 12.0f * 1.3f + 8.0f;
@@ -2608,7 +2992,7 @@ namespace NoclipProtocol
                         items[n++] = i;
                     }
                 }
-                m_orderItem = AZStd::clamp(m_orderItem, 0, AZStd::max(0, n - 1));
+                m_orderItem = AZ::GetClamp(m_orderItem, 0, AZStd::max(0, n - 1));
                 const float cardW = (mainW - 20.0f) / 3.0f;
                 const float cardH = 14.0f + 14.0f * 1.3f + 6.0f + 11.0f * 1.3f + 6.0f + 12.0f * 1.3f + 14.0f;
                 for (int k = 0; k < n; ++k)
@@ -2737,7 +3121,7 @@ namespace NoclipProtocol
                 trect(X(ax), Y(ay), aw * s, 150.0f * s, Hex(0x050403));
                 toutline(X(ax), Y(ay), aw * s, 150.0f * s, AZStd::max(1.0f, s), AZ::Color(216 / 255.0f, 195 / 255.0f, 90 / 255.0f, 0.3f));
                 // The seam: 4 px of violet light fading out at both ends (wider while it's open).
-                const float seam = 4.0f + 36.0f * AZStd::clamp(base.m_breachOpen, 0.0f, 1.0f);
+                const float seam = 4.0f + 36.0f * AZ::GetClamp(base.m_breachOpen, 0.0f, 1.0f);
                 for (int k = 0; k < 20; ++k)
                 {
                     const float t = (k + 0.5f) / 20.0f;
@@ -2758,7 +3142,7 @@ namespace NoclipProtocol
                     ay += 12.0f * 1.3f + 12.0f;
                     trect(X(ax), Y(ay), aw * s, 6.0f * s, goldTrack);
                     const float total = d.m_item < 0 ? 30.0f : Base::DeliverySeconds;
-                    trect(X(ax), Y(ay), aw * s * AZStd::clamp(1.0f - d.m_left / total, 0.0f, 1.0f), 6.0f * s, TermGold);
+                    trect(X(ax), Y(ay), aw * s * AZ::GetClamp(1.0f - d.m_left / total, 0.0f, 1.0f), 6.0f * s, TermGold);
                     ay += 6.0f + 12.0f;
                 }
                 else if (!base.m_waiting.empty())
@@ -2786,7 +3170,7 @@ namespace NoclipProtocol
                     }
                 }
             }
-            for (int layer = 0; layer < AZStd::clamp(static_cast<int>(hud_orders_layers), 1, 8); ++layer)
+            for (int layer = 0; layer < AZ::GetClamp(static_cast<int>(hud_orders_layers), 1, 8); ++layer)
             {
                 AZ::RPI::AuxGeomDraw::AuxGeomDynamicDrawArguments args;
                 args.m_verts = tv.data();
