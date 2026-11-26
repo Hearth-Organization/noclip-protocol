@@ -363,6 +363,13 @@ namespace NoclipProtocol::Level0
         // 7. Lights, decided per global cell (independent of chunk generation order).
         //    Lit areas: mostly working, some flickering, a few dead. Dark zones: mostly missing, some dead, rare flicker.
         //    The spawn room is mostly lit: the cells around spawn always work, elsewhere some lights are out.
+        //    Working lights: 0.66 is the original balance. Fewer working lights (ray tracing) turns the difference
+        //    mostly into dead fixtures and a bit more flicker; the spawn room loses some too. Dark zones don't change.
+        const float working = std::clamp(settings.m_workingLights, 0.05f, 0.9f);
+        const float fewer = std::max(0.0f, 0.66f - working);
+        const float litFlicker = std::min(0.94f, working + 0.16f + fewer * 0.25f);
+        const float spawnDead = 0.20f + fewer * 0.5f;
+        const float spawnFlicker = spawnDead + 0.06f + fewer * 0.1f;
         for (int x = 0; x < n; ++x)
         {
             for (int y = 0; y < n; ++y)
@@ -379,8 +386,8 @@ namespace NoclipProtocol::Level0
                     const float spawnRoll = Unit(Hash(settings.m_seed, TagSpawnLight, gx, gy));
                     LightState state = LightState::Working;
                     if (corner) { state = LightState::Flickering; }
-                    else if (!nearSpawn && spawnRoll < 0.20f) { state = LightState::Dead; }
-                    else if (!nearSpawn && spawnRoll < 0.26f) { state = LightState::Flickering; }
+                    else if (!nearSpawn && spawnRoll < spawnDead) { state = LightState::Dead; }
+                    else if (!nearSpawn && spawnRoll < spawnFlicker) { state = LightState::Flickering; }
                     layout.m_lights.push_back(Light{ at, state });
                     continue;
                 }
@@ -394,9 +401,9 @@ namespace NoclipProtocol::Level0
                 }
                 else
                 {
-                    if (roll < 0.66f) { layout.m_lights.push_back(Light{ at, LightState::Working }); }
-                    else if (roll < 0.70f) { layout.m_lights.push_back(Light{ at, LightState::Dying }); }
-                    else if (roll < 0.82f) { layout.m_lights.push_back(Light{ at, LightState::Flickering }); }
+                    if (roll < working) { layout.m_lights.push_back(Light{ at, LightState::Working }); }
+                    else if (roll < working + 0.04f) { layout.m_lights.push_back(Light{ at, LightState::Dying }); }
+                    else if (roll < litFlicker) { layout.m_lights.push_back(Light{ at, LightState::Flickering }); }
                     else if (roll < 0.94f) { layout.m_lights.push_back(Light{ at, LightState::Dead }); }
                 }
             }

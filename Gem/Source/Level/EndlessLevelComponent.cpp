@@ -1,6 +1,7 @@
 #include "EndlessLevelComponent.h"
 #include "Level0Scripting.h"
 #include "Level0Json.h"
+#include "../Render/RayTracing.h"
 
 #include <AzCore/Asset/AssetManager.h>
 #include <AzCore/Asset/AssetManagerBus.h>
@@ -39,6 +40,8 @@ namespace NoclipProtocol
                 ->Field("OpenFraction", &EndlessLevelComponent::m_openFractionField)
                 ->Field("DarkZoneShare", &EndlessLevelComponent::m_darkZoneShareField)
                 ->Field("DecalChance", &EndlessLevelComponent::m_decalChanceField)
+                ->Field("WorkingLights", &EndlessLevelComponent::m_workingLightsField)
+                ->Field("WorkingLightsRayTraced", &EndlessLevelComponent::m_workingLightsRayTracedField)
                 ->Field("EnablePillars", &EndlessLevelComponent::m_enablePillars)
                 ->Field("EnableLightBulbs", &EndlessLevelComponent::m_enableLightBulbs)
                 ->Field("EnableFlicker", &EndlessLevelComponent::m_enableFlicker)
@@ -107,6 +110,14 @@ namespace NoclipProtocol
                         "Share of the world inside dark zones (dead or missing lights)")
                         ->Attribute(AZ::Edit::Attributes::Min, 0.0f)
                         ->Attribute(AZ::Edit::Attributes::Max, 1.0f)
+                    ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_workingLightsField, "Working lights",
+                        "Share of lights outside dark zones that work (the rest die, flicker, are dead or missing)")
+                        ->Attribute(AZ::Edit::Attributes::Min, 0.05f)
+                        ->Attribute(AZ::Edit::Attributes::Max, 0.9f)
+                    ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_workingLightsRayTracedField,
+                        "Working lights (ray traced)", "Used instead when ray-traced bounce light is on: bounced light brightens rooms, so fewer lights work")
+                        ->Attribute(AZ::Edit::Attributes::Min, 0.05f)
+                        ->Attribute(AZ::Edit::Attributes::Max, 0.9f)
                     ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_darkZoneScaleField, "Dark zone size",
                         "About how many cells across a dark zone is")
                         ->Attribute(AZ::Edit::Attributes::Min, 1.0f)
@@ -160,6 +171,10 @@ namespace NoclipProtocol
         m_settings.m_lightFraction = m_lightFractionField;
         m_settings.m_openFraction = m_openFractionField;
         m_settings.m_darkZoneShare = m_darkZoneShareField;
+        const bool rayTraced = RayTracing::IsOn();
+        m_settings.m_workingLights = rayTraced ? m_workingLightsRayTracedField : m_workingLightsField;
+        AZ_Printf("NoclipProtocol", "Level 0 lights: ray tracing %s, %.0f%% of lit-area lights work", rayTraced ? "on" : "off",
+            m_settings.m_workingLights * 100.0f);
         m_settings.m_decalChance = m_decalChanceField;
         m_settings.m_roomChance = m_roomChanceField;
         m_settings.m_pillarChance = m_pillarChanceField;

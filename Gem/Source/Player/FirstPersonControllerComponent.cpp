@@ -1,9 +1,12 @@
 #include "FirstPersonControllerComponent.h"
+#include "../Render/RayTracing.h"
 
 #include <AzCore/Settings/SettingsRegistry.h>
 #include <AzCore/Console/IConsole.h>
 #include <AzCore/std/string/conversions.h>
 
+#include <AzCore/Component/ComponentApplicationBus.h>
+#include <AzCore/Component/Entity.h>
 #include <AzCore/Component/TransformBus.h>
 #include <AzCore/Math/MathUtils.h>
 #include <AzCore/Math/Quaternion.h>
@@ -20,6 +23,39 @@ namespace NoclipProtocol
     {
         // The player that is playing right now (there is one first-person player per game window).
         FirstPersonControllerComponent* s_activePlayer = nullptr;
+
+        // Height of the ray-traced light grid's middle: halfway up Level 0's 3 m rooms.
+        constexpr float RayTracedLightHeight = 1.5f;
+
+        AZ::Entity* FindEntity(const AZ::EntityId& id)
+        {
+            AZ::Entity* entity = nullptr;
+            AZ::ComponentApplicationBus::BroadcastResult(entity, &AZ::ComponentApplicationRequests::FindEntity, id);
+            return entity;
+        }
+
+        void SetEntityActive(const AZ::EntityId& id, bool active)
+        {
+            AZ::Entity* entity = id.IsValid() ? FindEntity(id) : nullptr;
+            if (!entity)
+            {
+                return;
+            }
+            if (active && entity->GetState() == AZ::Entity::State::Init)
+            {
+                entity->Activate();
+            }
+            else if (!active && entity->GetState() == AZ::Entity::State::Active)
+            {
+                entity->Deactivate();
+            }
+        }
+
+        bool IsEntityActive(const AZ::EntityId& id)
+        {
+            AZ::Entity* entity = id.IsValid() ? FindEntity(id) : nullptr;
+            return entity && entity->GetState() == AZ::Entity::State::Active;
+        }
 
         // noclip_tp <x> <y> <z> [yaw degrees] [pitch degrees]: put the player somewhere, facing a way.
         // A developer command, so Claude (through the editor's script console) and the owner can take
@@ -47,6 +83,13 @@ namespace NoclipProtocol
 
     void FirstPersonControllerComponent::Teleport(const AZ::Vector3& position, float yaw, float pitch, bool setYaw, bool setPitch)
     {
+        // A ray-traced light grid that jumps a long way can crash the graphics driver: switch it off for a few
+        // frames and let it start again at the new spot.
+        if (m_rayTracedLight.IsValid())
+        {
+            SetEntityActive(m_rayTracedLight, false);
+            m_rayTracedLightPause = 6;
+        }
         Physics::CharacterRequestBus::Event(GetEntityId(), &Physics::CharacterRequests::SetBasePosition, position);
         AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldTranslation, position);
         if (setYaw)
@@ -188,12 +231,67 @@ namespace NoclipProtocol
         return false; // never swallow input; other components may want it too
     }
 
+    void FirstPersonControllerComponent::UpdateRayTracedLight()
+    {
+        if (!m_rayTracedLightSearched)
+        {
+            m_rayTracedLightSearched = true;
+            AZStd::vector<AZ::EntityId> descendants;
+            AZ::TransformBus::EventResult(descendants, GetEntityId(), &AZ::TransformBus::Events::GetAllDescendants);
+            for (const AZ::EntityId& id : descendants)
+            {
+                AZ::Entity* entity = FindEntity(id);
+                if (entity && entity->GetName() == "RayTracedLight")
+                {
+                    m_rayTracedLight = id;
+                    break;
+                }
+            }
+            if (!m_rayTracedLight.IsValid())
+            {
+                return;
+            }
+            // Off the player, so turning doesn't rotate the grid (it only supports moving).
+            AZ::TransformBus::Event(m_rayTracedLight, &AZ::TransformBus::Events::SetParent, AZ::EntityId());
+            AZ_Printf("NoclipProtocol", "Ray-traced bounce light: %s", RayTracing::IsOn() ? "on" : "off (no ray tracing here, or turned off)");
+        }
+        if (!m_rayTracedLight.IsValid())
+        {
+            return;
+        }
+
+        const bool wanted = RayTracing::IsOn();
+        if (m_rayTracedLightPause > 0)
+        {
+            --m_rayTracedLightPause;
+            if (m_rayTracedLightPause > 0)
+            {
+                return;
+            }
+        }
+        if (!wanted)
+        {
+            SetEntityActive(m_rayTracedLight, false);
+            return;
+        }
+        SetEntityActive(m_rayTracedLight, true);
+        if (!IsEntityActive(m_rayTracedLight))
+        {
+            return;
+        }
+        AZ::Vector3 at = AZ::Vector3::CreateZero();
+        AZ::TransformBus::EventResult(at, GetEntityId(), &AZ::TransformBus::Events::GetWorldTranslation);
+        at.SetZ(RayTracedLightHeight);
+        AZ::TransformBus::Event(m_rayTracedLight, &AZ::TransformBus::Events::SetWorldTM, AZ::Transform::CreateTranslation(at));
+    }
+
     void FirstPersonControllerComponent::OnTick(float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
         if (deltaTime <= 0.0f)
         {
             return;
         }
+        UpdateRayTracedLight();
         {
             // Pick up the facing on the first frame, and whenever something else turns the player
             // (the level generator at the start of a run, a teleport...).

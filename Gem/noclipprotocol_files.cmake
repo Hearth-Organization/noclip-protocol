@@ -20,6 +20,8 @@ set(FILES
     Source/Level/EndlessLevelComponent.h
     Source/Level/FlickerLightComponent.cpp
     Source/Level/FlickerLightComponent.h
+    Source/Render/RayTracing.cpp
+    Source/Render/RayTracing.h
     Source/Cinematics/CinematicCommands.cpp
     Source/Scripting/HearthBlocksComponent.cpp
     Source/Scripting/HearthBlocksComponent.h

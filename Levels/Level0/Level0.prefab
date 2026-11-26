@@ -96,7 +96,7 @@
                     "Id": 11239358782638521500,
                     "Controller": {
                         "Configuration": {
-                            "ManualCompensation": 1.4
+                            "ManualCompensation": 1.399999976158142
                         }
                     }
                 },
@@ -536,6 +536,84 @@
                 }
             }
         },
+        "Entity_[314748369824]": {
+            "Id": "Entity_[314748369824]",
+            "Name": "RayTracedLight",
+            "Components": {
+                "AZ::Render::EditorDiffuseProbeGridComponent": {
+                    "$type": "AZ::Render::EditorDiffuseProbeGridComponent",
+                    "Id": 14646742630374036277,
+                    "Controller": {
+                        "Configuration": {
+                            "ProbeSpacing": [
+                                2.0,
+                                2.0,
+                                1.5
+                            ],
+                            "Extents": [
+                                48.0,
+                                48.0,
+                                3.200000047683716
+                            ],
+                            "Scrolling": true
+                        }
+                    },
+                    "probeSpacingZ": 1.5,
+                    "ambientMultiplier": 0.5,
+                    "scrolling": true
+                },
+                "EditorBoxShapeComponent": {
+                    "$type": "EditorBoxShapeComponent",
+                    "Id": 16692488566492495120,
+                    "BoxShape": {
+                        "Configuration": {
+                            "Dimensions": [
+                                48.0,
+                                48.0,
+                                3.200000047683716
+                            ]
+                        }
+                    }
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 12358937651085647384
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 7068269431981763730
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 10936982367240977464
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 8357358628225251017
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 18084238476705938277
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 680195720903401039
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 18373162256666116030
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 15614883581379928445
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 7242437326849775871,
+                    "Parent Entity": "Entity_[915853021226]"
+                }
+            }
+        },
         "Entity_[911558053930]": {
             "Id": "Entity_[911558053930]",
             "Name": "GroundCollider",
@@ -651,7 +729,8 @@
                     "Id": 15762405793376488372,
                     "Child Entity Order": [
                         "Entity_[920147988522]",
-                        "Entity_[15429039280115]"
+                        "Entity_[15429039280115]",
+                        "Entity_[314748369824]"
                     ]
                 },
                 "EditorInspectorComponent": {

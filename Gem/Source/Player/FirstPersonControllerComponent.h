@@ -40,6 +40,7 @@ namespace NoclipProtocol
 
     private:
         void SetCursorCaptured(bool captured);
+        void UpdateRayTracedLight();
 
         // Settings (editable in the Editor)
         AZ::EntityId m_cameraEntity;
@@ -66,5 +67,12 @@ namespace NoclipProtocol
         bool m_cursorCaptured = false;
         bool m_facingRead = false;
         AZ::Quaternion m_lastWrittenRotation = AZ::Quaternion::CreateIdentity();
+
+        // Ray-traced bounce light: an entity named "RayTracedLight" under the player with a Diffuse Probe Grid.
+        // The grid can't rotate, so it's taken off the player and follows its position only; after a teleport it
+        // is switched off for a few frames and starts fresh where the player landed.
+        AZ::EntityId m_rayTracedLight;
+        bool m_rayTracedLightSearched = false;
+        int m_rayTracedLightPause = 0;
     };
 } // namespace NoclipProtocol

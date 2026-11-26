@@ -103,6 +103,8 @@ namespace NoclipProtocol
         bool m_enableDyingLights = true;   // off = dying lights become working lights
         float m_darkZoneShareField = 0.4f;
         float m_decalChanceField = 0.3f;
+        float m_workingLightsField = 0.66f;           // share of lit-area lights that work
+        float m_workingLightsRayTracedField = 0.40f;  // same, when ray-traced bounce light is on
         int m_chunkCellsField = 6;
         float m_lightFractionField = 0.35f;
         float m_openFractionField = 0.2f;
