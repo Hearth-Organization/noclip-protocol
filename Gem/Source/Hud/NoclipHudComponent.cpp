@@ -51,7 +51,7 @@ namespace NoclipProtocol
 
 AZ_CVAR(float, hud_term_alpha, 0.5f, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Terminal page: alpha of each layer of its shapes (text over shapes of alpha much above 0.5 gets white boxes)");
-AZ_CVAR(int, hud_orders_layers, 3, nullptr, AZ::ConsoleFunctorFlags::Null,
+AZ_CVAR(int, hud_orders_layers, 4, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Foundation requisitions page: half-alpha layers over its dark backdrop");
 AZ_CVAR(int, hud_term_layers, 7, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Terminal page: how many times its shapes are laid down (7 at 0.5 alpha covers 99% of the game behind)");

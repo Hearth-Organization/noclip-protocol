@@ -843,6 +843,17 @@ namespace NoclipProtocol
             {
                 continue;
             }
+            // The forward base's room never rearranges itself (its chunks hold the base, its floor holds the pieces).
+            if (m_buildEnabled)
+            {
+                const Base::State& base = Base::Get();
+                const float size = m_settings.m_cellSize * static_cast<float>(m_settings.m_chunkCells);
+                const float x0 = chunk.m_x * size, y0 = chunk.m_y * size;
+                if (x0 < base.m_maxX && x0 + size > base.m_minX && y0 < base.m_maxY && y0 + size > base.m_minY)
+                {
+                    continue;
+                }
+            }
             hidden.push_back(key);
         }
         if (hidden.empty())
