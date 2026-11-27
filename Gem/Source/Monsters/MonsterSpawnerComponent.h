@@ -1,8 +1,8 @@
 // Monster spawner: brings Level 0's monsters in out of the player's sight and takes them away again.
 //
-// Smilers (Prefabs/Monsters/Smiler.prefab: an Actor with its Tripo3D model, a Simple Motion component, a collider
-// and a Hearth Monster) come in once the player has been in Level 0 a while: never near the spawn room and the base,
-// always 28-45 m from the player, at most two at a time. A dead one sinks away and is removed; one left far behind
+// Smilers, Facelings, SCP-096 and SCP-106 (Prefabs/Monsters/<Kind>.prefab: an Actor with its Tripo3D model, a Simple
+// Motion component, a collider and a Hearth Monster) come in once the player has been in Level 0 a while (each kind
+// its own wait and number at a time, in Kinds()): never near the spawn room and the base, always 28-45 m away. A dead one sinks away and is removed; one left far behind
 // is taken away. /NoclipProtocol/Monsters/Spawn = false stops new ones. monster_spawn <kind> brings one in 10 m
 // ahead of the player at once (testing).
 //
@@ -75,10 +75,10 @@ namespace NoclipProtocol
         {
             static const Kind kinds[] = {
                 { "Smiler", "prefabs/monsters/smiler.spawnable", "assets/models/monsters/smiler/smiler", 2, 45.0f, 60.0f },
-                // Models in, behaviour still to be decided with the owner: only monster_spawn brings these in for now.
-                { "Faceling", "prefabs/monsters/faceling.spawnable", "assets/models/monsters/faceling/faceling", 0, 0.0f, 0.0f },
-                { "Scp096", "prefabs/monsters/scp096.spawnable", "assets/models/monsters/scp096/scp096", 0, 0.0f, 0.0f },
-                { "Scp106", "prefabs/monsters/scp106.spawnable", "assets/models/monsters/scp106/scp106", 0, 0.0f, 0.0f },
+                // Facelings drift about in small numbers; SCP-096 and SCP-106 are rare, one at a time, later on.
+                { "Faceling", "prefabs/monsters/faceling.spawnable", "assets/models/monsters/faceling/faceling", 3, 40.0f, 45.0f },
+                { "Scp096", "prefabs/monsters/scp096.spawnable", "assets/models/monsters/scp096/scp096", 1, 300.0f, 1200.0f },
+                { "Scp106", "prefabs/monsters/scp106.spawnable", "assets/models/monsters/scp106/scp106", 1, 600.0f, 1500.0f },
             };
             count = static_cast<int>(sizeof(kinds) / sizeof(kinds[0]));
             return kinds;

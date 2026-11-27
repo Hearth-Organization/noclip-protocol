@@ -44,6 +44,7 @@ namespace NoclipProtocol
             m_name = name;
             m_kind = kind;
             m_motions = motions;
+            m_health = kind == "Faceling" ? 90.0f : (kind == "Scp096" || kind == "Scp106") ? 1.0e9f : 160.0f;
             if (kind == "Smiler")
             {
                 m_speed = 4.2f;   // hunting: a run; it wanders at 40 % (a walk)
@@ -102,6 +103,23 @@ namespace NoclipProtocol
         float m_lit = 0.0f;          // seconds in the player's flashlight
         float m_fleeing = 0.0f;      // seconds left backing off from light
         AZ::s64 m_hitsSeen = -1;
+
+        // Kind behaviour (Nov 27, 2026, owner's notes): see HearthMonsterComponent.cpp, "Kinds".
+        float m_provoked = 0.0f;     // Faceling: seconds left hostile after being hurt
+        int m_mood = 0;              // SCP-096: 0 crying, 1 panic, 2 rage, 3 searching
+        float m_moodTime = 0.0f;
+        float m_lostFor = 0.0f;      // SCP-096: seconds since it last saw you in a rage
+        float m_slowed = 0.0f;       // seconds left slowed by bullets
+        float m_floorZ = 0.0f;
+        bool m_hasFloor = false;
+        float m_sink = -1.0f;        // SCP-106: seconds into sinking away (shot / after a grab), or < 0
+        float m_awayFor = 0.0f;      // SCP-106: seconds before it rises again somewhere else
+        float m_rise = 0.0f;         // SCP-106: seconds left rising out of the floor
+
+        AZ::Vector3 Walk(AZ::Vector3 at, const CellPos& goal, float speed, float deltaTime, bool closeIn, const AZ::Vector3& target);
+        bool Strike(float deltaTime, float distance, const AZ::Vector3& flat, float damage, float sanity, const AZStd::string& playerName,
+                    const AZ::Vector3& at);
+        CellPos WanderGoal(const AZ::Vector3& at);
         AZStd::string m_name;
         float m_hearing = 7.0f;
         float m_sight = 12.0f;

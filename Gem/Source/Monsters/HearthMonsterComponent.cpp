@@ -373,6 +373,28 @@ namespace NoclipProtocol
                     registry->Get(damage, "/NoclipProtocol/Weapons/Hit/Damage");
                     if (hitEntity == static_cast<AZ::u64>(GetEntityId()) && m_health > 0.0f)
                     {
+                        if (m_kind == "Scp096")
+                        {
+                            damage = 0.0;            // can't be killed: bullets only slow it a moment, and wake it
+                            m_slowed = 0.8f;
+                            if (m_mood == 0)
+                            {
+                                m_mood = 1;
+                                m_moodTime = 6.0f;
+                            }
+                        }
+                        else if (m_kind == "Scp106")
+                        {
+                            damage = 0.0;            // can't be killed: shot, it sinks back into the floor
+                            if (m_sink < 0.0f && m_awayFor <= 0.0f && m_rise <= 0.0f)
+                            {
+                                m_sink = 0.0f;
+                            }
+                        }
+                        else if (m_kind == "Faceling")
+                        {
+                            m_provoked = 12.0f;
+                        }
                         m_health -= static_cast<float>(damage);
                         m_heardAt = shooterAt;   // it knows where that came from
                         m_sinceHeard = 0.0f;
@@ -462,8 +484,9 @@ namespace NoclipProtocol
         }
         AZ::Transform playerTm = AZ::Transform::CreateIdentity();
         AZ::TransformBus::EventResult(playerTm, player, &AZ::TransformBus::Events::GetWorldTM);
+        const AZ::Vector3 playerAhead = playerTm.GetBasisY().GetNormalized();
         const bool inBeam = flashlight && distance < 11.0f && distance > 0.01f &&
-            playerTm.GetBasisY().GetNormalized().Dot(-flat / distance) >= 0.9f && LineOfSight(playerAt, at);
+            playerAhead.Dot(-flat / distance) >= 0.9f && LineOfSight(playerAt, at);
         m_lit = inBeam ? m_lit + deltaTime : AZStd::max(0.0f, m_lit - deltaTime * 0.5f);
         if (m_kind == "Smiler" && (m_lit > 1.2f || (flare > 0.3 && distance < 9.0f)))
         {
@@ -473,15 +496,270 @@ namespace NoclipProtocol
         }
         m_fleeing = AZStd::max(0.0f, m_fleeing - deltaTime);
         m_attackCooldown = AZStd::max(0.0f, m_attackCooldown - deltaTime);
-
-        // Its grin in the dark wears on you.
-        if (sees && registry && m_kind == "Smiler")
+        m_slowed = AZStd::max(0.0f, m_slowed - deltaTime);
+        if (!m_hasFloor)
         {
-            double add = 0.0;
-            registry->Get(add, "/NoclipProtocol/Player/SanityAdd");
-            registry->Set("/NoclipProtocol/Player/SanityAdd", add - 0.012 * deltaTime);
+            m_floorZ = at.GetZ();
+            m_hasFloor = true;
+        }
+        auto drainSanity = [registry](double amount)
+        {
+            if (registry)
+            {
+                double add = 0.0;
+                registry->Get(add, "/NoclipProtocol/Player/SanityAdd");
+                registry->Set("/NoclipProtocol/Player/SanityAdd", add - amount);
+            }
+        };
+        auto facePlayer = [this, &flat, distance]()
+        {
+            if (distance > 0.01f)
+            {
+                const AZ::Vector3 face = flat / distance;
+                AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion,
+                    AZ::Quaternion::CreateRotationZ(std::atan2(-face.GetX(), face.GetY())));
+            }
+        };
+        // The player has it on screen (near the middle of the view, nothing in between).
+        const bool lookedAt = distance > 0.01f && playerAhead.Dot(-flat / distance) >= 0.8f && LineOfSight(playerAt, at);
+
+        // ------------------------------------------------------------ Kinds
+        if (m_kind == "Faceling")
+        {
+            // Unsettling, not deadly: it follows you at a distance and stares; it freezes when you look at it. Hurt,
+            // it charges once, strikes, and runs off into the dark.
+            if (m_provoked > 0.0f)
+            {
+                m_provoked -= deltaTime;
+                if (m_attack < 0.0f && distance < 1.7f && m_attackCooldown <= 0.0f)
+                {
+                    m_attack = 0.0f;
+                    m_struck = false;
+                }
+                if (m_attack >= 0.0f)
+                {
+                    const bool hadStruck = m_struck;
+                    Strike(deltaTime, distance, flat, 0.10f, 0.03f, playerName, at);
+                    if (!hadStruck && m_struck)
+                    {
+                        m_provoked = 0.0f;
+                        m_fleeing = 8.0f;
+                    }
+                    return;
+                }
+                at = Walk(at, Cell(playerAt), m_speed * 1.6f, deltaTime, true, playerAt);
+                Report(at, "Charging " + playerName);
+                return;
+            }
+            if (m_fleeing > 0.0f)
+            {
+                const AZ::Vector3 away = distance > 0.01f ? -flat / distance : AZ::Vector3::CreateAxisY();
+                at = Walk(at, Cell(at + away * 14.0f), m_speed * 1.4f, deltaTime, false, playerAt);
+                Report(at, "Running off");
+                return;
+            }
+            if (sees || (m_sinceHeard < 6.0f && distance < m_sight))
+            {
+                drainSanity(0.006 * deltaTime);
+                if (lookedAt || distance <= 5.0f)
+                {
+                    Walk(at, Cell(at), 0.0f, deltaTime, false, playerAt);
+                    facePlayer();
+                    Report(at, lookedAt ? "Frozen, staring" : "Staring at " + playerName);
+                    return;
+                }
+                at = Walk(at, Cell(playerAt), m_speed * 0.5f, deltaTime, false, playerAt);
+                Report(at, "Following " + playerName);
+                return;
+            }
+            at = Walk(at, WanderGoal(at), m_speed * 0.4f, deltaTime, false, playerAt);
+            Report(at, "Drifting");
+            return;
         }
 
+        if (m_kind == "Scp096")
+        {
+            // Harmless while it cries, facing away. See its face and it screams, shakes for six seconds (your head
+            // start), then runs you down through the doorways; one hit kills. Break its line of sight long enough and it
+            // loses you: it wanders a while, then sits down and cries again. Bullets only slow it a moment.
+            const bool faceShown = distance > 0.01f && self.GetBasisY().GetNormalized().Dot(flat / distance) > 0.2f;
+            const bool seesYou = player.IsValid() && distance < 40.0f && LineOfSight(at, playerAt);
+            const float rageSpeed = 6.5f * (m_slowed > 0.0f ? 0.3f : 1.0f);
+            switch (m_mood)
+            {
+            case 0:
+                Walk(at, Cell(at), 0.0f, deltaTime, false, playerAt);
+                Play("idle", true, 0.5f);
+                if (lookedAt && faceShown && distance < 25.0f)
+                {
+                    m_mood = 1;
+                    m_moodTime = 6.0f;
+                    drainSanity(0.10);
+                    if (registry)
+                    {
+                        AZ::s64 screams = 0;
+                        registry->Get(screams, "/NoclipProtocol/Monsters/Scp096/Screams");
+                        registry->Set("/NoclipProtocol/Monsters/Scp096/Screams", screams + 1);
+                    }
+                    AZ_Printf("Noclip", "monster: %s saw your face looking at it: panic", m_name.c_str());
+                }
+                Report(at, "Crying");
+                return;
+            case 1:
+                m_moodTime -= deltaTime;
+                facePlayer();
+                Play("idle", true, 3.0f);
+                drainSanity(0.01 * deltaTime);
+                if (m_moodTime <= 0.0f)
+                {
+                    m_mood = 2;
+                    m_lostFor = 0.0f;
+                    m_heardAt = playerAt;
+                }
+                Report(at, "Screaming");
+                return;
+            case 2:
+            {
+                if (seesYou)
+                {
+                    m_heardAt = playerAt;
+                    m_lostFor = 0.0f;
+                }
+                else
+                {
+                    m_lostFor += deltaTime;
+                }
+                if (m_attack < 0.0f && seesYou && distance < 1.8f)
+                {
+                    m_attack = 0.0f;
+                    m_struck = false;
+                }
+                if (m_attack >= 0.0f)
+                {
+                    const bool hadStruck = m_struck;
+                    Strike(deltaTime, distance, flat, 1.0f, 0.2f, playerName, at);
+                    if (!hadStruck && m_struck)
+                    {
+                        m_mood = 3;
+                        m_moodTime = 25.0f;
+                    }
+                    return;
+                }
+                at = Walk(at, Cell(m_heardAt), rageSpeed, deltaTime, seesYou, playerAt);
+                if (m_lostFor > 4.0f && (Cell(at) == Cell(m_heardAt) || m_lostFor > 12.0f))
+                {
+                    m_mood = 3;
+                    m_moodTime = 25.0f;
+                    AZ_Printf("Noclip", "monster: %s lost you", m_name.c_str());
+                }
+                Report(at, m_lostFor > 0.0f ? "Raging, lost sight" : "Raging at " + playerName);
+                return;
+            }
+            default:
+                if (seesYou && distance < m_sight && self.GetBasisY().GetNormalized().Dot(flat / AZStd::max(distance, 0.01f)) >= 0.5f)
+                {
+                    m_mood = 2;
+                    m_lostFor = 0.0f;
+                    m_heardAt = playerAt;
+                    return;
+                }
+                m_moodTime -= deltaTime;
+                at = Walk(at, WanderGoal(at), 1.6f, deltaTime, false, playerAt);
+                if (m_moodTime <= 0.0f)
+                {
+                    m_mood = 0;
+                    m_playing.clear();
+                }
+                Report(at, "Wandering, searching");
+                return;
+            }
+        }
+
+        if (m_kind == "Scp106")
+        {
+            // Rises out of the floor, walks after you slowly through the doorways and never gives up. Shoot it and it
+            // sinks back into the floor (your chance to get away) and rises somewhere else a couple of minutes later.
+            // Flares slow it. If it reaches you it drags you down: you come up somewhere else in the level, hurt and
+            // shaken (its Pocket Dimension comes later).
+            if (m_awayFor > 0.0f)
+            {
+                m_awayFor -= deltaTime;
+                at.SetZ(m_floorZ - 4.0f);
+                if (m_awayFor <= 0.0f)
+                {
+                    const float angle = static_cast<float>(std::rand() % 6283) / 1000.0f;
+                    const float radius = 18.0f + static_cast<float>(std::rand() % 800) / 100.0f;
+                    const CellPos c = Cell(playerAt + AZ::Vector3(std::cos(angle), std::sin(angle), 0.0f) * radius);
+                    at = Centre(c, m_floorZ - 2.6f);
+                    m_rise = 2.0f;
+                    m_path.clear();
+                    AZ_Printf("Noclip", "monster: %s rises again at %.1f %.1f", m_name.c_str(), at.GetX(), at.GetY());
+                }
+                AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldTranslation, at);
+                Report(at, "Under the floor");
+                return;
+            }
+            if (m_sink >= 0.0f)
+            {
+                m_sink += deltaTime;
+                at.SetZ(m_floorZ - m_sink * 1.4f);
+                AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldTranslation, at);
+                Play("idle", true, 0.5f);
+                if (m_sink >= 2.0f)
+                {
+                    m_sink = -1.0f;
+                    m_awayFor = 120.0f + static_cast<float>(std::rand() % 60);
+                }
+                Report(at, "Sinking into the floor");
+                return;
+            }
+            if (m_rise > 0.0f)
+            {
+                m_rise = AZStd::max(0.0f, m_rise - deltaTime);
+                at.SetZ(m_floorZ - m_rise * 1.3f);
+                AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldTranslation, at);
+                facePlayer();
+                Play("idle", true, 0.7f);
+                Report(at, "Rising out of the floor");
+                return;
+            }
+            if (sees)
+            {
+                drainSanity(0.008 * deltaTime);
+            }
+            if (sees && distance < 1.3f && registry)
+            {
+                // The grab: dragged down, and up again somewhere else in the level.
+                double damage = 0.0;
+                registry->Get(damage, "/NoclipProtocol/Player/Damage");
+                registry->Set("/NoclipProtocol/Player/Damage", damage + 0.25);
+                drainSanity(0.35);
+                AZ::Entity* playerEntity = nullptr;
+                AZ::ComponentApplicationBus::BroadcastResult(playerEntity, &AZ::ComponentApplicationRequests::FindEntity, player);
+                if (auto* controller = playerEntity ? playerEntity->FindComponent<FirstPersonControllerComponent>() : nullptr)
+                {
+                    const float angle = static_cast<float>(std::rand() % 6283) / 1000.0f;
+                    const float radius = 40.0f + static_cast<float>(std::rand() % 2000) / 100.0f;
+                    const CellPos c = Cell(playerAt + AZ::Vector3(std::cos(angle), std::sin(angle), 0.0f) * radius);
+                    controller->Teleport(Centre(c, playerAt.GetZ()), 0.0f, 0.0f, false, false);
+                }
+                AZ_Printf("Noclip", "monster: %s dragged you down", m_name.c_str());
+                m_sink = 0.0f;
+                Report(at, "Dragged " + playerName + " down");
+                return;
+            }
+            const float speed = m_speed * (flare > 0.3 && distance < 9.0f ? 0.5f : 1.0f) * (m_slowed > 0.0f ? 0.5f : 1.0f);
+            at = Walk(at, Cell(playerAt), speed, deltaTime, sees, playerAt);
+            Report(at, sees ? "Coming for " + playerName : "Following your trail");
+            return;
+        }
+
+        // ------------------------------------------------------------ Smiler (and the default)
+        // Its grin in the dark wears on you.
+        if (sees && m_kind == "Smiler")
+        {
+            drainSanity(0.012 * deltaTime);
+        }
         // Up close it strikes: the blow lands partway into the attack, if you're still in reach.
         if (m_attack < 0.0f && m_fleeing <= 0.0f && sees && distance < 1.7f && m_attackCooldown <= 0.0f)
         {
@@ -490,36 +768,7 @@ namespace NoclipProtocol
         }
         if (m_attack >= 0.0f)
         {
-            m_attack += deltaTime;
-            Play("slash", false, 1.6f);
-            if (!m_struck && m_attack >= 0.45f)
-            {
-                m_struck = true;
-                if (distance < 2.3f && registry)
-                {
-                    bool shield = false;
-                    registry->Get(shield, "/NoclipProtocol/Player/Shield");
-                    double damage = 0.0;
-                    registry->Get(damage, "/NoclipProtocol/Player/Damage");
-                    registry->Set("/NoclipProtocol/Player/Damage", damage + (shield ? 0.04 : 0.15));
-                    double add = 0.0;
-                    registry->Get(add, "/NoclipProtocol/Player/SanityAdd");
-                    registry->Set("/NoclipProtocol/Player/SanityAdd", add - 0.03);
-                }
-            }
-            if (distance > 0.01f)
-            {
-                const AZ::Vector3 face = flat / distance;
-                AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion,
-                    AZ::Quaternion::CreateRotationZ(std::atan2(-face.GetX(), face.GetY())));
-            }
-            if (m_attack >= 1.1f)
-            {
-                m_attack = -1.0f;
-                m_attackCooldown = 1.2f;
-                m_playing.clear();
-            }
-            Report(at, "Attacking " + playerName);
+            Strike(deltaTime, distance, flat, 0.15f, 0.03f, playerName, at);
             return;
         }
 
@@ -547,14 +796,64 @@ namespace NoclipProtocol
         {
             state = "Wandering";
             speed = m_speed * 0.4f;
-            if (!m_hasWander || Cell(at) == m_wander)
-            {
-                const CellPos here = Cell(at);
-                m_wander = { here.x + (std::rand() % 9) - 4, here.y + (std::rand() % 9) - 4 };
-                m_hasWander = true;
-            }
-            goal = m_wander;
+            goal = WanderGoal(at);
         }
+        at = Walk(at, goal, speed, deltaTime, sees && m_fleeing <= 0.0f, playerAt);
+        Report(at, state);
+    }
+
+    HearthMonsterComponent::CellPos HearthMonsterComponent::WanderGoal(const AZ::Vector3& at)
+    {
+        if (!m_hasWander || Cell(at) == m_wander)
+        {
+            const CellPos here = Cell(at);
+            m_wander = { here.x + (std::rand() % 9) - 4, here.y + (std::rand() % 9) - 4 };
+            m_hasWander = true;
+        }
+        return m_wander;
+    }
+
+    bool HearthMonsterComponent::Strike(float deltaTime, float distance, const AZ::Vector3& flat, float damage, float sanity,
+                                        const AZStd::string& playerName, const AZ::Vector3& at)
+    {
+        auto* registry = AZ::SettingsRegistry::Get();
+        m_attack += deltaTime;
+        Play("slash", false, 1.6f);
+        if (!m_struck && m_attack >= 0.45f)
+        {
+            m_struck = true;
+            if (distance < 2.3f && registry)
+            {
+                bool shield = false;
+                registry->Get(shield, "/NoclipProtocol/Player/Shield");
+                double hurt = 0.0;
+                registry->Get(hurt, "/NoclipProtocol/Player/Damage");
+                // The shield takes most of a blow, but not a killing one.
+                registry->Set("/NoclipProtocol/Player/Damage", hurt + (shield && damage < 0.5f ? damage * 0.27f : damage));
+                double add = 0.0;
+                registry->Get(add, "/NoclipProtocol/Player/SanityAdd");
+                registry->Set("/NoclipProtocol/Player/SanityAdd", add - sanity);
+            }
+        }
+        if (distance > 0.01f)
+        {
+            const AZ::Vector3 face = flat / distance;
+            AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion,
+                AZ::Quaternion::CreateRotationZ(std::atan2(-face.GetX(), face.GetY())));
+        }
+        if (m_attack >= 1.1f)
+        {
+            m_attack = -1.0f;
+            m_attackCooldown = 1.2f;
+            m_playing.clear();
+        }
+        Report(at, "Attacking " + playerName);
+        return true;
+    }
+
+    AZ::Vector3 HearthMonsterComponent::Walk(AZ::Vector3 at, const CellPos& goal, float speed, float deltaTime, bool closeIn,
+                                             const AZ::Vector3& target)
+    {
         m_repath -= deltaTime;
         if (m_repath <= 0.0f)
         {
@@ -567,8 +866,8 @@ namespace NoclipProtocol
         const AZ::Vector3 startAt = at;
         while (left > 0.0f && !m_path.empty())
         {
-            const AZ::Vector3 target = Centre(m_path.front(), at.GetZ());
-            const AZ::Vector3 to = target - at;
+            const AZ::Vector3 next = Centre(m_path.front(), at.GetZ());
+            const AZ::Vector3 to = next - at;
             const float length = to.GetLength();
             if (length < 0.05f)
             {
@@ -580,7 +879,10 @@ namespace NoclipProtocol
             at += heading * move;
             left -= move;
         }
-        if (sees && m_path.empty() && distance > 1.0f)
+        // In the same cell as what it's after: straight at it, stopping just short.
+        const AZ::Vector3 flat(target.GetX() - at.GetX(), target.GetY() - at.GetY(), 0.0f);
+        const float distance = flat.GetLength();
+        if (closeIn && m_path.empty() && distance > 1.0f && left > 0.0f)
         {
             heading = flat / distance;
             at += heading * AZStd::min(left, distance - 1.0f);
@@ -605,6 +907,6 @@ namespace NoclipProtocol
             AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion,
                 AZ::Quaternion::CreateRotationZ(std::atan2(-heading.GetX(), heading.GetY())));
         }
-        Report(at, state);
+        return at;
     }
 } // namespace NoclipProtocol
