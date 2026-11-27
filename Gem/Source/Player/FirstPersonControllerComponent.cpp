@@ -5,6 +5,7 @@
 #include "../Debug/GameBridgeComponent.h"
 #include "WeaponsComponent.h"
 #include "../Monsters/MonsterSpawnerComponent.h"
+#include "DeathSequence.h"
 
 #include <AzCore/Settings/SettingsRegistry.h>
 #include <AzCore/Console/IConsole.h>
@@ -212,6 +213,25 @@ namespace NoclipProtocol
         return WeaponsComponent::CreateDescriptor();
     }
 
+    namespace
+    {
+        // player_die [Kind]: drop the player's health to 0, as if Kind (default Smiler) got them (testing the death sequence).
+        void PlayerDie(const AZ::ConsoleCommandContainer& arguments)
+        {
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Set("/NoclipProtocol/Player/LastHitBy", AZStd::string(arguments.empty() ? "Smiler" : AZStd::string(arguments.front()).c_str()));
+                registry->Set("/NoclipProtocol/Player/Damage", 5.0);
+            }
+        }
+        AZ_CONSOLEFREEFUNC("player_die", PlayerDie, AZ::ConsoleFunctorFlags::Null, "player_die [Kind]: die now, killed by Kind (testing)");
+    }
+
+    AZ::ComponentDescriptor* CreateDeathSequenceDescriptor()
+    {
+        return DeathSequenceComponent::CreateDescriptor();
+    }
+
     AZ::ComponentDescriptor* CreateMonsterSpawnerDescriptor()
     {
         return MonsterSpawnerComponent::CreateDescriptor();
@@ -311,6 +331,9 @@ namespace NoclipProtocol
         m_uiEntity->CreateComponent<GameBridgeComponent>();
         m_uiEntity->CreateComponent<WeaponsComponent>()->m_player = GetEntityId();
         m_uiEntity->CreateComponent<MonsterSpawnerComponent>()->m_player = GetEntityId();
+        auto* death = m_uiEntity->CreateComponent<DeathSequenceComponent>();
+        death->m_player = GetEntityId();
+        death->m_camera = m_cameraEntity;
         m_uiEntity->Init();
         m_uiEntity->Activate();
     }
@@ -349,6 +372,21 @@ namespace NoclipProtocol
 
         const AzFramework::InputChannelId& id = inputChannel.GetInputChannelId();
         const bool held = inputChannel.IsActive();
+
+        // Dead: the death sequence has the camera; any key or button skips the card ahead.
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            bool dead = false;
+            if (registry->Get(dead, "/NoclipProtocol/Player/Dead") && dead)
+            {
+                if (inputChannel.IsStateBegan() && id != Mouse::Movement::X && id != Mouse::Movement::Y &&
+                    id != Mouse::Movement::Z && id != Mouse::SystemCursorPosition)
+                {
+                    registry->Set("/NoclipProtocol/Death/Skip", true);
+                }
+                return false;
+            }
+        }
 
         if (id == Mouse::Movement::X)
         {
@@ -450,6 +488,20 @@ namespace NoclipProtocol
         {
             registry->Get(paused, "/NoclipProtocol/Paused");
             registry->Get(sensitivity, "/NoclipProtocol/Player/MouseSensitivity");
+        }
+        bool dead = false;
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Get(dead, "/NoclipProtocol/Player/Dead");
+        }
+        if (dead)
+        {
+            // The death sequence moves the camera; the body stays where it fell.
+            m_mouseDeltaX = 0.0f;
+            m_mouseDeltaY = 0.0f;
+            m_jumpRequested = false;
+            m_forward = m_back = m_left = m_right = m_sprint = false;
+            return;
         }
         if (paused)
         {

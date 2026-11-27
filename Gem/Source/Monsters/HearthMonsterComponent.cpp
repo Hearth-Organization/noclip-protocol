@@ -744,6 +744,7 @@ namespace NoclipProtocol
                 double damage = 0.0;
                 registry->Get(damage, "/NoclipProtocol/Player/Damage");
                 registry->Set("/NoclipProtocol/Player/Damage", damage + 0.25);
+                registry->Set("/NoclipProtocol/Player/LastHitBy", m_kind);
                 drainSanity(0.35);
                 AZ::Entity* playerEntity = nullptr;
                 AZ::ComponentApplicationBus::BroadcastResult(playerEntity, &AZ::ComponentApplicationRequests::FindEntity, player);
@@ -781,6 +782,7 @@ namespace NoclipProtocol
                 double damage = 0.0;
                 registry->Get(damage, "/NoclipProtocol/Player/Damage");
                 registry->Set("/NoclipProtocol/Player/Damage", damage + 1.0);
+                registry->Set("/NoclipProtocol/Player/LastHitBy", m_kind);
                 drainSanity(0.3);
                 AZ_Printf("Noclip", "monster: %s reached you", m_name.c_str());
                 Report(at, "Reached " + playerName);
@@ -817,6 +819,7 @@ namespace NoclipProtocol
                 double damage = 0.0;
                 registry->Get(damage, "/NoclipProtocol/Player/Damage");
                 registry->Set("/NoclipProtocol/Player/Damage", damage + (m_kind == "Plush" ? 0.15 : 0.25));
+                registry->Set("/NoclipProtocol/Player/LastHitBy", m_kind);
                 drainSanity(0.12);
                 m_attackCooldown = 2.0f;
                 Report(at, "Reached " + playerName);
@@ -853,6 +856,7 @@ namespace NoclipProtocol
                 double damage = 0.0;
                 registry->Get(damage, "/NoclipProtocol/Player/Damage");
                 registry->Set("/NoclipProtocol/Player/Damage", damage + 0.04);
+                registry->Set("/NoclipProtocol/Player/LastHitBy", m_kind);
                 drainSanity(0.03);
                 m_attackCooldown = 1.2f;
             }
@@ -873,6 +877,7 @@ namespace NoclipProtocol
                 double damage = 0.0;
                 registry->Get(damage, "/NoclipProtocol/Player/Damage");
                 registry->Set("/NoclipProtocol/Player/Damage", damage + 0.3);
+                registry->Set("/NoclipProtocol/Player/LastHitBy", m_kind);
                 drainSanity(0.05);
                 m_attackCooldown = 2.0f;
             }
@@ -1004,6 +1009,7 @@ namespace NoclipProtocol
                 registry->Get(hurt, "/NoclipProtocol/Player/Damage");
                 // The shield takes most of a blow, but not a killing one.
                 registry->Set("/NoclipProtocol/Player/Damage", hurt + (shield && damage < 0.5f ? damage * 0.27f : damage));
+                registry->Set("/NoclipProtocol/Player/LastHitBy", m_kind);
                 double add = 0.0;
                 registry->Get(add, "/NoclipProtocol/Player/SanityAdd");
                 registry->Set("/NoclipProtocol/Player/SanityAdd", add - sanity);

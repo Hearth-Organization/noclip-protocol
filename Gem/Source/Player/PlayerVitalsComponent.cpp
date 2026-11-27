@@ -103,6 +103,24 @@ namespace NoclipProtocol
         registry->Get(sprinting, "/NoclipProtocol/Player/Sprinting");
         registry->Get(flashlight, "/NoclipProtocol/Player/FlashlightOn");
         registry->Get(light, "/NoclipProtocol/Player/Light");
+        bool respawn = false;
+        if (registry->Get(respawn, "/NoclipProtocol/Player/Respawn") && respawn)
+        {
+            // The next agent: fresh, a little shaken.
+            registry->Set("/NoclipProtocol/Player/Respawn", false);
+            m_health = 1.0f;
+            m_stamina = 1.0f;
+            m_exhausted = false;
+            m_sanity = 0.75f;
+            registry->Set("/NoclipProtocol/Player/Damage", 0.0);
+        }
+        bool dead = false;
+        if (registry->Get(dead, "/NoclipProtocol/Player/Dead") && dead)
+        {
+            registry->Set("/NoclipProtocol/Player/Damage", 0.0);
+            registry->Set("/NoclipProtocol/Hud/player.health", 0.0);
+            return;
+        }
         if (registry->Get(damage, "/NoclipProtocol/Player/Damage") && damage != 0.0)
         {
             m_health = AZStd::clamp(m_health - static_cast<float>(damage), 0.0f, 1.0f);

@@ -1060,8 +1060,147 @@ namespace NoclipProtocol
             return lines;
         };
 
+        // ---- dying (Death1-6.dc.html, approved Nov 27): drawn over the world instead of the HUD ----
+        const int deathPhase = mock ? 0 : static_cast<int>(RegNumber("/NoclipProtocol/Death/Phase", 0.0));
+        if (deathPhase > 0)
+        {
+            const float t = static_cast<float>(AZ::GetClamp(RegNumber("/NoclipProtocol/Death/T", 0.0), 0.0, 1.0));
+            const float cx = W * 0.5f;
+            auto fade = [](float x) { return AZStd::clamp(x, 0.0f, 1.0f); };
+            auto withA = [](AZ::Color c, float a) { c.SetA(c.GetA() * a); return c; };
+            // Battlefield 1's card: rank and number small, the name large, the years, then the facts.
+            auto card = [&](const char* root, float top, const AZ::Color& accent, float alpha)
+            {
+                if (alpha <= 0.01f)
+                {
+                    return;
+                }
+                const AZStd::string base = root;
+                const AZStd::string rank = RegString((base + "/Rank").c_str(), "CPL.");
+                const AZStd::string number = RegString((base + "/Number").c_str(), "4417");
+                const AZStd::string head = rank + " \xc2\xb7 AGT. " + number + " \xc2\xb7 MTF EPSILON-6";
+                const float headW = measure(Face::Mono, head, 13.0f, 4.0f);
+                const float iconR = 9.0f * s;
+                diamond(cx - headW * 0.5f - 12.0f * s - iconR, (top + 9.0f) * s, iconR, withA(accent, alpha), false, 2.0f * s);
+                text(Face::Mono, head, cx + iconR, top * s, 13.0f, withA(accent, alpha), 1, 4.0f);
+                text(Face::Oswald, RegString((base + "/Name").c_str(), ""), cx, (top + 30.0f) * s, 72.0f, withA(Bright, alpha), 1, 6.0f);
+                text(Face::Oswald, RegString((base + "/Years").c_str(), ""), cx, (top + 112.0f) * s, 26.0f, withA(Cream, alpha), 1, 8.0f);
+                // The facts: "KEY\tvalue" lines.
+                AZStd::vector<AZStd::pair<AZStd::string, AZStd::string>> rows;
+                const AZStd::string facts = RegString((base + "/Facts").c_str(), "");
+                size_t start = 0;
+                while (start < facts.size())
+                {
+                    size_t end = facts.find('\n', start);
+                    if (end == AZStd::string::npos) { end = facts.size(); }
+                    const AZStd::string row = facts.substr(start, end - start);
+                    const size_t tab = row.find('\t');
+                    if (tab != AZStd::string::npos) { rows.push_back({ row.substr(0, tab), row.substr(tab + 1) }); }
+                    start = end + 1;
+                }
+                float valueW = 0.0f;
+                for (const auto& row : rows) { valueW = AZStd::max(valueW, measure(Face::Mono, row.second, 13.0f, 0.0f)); }
+                const float keyW = 150.0f * s, gap = 14.0f * s, pad = 22.0f * s, rowH = 13.0f * 1.9f * s;
+                const float panelW = keyW + gap + valueW + pad * 2.0f;
+                const float panelTop = (top + 168.0f) * s;
+                const float panelH = rows.size() * rowH + 28.0f * s;
+                const float left = cx - panelW * 0.5f;
+                rect(left, panelTop, panelW, panelH, AZ::Color(8 / 255.0f, 7 / 255.0f, 5 / 255.0f, 0.72f * alpha));
+                rect(left, panelTop, panelW, 2.0f * s, withA(accent, alpha));
+                float y = panelTop + 14.0f * s + (rowH - 13.0f * 1.2f * s) * 0.5f;
+                for (const auto& row : rows)
+                {
+                    text(Face::Mono, row.first, left + pad, y, 13.0f, withA(Muted, alpha), 0, 2.0f);
+                    text(Face::Mono, row.second, left + pad + keyW + gap, y, 13.0f, withA(Cream, alpha));
+                    y += rowH;
+                }
+            };
+            if (deathPhase == 1)
+            {
+                // The hit: red at the edges, closing in.
+                const float a = fade(t * 1.5f);
+                const int bands = 14;
+                for (int i = 0; i < bands; ++i)
+                {
+                    const float f = static_cast<float>(i) / bands;
+                    const float inset = (0.36f * H) * f;
+                    const AZ::Color c(90 / 255.0f, 0.0f, 0.0f, 0.85f * a * (1.0f - f) * (1.0f - f) * 0.35f);
+                    outline(inset, inset, W - inset * 2.0f, H - inset * 2.0f, 0.36f * H / bands, c);
+                }
+                rect(0, 0, W, H, AZ::Color(120 / 255.0f, 0.0f, 0.0f, 0.38f * a));
+                text(Face::Mono, "VITALS LOST", cx, 330.0f * s, 12.0f, withA(AZ::Color(1.0f, 138 / 255.0f, 120 / 255.0f, 0.8f), a), 1, 6.0f);
+            }
+            else if (deathPhase == 2 || deathPhase == 3)
+            {
+                // Grey and darker, rising out of the body; then the card.
+                const float grey = deathPhase == 2 ? fade(t * 2.0f) : 1.0f;
+                rect(0, 0, W, H, AZ::Color(0.32f, 0.31f, 0.29f, 0.42f * grey));
+                rect(0, 0, W, H, AZ::Color(0.0f, 0.0f, 0.0f, 0.45f * grey));
+                if (deathPhase == 2)
+                {
+                    rect(cx, 240.0f * s, 1.0f, 150.0f * s, withA(AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.25f), grey));
+                }
+                else
+                {
+                    card("/NoclipProtocol/Death/Card", 190.0f, Gold, fade(t * 4.0f) * fade((1.0f - t) * 5.0f + 0.2f));
+                }
+            }
+            else if (deathPhase == 4)
+            {
+                // The level as a map: the beacon pulses gold, a grey X where the agent fell.
+                rect(0, 0, W, H, AZ::Color(0.0f, 0.0f, 0.0f, 0.25f + 0.3f * (1.0f - t)));
+                const float half = H * 0.5f;
+                const float bx = cx + static_cast<float>(RegNumber("/NoclipProtocol/Death/BaseU", 0.0)) * half;
+                const float by = H * 0.5f - static_cast<float>(RegNumber("/NoclipProtocol/Death/BaseV", 0.0)) * half;
+                const float dx = cx + static_cast<float>(RegNumber("/NoclipProtocol/Death/MarkU", 0.0)) * half;
+                const float dy = H * 0.5f - static_cast<float>(RegNumber("/NoclipProtocol/Death/MarkV", 0.0)) * half;
+                const AZStd::string number = RegString("/NoclipProtocol/Death/Card/Number", "4417");
+                // Rings sweeping out from the beacon, one after another.
+                const float now = static_cast<float>(RegNumber("/NoclipProtocol/Hud/time", 0.0));
+                for (int i = 0; i < 4; ++i)
+                {
+                    const float phase = std::fmod(now * 0.6f + i * 0.25f, 1.0f);
+                    const float r = (18.0f + phase * 260.0f) * s;
+                    const AZ::Color c = withA(Gold, (1.0f - phase) * 0.9f);
+                    const int segments = 72;
+                    for (int k = 0; k < segments; ++k)
+                    {
+                        const float a0 = AZ::Constants::TwoPi * k / segments, a1 = AZ::Constants::TwoPi * (k + 1) / segments;
+                        line(bx + std::cos(a0) * r, by + std::sin(a0) * r, bx + std::cos(a1) * r, by + std::sin(a1) * r, (3.0f - phase * 1.8f) * s, c);
+                    }
+                }
+                diamond(bx, by, 12.7f * s, Gold, true, 0.0f);
+                text(Face::Mono, "FOUNDATION BEACON", bx + 26.0f * s, by - 34.0f * s, 12.0f, Gold, 0, 2.0f);
+                text(Face::Mono, RegString("/NoclipProtocol/Death/BaseLabel", "FORWARD BASE \xc2\xb7 LEVEL 0"), bx + 26.0f * s, by - 34.0f * s + 14.4f * s, 12.0f, Muted, 0, 2.0f);
+                const AZ::Color xc = Hex(0xb9b1a0);
+                line(dx - 12.0f * s, dy - 12.0f * s, dx + 12.0f * s, dy + 12.0f * s, 5.0f * s, xc);
+                line(dx + 12.0f * s, dy - 12.0f * s, dx - 12.0f * s, dy + 12.0f * s, 5.0f * s, xc);
+                text(Face::Mono, "AGT. " + number, dx + 22.0f * s, dy - 10.0f * s, 12.0f, Hex(0xd8d0bc), 0, 2.0f);
+                text(Face::Mono, "SIGNAL LOST", dx + 22.0f * s, dy - 10.0f * s + 14.4f * s, 12.0f, Muted, 0, 2.0f);
+                // Command on the radio, then the line.
+                const AZStd::string radio = "Epsilon-6, we've lost " + number + "'s signal. Notify the family. Sending the next one through.";
+                const float radioW = measure(Face::Mono, radio, 14.0f, 0.0f) + measure(Face::Mono, "FOUNDATION  ", 11.0f, 3.0f);
+                rect(cx - radioW * 0.5f - 18.0f * s, H - 128.0f * s, radioW + 36.0f * s, 34.0f * s, Panel);
+                const float rl = cx - radioW * 0.5f;
+                const float labelW = text(Face::Mono, "FOUNDATION", rl, H - 119.0f * s, 11.0f, Gold, 0, 3.0f);
+                text(Face::Mono, radio, rl + labelW + 12.0f * s, H - 120.0f * s, 14.0f, Cream);
+                text(Face::Oswald, "NEXT AGENT DISPATCHED", cx, H - 70.0f * s, 22.0f, withA(Bright, fade(t * 3.0f - 0.5f)), 1, 8.0f);
+            }
+            else if (deathPhase == 5)
+            {
+                card("/NoclipProtocol/Death/Next", 40.0f, Gold, fade(t * 4.0f) * fade((1.0f - t) * 6.0f));
+            }
+        }
+        // The new agent's field unit booting, for a few seconds after control comes back.
+        else if (!mock && RegNumber("/NoclipProtocol/Death/BootUntil", 0.0) > RegNumber("/NoclipProtocol/Hud/time", 0.0))
+        {
+            text(Face::Mono, "FIELD UNIT \xc2\xb7 AGT. " + RegString("/NoclipProtocol/Agent/NumberText", "") +
+                 " \xc2\xb7 BOOTING \xe2\x96\xb8 VITALS \xe2\x96\xb8 COMPASS \xe2\x96\xb8 RADIO CH 3",
+                 W * 0.5f, 300.0f * s, 12.0f, AZ::Color(127 / 255.0f, 224 / 255.0f, 160 / 255.0f, 0.85f), 1, 2.0f);
+        }
+
         // The HUD itself; the terminal covers the whole screen (and text always draws over shapes), so not under it.
-        if (m_page != Page::Terminal && !m_inMenu && m_page != Page::Build && m_page != Page::Orders)
+        if (deathPhase == 0 && m_page != Page::Terminal && !m_inMenu && m_page != Page::Build && m_page != Page::Orders)
         {
             // ---- vignette: radial-gradient(ellipse at center, transparent 55%, rgba(8,7,4,0.55) 100%) ----
             {
