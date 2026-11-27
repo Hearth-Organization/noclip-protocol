@@ -1234,7 +1234,7 @@ namespace NoclipProtocol
         m_lightTint = AZ::Color(level.m_lightColor[0], level.m_lightColor[1], level.m_lightColor[2], 1.0f);
         const float reach = m_settings.m_ceilingHeight / 3.0f;
         static const float brightness[5] = { 1.3f, 1.0f, 0.75f, 0.55f, 0.4f };
-        m_lightIntensityScale = brightness[m_settings.m_light] * reach * reach;
+        m_lightIntensityScale = brightness[m_settings.m_light] * reach * reach * (m_settings.m_layout == 3 ? 2.0f : 1.0f); // outdoors: daylight
         m_lightRadiusScale = reach;
         AZ_Printf("NoclipProtocol", "Catalog level %d: %s (layout %d, light %d, danger %d)", static_cast<int>(number), level.m_name,
             level.m_layout, level.m_light, level.m_danger);

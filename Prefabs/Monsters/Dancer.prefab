@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Dancer",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 7605982549240295646
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 7102021037870082776
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 6227299736722181353
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 1157849825368332919
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 2811589249314681936
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 4509454257385136476
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 4935785197726119664
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 7626744008357621382
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 8812228752570119044
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 1817358236999950243,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 7866006780746485476,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{D348D8C8-82C7-524B-B087-E08E636370DA}",
+                        "subId": 761982503
+                    },
+                    "assetHint": "assets/models/monsters/dancer/dancer.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 3480246035090689391,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{19D12421-D9D5-5FD7-B2B9-FF601F234CEB}",
+                            "subId": 1142156810
+                        },
+                        "assetHint": "assets/models/monsters/dancer/dancer_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 674638755998311261,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{B70F1C87-424C-5CEC-B463-899AA465EAB7}"
+                                    },
+                                    "assetHint": "assets/models/monsters/dancer/dancer.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 3754119706127698141,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.95
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.9,
+                        "Radius": 0.35
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 7536807559945744976
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 6676078290118446082,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Dancer",
+                    "Kind": "Dancer",
+                    "Motions": "assets/models/monsters/dancer/dancer"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

@@ -189,6 +189,7 @@ namespace NoclipProtocol::Level0
         settings.m_style = nearest[settings.m_layout];
         ApplyStyle(settings);
         settings.m_spawnRoomRadius = 1;
+        settings.m_wallHeight = 0.0f;
         settings.m_propChance = 0.0f; // the hand-made levels' crates and pipes need their own pieces
         switch (settings.m_layout)
         {
@@ -201,10 +202,11 @@ namespace NoclipProtocol::Level0
         case 2: // corridors: Level 2's tunnels
             settings.m_chunkCells = 8; settings.m_cellSize = 3.0f; settings.m_ceilingHeight = 2.6f;
             break;
-        case 3: // outdoor: open ground, a few big blocks (houses, trees, rocks), the sky far overhead
-            settings.m_chunkCells = 6; settings.m_cellSize = 10.0f; settings.m_ceilingHeight = 14.0f;
+        case 3: // outdoor: open ground, low fences and hedges, a few big blocks (sheds, trees, rocks), the sky far overhead
+            settings.m_chunkCells = 6; settings.m_cellSize = 10.0f; settings.m_ceilingHeight = 8.0f; settings.m_wallHeight = 2.4f;
+            settings.m_spawnRoomRadius = 0;
             settings.m_openFraction = 1.0f; settings.m_borderExtraOpen = 1.0f; settings.m_roomChance = 0.0f;
-            settings.m_pillarChance = 0.3f; settings.m_pillarSize = 2.6f; settings.m_lightSpacing = 2;
+            settings.m_pillarChance = 0.3f; settings.m_pillarSize = 2.6f; settings.m_lightSpacing = 1;
             settings.m_decalChance = 0.1f; settings.m_clutterChance = 0.25f; settings.m_scatterChance = 0.2f;
             break;
         case 4: // caves: wide winding tunnels, thick rock columns
@@ -327,6 +329,9 @@ namespace NoclipProtocol::Level0
         const float cell = settings.m_cellSize;
         const float thick = settings.m_wallThickness;
         const float height = settings.m_ceilingHeight;
+        // Outdoors the walls are fences and hedges and the pillars are sheds and trees, under a far-off sky.
+        const float wallHeight = settings.m_wallHeight > 0.0f ? settings.m_wallHeight : height;
+        const float pillarHeight = settings.m_wallHeight > 0.0f ? settings.m_wallHeight * 2.2f : height;
         const int baseX = chunkX * n; // global cell index of this chunk's first column
         const int baseY = chunkY * n;
 
@@ -524,7 +529,7 @@ namespace NoclipProtocol::Level0
                 if (h[x][y])
                 {
                     layout.m_walls.push_back(Box{ originX + (static_cast<float>(x) + 0.5f) * cell, originY + static_cast<float>(y) * cell,
-                                                  height * 0.5f, cell + thick, thick, height });
+                                                  wallHeight * 0.5f, cell + thick, thick, wallHeight });
                 }
             }
         }
@@ -535,7 +540,7 @@ namespace NoclipProtocol::Level0
                 if (v[x][y])
                 {
                     layout.m_walls.push_back(Box{ originX + static_cast<float>(x) * cell, originY + (static_cast<float>(y) + 0.5f) * cell,
-                                                  height * 0.5f, thick, cell + thick, height });
+                                                  wallHeight * 0.5f, thick, cell + thick, wallHeight });
                 }
             }
         }
@@ -552,8 +557,8 @@ namespace NoclipProtocol::Level0
                 const float pillarRoll = rng.NextUnit(); // always drawn, so the rest of the chunk stays the same
                 if (!touching && !roomInside && pillarRoll < settings.m_pillarChance)
                 {
-                    layout.m_pillars.push_back(Box{ originX + static_cast<float>(x) * cell, originY + static_cast<float>(y) * cell, height * 0.5f,
-                                                    settings.m_pillarSize, settings.m_pillarSize, height });
+                    layout.m_pillars.push_back(Box{ originX + static_cast<float>(x) * cell, originY + static_cast<float>(y) * cell, pillarHeight * 0.5f,
+                                                    settings.m_pillarSize, settings.m_pillarSize, pillarHeight });
                 }
             }
         }

@@ -54,6 +54,7 @@ namespace NoclipProtocol::Level0
         int m_catalog = -1;
         int m_layout = 0;
         int m_light = 1;
+        float m_wallHeight = 0.0f;     // walls and pillars this tall (0: up to the ceiling); outdoor levels' fences
     };
 
     //! Level 1 and 2 presets: sizes, openness, pillars, rooms, lights and props for that level's look.

@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Nurse",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 6616297442633065418
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 4345935814612617157
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 8754001693031537461
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 2016666965809611253
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 5807085357885432079
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 5654634667554388698
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 7596037895680130725
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 4640512700580881305
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 5044069666440873968
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 2591094709750265606,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 3289574172313121806,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{42B67467-6B8A-53A4-9FD8-AEF74A302CD0}",
+                        "subId": 2303733374
+                    },
+                    "assetHint": "assets/models/monsters/nurse/nurse.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 6410905808601816224,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{2A346AF8-8D7E-5FBD-807B-E4F137716285}",
+                            "subId": 1772717327
+                        },
+                        "assetHint": "assets/models/monsters/nurse/nurse_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 5604688173972011593,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{2214C58E-535A-5AA9-B1EA-79CEF8E4DFB6}"
+                                    },
+                                    "assetHint": "assets/models/monsters/nurse/nurse.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 8430562950872472414,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.875
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.75,
+                        "Radius": 0.35
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 7708287671082814587
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 3503282398381285894,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Nurse",
+                    "Kind": "Nurse",
+                    "Motions": "assets/models/monsters/nurse/nurse"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

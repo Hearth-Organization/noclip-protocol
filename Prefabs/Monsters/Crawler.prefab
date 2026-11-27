@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Crawler",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 8142369115966243577
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 2098722244759825250
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 7341536301254253694
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 8595482291679633835
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 8907750968607270775
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 5099912299103921659
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 5106608210986483027
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 3208758455832967314
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 409223836745195275
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 5718618205516191038,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 1350318407855563148,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{A609E391-60C5-51CD-9045-623E52F23694}",
+                        "subId": 2467364348
+                    },
+                    "assetHint": "assets/models/monsters/crawler/crawler.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 8763479519222298914,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{DFCE1BDF-6000-5C63-A863-8870339945F2}",
+                            "subId": 3987434577
+                        },
+                        "assetHint": "assets/models/monsters/crawler/crawler_walk.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 8768389090280000661,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{A2EDE162-CAE7-5107-BAB5-2A7E2C66ED50}"
+                                    },
+                                    "assetHint": "assets/models/monsters/crawler/crawler.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 7195699718704119013,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.7
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.4,
+                        "Radius": 0.8
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 7936339181855366703
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 8474442893630398449,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Crawler",
+                    "Kind": "Crawler",
+                    "Motions": "assets/models/monsters/crawler/crawler"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

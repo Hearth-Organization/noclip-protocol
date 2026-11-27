@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Burnt",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 5656827889848894386
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 4137784989154221155
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 5318567224658890267
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 6800928768099434934
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 2100657494104669015
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 6210717898032640389
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 4318569404117814695
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 6481730805376247062
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 102536018095136372
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 7367385981198187422,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 866660493556468834,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{311A9719-B73A-5585-A191-E6F5B6309FB8}",
+                        "subId": 875136903
+                    },
+                    "assetHint": "assets/models/monsters/burnt/burnt.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 2738821045376328076,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{ADBC0B4C-7292-593D-AA7C-AE5FF698320D}",
+                            "subId": 2234644418
+                        },
+                        "assetHint": "assets/models/monsters/burnt/burnt_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 6833001081028875211,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{9F7E28AB-518E-5498-B506-0939E349A876}"
+                                    },
+                                    "assetHint": "assets/models/monsters/burnt/burnt.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 4669624607142514491,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.925
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.85,
+                        "Radius": 0.35
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 2339023367014219860
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 3643837218244773381,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Burnt",
+                    "Kind": "Burnt",
+                    "Motions": "assets/models/monsters/burnt/burnt"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

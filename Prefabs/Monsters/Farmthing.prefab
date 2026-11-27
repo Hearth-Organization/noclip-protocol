@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Farmthing",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 8612827101180810243
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 6429290572724881889
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 4500576747091085197
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 1745671570795148885
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 2144385219378080457
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 3516302252932041681
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 3451979415262159078
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 7161332425011602737
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 7279366681635559596
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 5080129241775951410,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 4636264932528464231,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{1B7DEBB2-AF22-52D0-B99A-015FA108B552}",
+                        "subId": 1573851555
+                    },
+                    "assetHint": "assets/models/monsters/farmthing/farmthing.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 5384199024610392317,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{4BD4F1B5-B077-57DA-8286-E425E4A32257}",
+                            "subId": 90469551
+                        },
+                        "assetHint": "assets/models/monsters/farmthing/farmthing_walk.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 276739597864067021,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{F973E686-2D59-5FAB-AC40-3E0FD9EFB1B3}"
+                                    },
+                                    "assetHint": "assets/models/monsters/farmthing/farmthing.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 2094484586865057400,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.8
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.6,
+                        "Radius": 0.6
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 4717963829231126423
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 859610856534924697,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Farmthing",
+                    "Kind": "Farmthing",
+                    "Motions": "assets/models/monsters/farmthing/farmthing"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

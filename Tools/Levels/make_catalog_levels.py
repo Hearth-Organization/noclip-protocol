@@ -32,9 +32,9 @@ from make_levels_1_2 import asset_guid, path, walk  # noqa: E402
 PROJECT = os.path.abspath(os.path.join(HERE, "..", ".."))
 S = 512
 
-# Layout sizes: must match Level0::ApplyCatalog (Level0Layout.cpp). cell size, cells per chunk, ceiling height.
+# Layout sizes: must match Level0::ApplyCatalog (Level0Layout.cpp). cell size, cells per chunk, wall height.
 LAYOUT = {
-    "rooms": (4.0, 6, 3.0), "halls": (8.0, 6, 5.0), "corridors": (3.0, 8, 2.6), "outdoor": (10.0, 6, 14.0),
+    "rooms": (4.0, 6, 3.0), "halls": (8.0, 6, 5.0), "corridors": (3.0, 8, 2.6), "outdoor": (10.0, 6, 2.4),
     "caves": (5.0, 6, 4.5), "water": (6.0, 6, 3.5), "stairs": (3.0, 8, 7.0),
 }
 

@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Scarecrow",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 2972733257316329022
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 6181621771462134113
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 2044154460271691715
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 3442916251442641420
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 18624365766176841
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 4513386611241663785
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 2153885337233854483
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 2531646712498837184
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 5349772423609618110
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 297273148669860997,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 1655511022920804802,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{D3C531C5-62AC-57B5-959F-47BB30091EA2}",
+                        "subId": 3748994734
+                    },
+                    "assetHint": "assets/models/monsters/scarecrow/scarecrow.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 3131754243591976339,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{E4F0400A-F487-5AB1-B01C-7E1C90E23CDD}",
+                            "subId": 3519608991
+                        },
+                        "assetHint": "assets/models/monsters/scarecrow/scarecrow_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 2499278481773731405,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{1E2A288F-6AEE-5BFC-B60C-D46E4F14A5D3}"
+                                    },
+                                    "assetHint": "assets/models/monsters/scarecrow/scarecrow.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 8037790329767812868,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        1.15
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 2.3,
+                        "Radius": 0.4
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 8549622708826718275
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 125167129345242904,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Scarecrow",
+                    "Kind": "Scarecrow",
+                    "Motions": "assets/models/monsters/scarecrow/scarecrow"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

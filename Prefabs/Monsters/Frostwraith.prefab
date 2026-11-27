@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Frostwraith",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 2146461506449722265
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 484696816648079896
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 6540258168437601251
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 1939126162003633722
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 5817547444942170964
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 5076333682079782868
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 733901731218593286
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 6712922052847236060
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 3403441190556985870
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 1023714005519752898,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 9146644814337315914,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{799A2710-A70E-59F1-A3EF-42CBBEBD0080}",
+                        "subId": 299991749
+                    },
+                    "assetHint": "assets/models/monsters/frostwraith/frostwraith.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 2701312866242129114,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{EF90A4F0-5D6C-50C9-AB95-A52CE836CD36}",
+                            "subId": 3635677891
+                        },
+                        "assetHint": "assets/models/monsters/frostwraith/frostwraith_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 1843407674511178334,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{D5346592-931E-5C68-AF2C-6A375D6F00B3}"
+                                    },
+                                    "assetHint": "assets/models/monsters/frostwraith/frostwraith.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 1791784341407683083,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        1.2
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 2.4,
+                        "Radius": 0.42
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 207530132609798685
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 2019960696608470119,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Frostwraith",
+                    "Kind": "Frostwraith",
+                    "Motions": "assets/models/monsters/frostwraith/frostwraith"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

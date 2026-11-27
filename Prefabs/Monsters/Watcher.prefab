@@ -1,0 +1,122 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Watcher",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 1342897536155096758
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 4305476384178565590
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 4423310217566951853
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 6253653710379829452
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 2458160388197182238
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 1981389974719014812
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 2701230318600704546
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 936770008589763696
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 8414576101562014644
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 1930833881361366820,
+                "Parent Entity": ""
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 9121842520421788703,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{DA05FD2E-937D-5860-BC2B-4A8700721590}"
+                                    },
+                                    "assetHint": "assets/models/monsters/watcher/watcher.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 2676799983232256527,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        1.15
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 2.3,
+                        "Radius": 0.4
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 8546106356450231164
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 1900814765188634405,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Watcher",
+                    "Kind": "Watcher",
+                    "Motions": ""
+                }
+            },
+            "AZ::Render::EditorMeshComponent": {
+                "$type": "AZ::Render::EditorMeshComponent",
+                "Id": 7800020803398069997,
+                "Controller": {
+                    "Configuration": {
+                        "ModelAsset": {
+                            "assetId": {
+                                "guid": "{E8FE523E-C652-53F3-88CC-E8F4786B7888}",
+                                "subId": 277866156
+                            },
+                            "assetHint": "assets/models/monsters/watcher/watcher.fbx.azmodel"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

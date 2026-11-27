@@ -14,9 +14,9 @@ namespace NoclipProtocol::Catalog
         { "assets/materials/catalog/wallpaper_13163ed6.azmaterial", "assets/materials/catalog/carpet_c4449de5.azmaterial", "assets/materials/catalog/ceilingtile_4a3afce6.azmaterial" },  // Level 6
         { "assets/materials/catalog/tile_387a6196.azmaterial", "assets/materials/catalog/water_ab6b1d73.azmaterial", "assets/materials/catalog/plaster_f4c8adfe.azmaterial" },  // Level 7
         { "assets/materials/catalog/rock_ca9ee1d4.azmaterial", "assets/materials/catalog/rock_12bcfd2a.azmaterial", "assets/materials/catalog/rock_12bcfd2a.azmaterial" },  // Level 8
-        { "assets/materials/catalog/concrete_cd085a9b.azmaterial", "assets/materials/catalog/grass_59901813.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 9
-        { "assets/materials/catalog/wood_426789a2.azmaterial", "assets/materials/catalog/grass_abd098a8.azmaterial", "assets/materials/catalog/sky_5f280a4b.azmaterial" },  // Level 10
-        { "assets/materials/catalog/concrete_cd085a9b.azmaterial", "assets/materials/catalog/concrete_60eff111.azmaterial", "assets/materials/catalog/sky_1ab8d4e2.azmaterial" },  // Level 11
+        { "assets/materials/catalog/concrete_71266075.azmaterial", "assets/materials/catalog/grass_59901813.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 9
+        { "assets/materials/catalog/wood_3ac6520c.azmaterial", "assets/materials/catalog/grass_abd098a8.azmaterial", "assets/materials/catalog/sky_5f280a4b.azmaterial" },  // Level 10
+        { "assets/materials/catalog/concrete_71266075.azmaterial", "assets/materials/catalog/concrete_60eff111.azmaterial", "assets/materials/catalog/sky_1ab8d4e2.azmaterial" },  // Level 11
         { "assets/materials/catalog/metal_f8bf54ca.azmaterial", "assets/materials/catalog/concrete_b76e51b7.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial" },  // Level 12
         { "assets/materials/catalog/wallpaper_fd02a9ee.azmaterial", "assets/materials/catalog/carpet_beda9eb9.azmaterial", "assets/materials/catalog/ceilingtile_2d8a273d.azmaterial" },  // Level 13
         { "assets/materials/catalog/concrete_796f43eb.azmaterial", "assets/materials/catalog/concrete_4441c5b3.azmaterial", "assets/materials/catalog/concrete_4441c5b3.azmaterial" },  // Level 14
@@ -35,7 +35,7 @@ namespace NoclipProtocol::Catalog
         { "assets/materials/catalog/tile_3f8d1f08.azmaterial", "assets/materials/catalog/tile_91a4fa67.azmaterial", "assets/materials/catalog/plaster_5e1ef39e.azmaterial" },  // Level 27
         { "assets/materials/catalog/wallpaper_fd02a9ee.azmaterial", "assets/materials/catalog/carpet_beda9eb9.azmaterial", "assets/materials/catalog/ceilingtile_2d8a273d.azmaterial" },  // Level 28
         { "assets/materials/catalog/metal_0dff11e0.azmaterial", "assets/materials/catalog/metal_9653df4b.azmaterial", "assets/materials/catalog/metal_9653df4b.azmaterial" },  // Level 29
-        { "assets/materials/catalog/concrete_cd085a9b.azmaterial", "assets/materials/catalog/concrete_60eff111.azmaterial", "assets/materials/catalog/sky_5f280a4b.azmaterial" },  // Level 30
+        { "assets/materials/catalog/concrete_71266075.azmaterial", "assets/materials/catalog/concrete_60eff111.azmaterial", "assets/materials/catalog/sky_5f280a4b.azmaterial" },  // Level 30
         { "assets/materials/catalog/wood_62707727.azmaterial", "assets/materials/catalog/wood_eed37b91.azmaterial", "assets/materials/catalog/plaster_ff68fec5.azmaterial" },  // Level 31
         { "assets/materials/catalog/metal_f8bf54ca.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial" },  // Level 32
         { "assets/materials/catalog/wallpaper_456e06d9.azmaterial", "assets/materials/catalog/carpet_e2d1374f.azmaterial", "assets/materials/catalog/ceilingtile_75aabca5.azmaterial" },  // Level 33
@@ -44,13 +44,13 @@ namespace NoclipProtocol::Catalog
         { "assets/materials/catalog/wood_c85612ea.azmaterial", "assets/materials/catalog/wood_d90ee089.azmaterial", "assets/materials/catalog/plaster_5e1ef39e.azmaterial" },  // Level 36
         { "assets/materials/catalog/tile_387a6196.azmaterial", "assets/materials/catalog/water_ab6b1d73.azmaterial", "assets/materials/catalog/plaster_f4c8adfe.azmaterial" },  // Level 37
         { "assets/materials/catalog/wood_e50e8e65.azmaterial", "assets/materials/catalog/wood_741e2244.azmaterial", "assets/materials/catalog/plaster_9ee55e1d.azmaterial" },  // Level 38
-        { "assets/materials/catalog/plaster_f8803332.azmaterial", "assets/materials/catalog/snow_426ce840.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 39
+        { "assets/materials/catalog/plaster_da9158ca.azmaterial", "assets/materials/catalog/snow_426ce840.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 39
         { "assets/materials/catalog/wallpaper_8c5bd647.azmaterial", "assets/materials/catalog/carpet_7670f8d7.azmaterial", "assets/materials/catalog/ceilingtile_d44c34d6.azmaterial" },  // Level 40
         { "assets/materials/catalog/tile_3f8d1f08.azmaterial", "assets/materials/catalog/tile_91a4fa67.azmaterial", "assets/materials/catalog/plaster_5e1ef39e.azmaterial" },  // Level 41
         { "assets/materials/catalog/wood_e50e8e65.azmaterial", "assets/materials/catalog/wood_741e2244.azmaterial", "assets/materials/catalog/plaster_9ee55e1d.azmaterial" },  // Level 42
         { "assets/materials/catalog/metal_452a633f.azmaterial", "assets/materials/catalog/metal_9dcf6e9c.azmaterial", "assets/materials/catalog/metal_9dcf6e9c.azmaterial" },  // Level 43
         { "assets/materials/catalog/wallpaper_fd02a9ee.azmaterial", "assets/materials/catalog/carpet_beda9eb9.azmaterial", "assets/materials/catalog/ceilingtile_2d8a273d.azmaterial" },  // Level 44
-        { "assets/materials/catalog/concrete_cd085a9b.azmaterial", "assets/materials/catalog/concrete_60eff111.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 45
+        { "assets/materials/catalog/concrete_71266075.azmaterial", "assets/materials/catalog/concrete_60eff111.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 45
         { "assets/materials/catalog/wood_e50e8e65.azmaterial", "assets/materials/catalog/wood_741e2244.azmaterial", "assets/materials/catalog/plaster_9ee55e1d.azmaterial" },  // Level 46
         { "assets/materials/catalog/brick_7d23650a.azmaterial", "assets/materials/catalog/concrete_b76e51b7.azmaterial", "assets/materials/catalog/concrete_b76e51b7.azmaterial" },  // Level 47
         { "assets/materials/catalog/wallpaper_b9fa0cc3.azmaterial", "assets/materials/catalog/carpet_337d1102.azmaterial", "assets/materials/catalog/ceilingtile_aa394f73.azmaterial" },  // Level 48
@@ -58,32 +58,32 @@ namespace NoclipProtocol::Catalog
         { "assets/materials/catalog/wallpaper_fd02a9ee.azmaterial", "assets/materials/catalog/carpet_beda9eb9.azmaterial", "assets/materials/catalog/ceilingtile_2d8a273d.azmaterial" },  // Level 50
         { "assets/materials/catalog/metal_2339a4e0.azmaterial", "assets/materials/catalog/concrete_492a5fa9.azmaterial", "assets/materials/catalog/metal_12821909.azmaterial" },  // Level 51
         { "assets/materials/catalog/metal_f8bf54ca.azmaterial", "assets/materials/catalog/concrete_b76e51b7.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial" },  // Level 52
-        { "assets/materials/catalog/glass_d63451d7.azmaterial", "assets/materials/catalog/concrete_60eff111.azmaterial", "assets/materials/catalog/sky_1ab8d4e2.azmaterial" },  // Level 53
+        { "assets/materials/catalog/glass_ca2838a1.azmaterial", "assets/materials/catalog/concrete_60eff111.azmaterial", "assets/materials/catalog/sky_1ab8d4e2.azmaterial" },  // Level 53
         { "assets/materials/catalog/wood_e50e8e65.azmaterial", "assets/materials/catalog/wood_741e2244.azmaterial", "assets/materials/catalog/plaster_9ee55e1d.azmaterial" },  // Level 54
         { "assets/materials/catalog/glass_0e34a3c5.azmaterial", "assets/materials/catalog/tile_91a4fa67.azmaterial", "assets/materials/catalog/plaster_5e1ef39e.azmaterial" },  // Level 55
         { "assets/materials/catalog/metal_696737cb.azmaterial", "assets/materials/catalog/water_ab6b1d73.azmaterial", "assets/materials/catalog/metal_e7156877.azmaterial" },  // Level 56
-        { "assets/materials/catalog/metal_c7d3333b.azmaterial", "assets/materials/catalog/metal_d78046c1.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 57
+        { "assets/materials/catalog/metal_d516c68e.azmaterial", "assets/materials/catalog/metal_d78046c1.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 57
         { "assets/materials/catalog/metal_0dff11e0.azmaterial", "assets/materials/catalog/metal_9653df4b.azmaterial", "assets/materials/catalog/metal_9653df4b.azmaterial" },  // Level 58
         { "assets/materials/catalog/hedge_cee97971.azmaterial", "assets/materials/catalog/dirt_d62240b1.azmaterial", "assets/materials/catalog/sky_1ab8d4e2.azmaterial" },  // Level 59
         { "assets/materials/catalog/metal_f8bf54ca.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial" },  // Level 60
         { "assets/materials/catalog/glass_c92bb3b2.azmaterial", "assets/materials/catalog/tile_655c6d8f.azmaterial", "assets/materials/catalog/plaster_9ee55e1d.azmaterial" },  // Level 61
         { "assets/materials/catalog/tile_387a6196.azmaterial", "assets/materials/catalog/water_ab6b1d73.azmaterial", "assets/materials/catalog/plaster_f4c8adfe.azmaterial" },  // Level 62
         { "assets/materials/catalog/brick_7d23650a.azmaterial", "assets/materials/catalog/concrete_b76e51b7.azmaterial", "assets/materials/catalog/concrete_b76e51b7.azmaterial" },  // Level 63
-        { "assets/materials/catalog/concrete_81953718.azmaterial", "assets/materials/catalog/dirt_f189e084.azmaterial", "assets/materials/catalog/sky_fbac84ac.azmaterial" },  // Level 64
+        { "assets/materials/catalog/concrete_96e152f7.azmaterial", "assets/materials/catalog/dirt_f189e084.azmaterial", "assets/materials/catalog/sky_fbac84ac.azmaterial" },  // Level 64
         { "assets/materials/catalog/metal_0dff11e0.azmaterial", "assets/materials/catalog/metal_9653df4b.azmaterial", "assets/materials/catalog/metal_9653df4b.azmaterial" },  // Level 65
         { "assets/materials/catalog/metal_28d410cc.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial" },  // Level 66
         { "assets/materials/catalog/wallpaper_fd02a9ee.azmaterial", "assets/materials/catalog/sand_b32af6bb.azmaterial", "assets/materials/catalog/ceilingtile_0459e930.azmaterial" },  // Level 67
         { "assets/materials/catalog/wood_e50e8e65.azmaterial", "assets/materials/catalog/wood_741e2244.azmaterial", "assets/materials/catalog/plaster_9ee55e1d.azmaterial" },  // Level 68
         { "assets/materials/catalog/flesh_c0608755.azmaterial", "assets/materials/catalog/flesh_eea5a80d.azmaterial", "assets/materials/catalog/flesh_eea5a80d.azmaterial" },  // Level 69
-        { "assets/materials/catalog/hedge_25f81f49.azmaterial", "assets/materials/catalog/dirt_309f0889.azmaterial", "assets/materials/catalog/sky_fbac84ac.azmaterial" },  // Level 70
+        { "assets/materials/catalog/hedge_f15ceb6f.azmaterial", "assets/materials/catalog/dirt_309f0889.azmaterial", "assets/materials/catalog/sky_fbac84ac.azmaterial" },  // Level 70
         { "assets/materials/catalog/rock_5d1b0818.azmaterial", "assets/materials/catalog/water_ab6b1d73.azmaterial", "assets/materials/catalog/rock_9ac517b7.azmaterial" },  // Level 71
         { "assets/materials/catalog/wood_1bdcaa80.azmaterial", "assets/materials/catalog/wood_d90ee089.azmaterial", "assets/materials/catalog/plaster_5e1ef39e.azmaterial" },  // Level 72
         { "assets/materials/catalog/wood_e50e8e65.azmaterial", "assets/materials/catalog/wood_741e2244.azmaterial", "assets/materials/catalog/plaster_9ee55e1d.azmaterial" },  // Level 73
         { "assets/materials/catalog/tile_3f8d1f08.azmaterial", "assets/materials/catalog/tile_91a4fa67.azmaterial", "assets/materials/catalog/plaster_5e1ef39e.azmaterial" },  // Level 74
         { "assets/materials/catalog/metal_14bf660b.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial" },  // Level 75
-        { "assets/materials/catalog/wood_895b5c2c.azmaterial", "assets/materials/catalog/grass_59901813.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 76
+        { "assets/materials/catalog/wood_071a21b2.azmaterial", "assets/materials/catalog/grass_59901813.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 76
         { "assets/materials/catalog/metal_28d410cc.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial" },  // Level 77
-        { "assets/materials/catalog/concrete_cd085a9b.azmaterial", "assets/materials/catalog/dirt_309f0889.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 78
+        { "assets/materials/catalog/concrete_71266075.azmaterial", "assets/materials/catalog/dirt_309f0889.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 78
         { "assets/materials/catalog/glass_c92bb3b2.azmaterial", "assets/materials/catalog/tile_655c6d8f.azmaterial", "assets/materials/catalog/plaster_9ee55e1d.azmaterial" },  // Level 79
         { "assets/materials/catalog/tile_b5158e1f.azmaterial", "assets/materials/catalog/tile_91a4fa67.azmaterial", "assets/materials/catalog/plaster_5e1ef39e.azmaterial" },  // Level 80
         { "assets/materials/catalog/tile_387a6196.azmaterial", "assets/materials/catalog/water_ab6b1d73.azmaterial", "assets/materials/catalog/plaster_f4c8adfe.azmaterial" },  // Level 81
@@ -91,15 +91,15 @@ namespace NoclipProtocol::Catalog
         { "assets/materials/catalog/rock_ca9ee1d4.azmaterial", "assets/materials/catalog/rock_12bcfd2a.azmaterial", "assets/materials/catalog/rock_12bcfd2a.azmaterial" },  // Level 83
         { "assets/materials/catalog/flesh_e079ee75.azmaterial", "assets/materials/catalog/flesh_4219a86e.azmaterial", "assets/materials/catalog/flesh_4219a86e.azmaterial" },  // Level 84
         { "assets/materials/catalog/glass_c92bb3b2.azmaterial", "assets/materials/catalog/tile_655c6d8f.azmaterial", "assets/materials/catalog/plaster_9ee55e1d.azmaterial" },  // Level 85
-        { "assets/materials/catalog/concrete_cd085a9b.azmaterial", "assets/materials/catalog/concrete_60eff111.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 86
+        { "assets/materials/catalog/concrete_71266075.azmaterial", "assets/materials/catalog/concrete_60eff111.azmaterial", "assets/materials/catalog/sky_9958827a.azmaterial" },  // Level 86
         { "assets/materials/catalog/tile_3f8d1f08.azmaterial", "assets/materials/catalog/tile_91a4fa67.azmaterial", "assets/materials/catalog/plaster_5e1ef39e.azmaterial" },  // Level 87
         { "assets/materials/catalog/metal_0dff11e0.azmaterial", "assets/materials/catalog/metal_9653df4b.azmaterial", "assets/materials/catalog/metal_9653df4b.azmaterial" },  // Level 88
-        { "assets/materials/catalog/hedge_25f81f49.azmaterial", "assets/materials/catalog/dirt_309f0889.azmaterial", "assets/materials/catalog/sky_fbac84ac.azmaterial" },  // Level 89
+        { "assets/materials/catalog/hedge_f15ceb6f.azmaterial", "assets/materials/catalog/dirt_309f0889.azmaterial", "assets/materials/catalog/sky_fbac84ac.azmaterial" },  // Level 89
         { "assets/materials/catalog/plaster_f9d9b1e7.azmaterial", "assets/materials/catalog/plaster_5e1ef39e.azmaterial", "assets/materials/catalog/plaster_5e1ef39e.azmaterial" },  // Level 90
-        { "assets/materials/catalog/hedge_25f81f49.azmaterial", "assets/materials/catalog/dirt_309f0889.azmaterial", "assets/materials/catalog/sky_fbac84ac.azmaterial" },  // Level 91
+        { "assets/materials/catalog/hedge_f15ceb6f.azmaterial", "assets/materials/catalog/dirt_309f0889.azmaterial", "assets/materials/catalog/sky_fbac84ac.azmaterial" },  // Level 91
         { "assets/materials/catalog/metal_f8bf54ca.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial", "assets/materials/catalog/metal_f41feff2.azmaterial" },  // Level 92
-        { "assets/materials/catalog/rock_d9fb69cc.azmaterial", "assets/materials/catalog/sand_fa334f48.azmaterial", "assets/materials/catalog/sky_5f280a4b.azmaterial" },  // Level 93
-        { "assets/materials/catalog/concrete_cd085a9b.azmaterial", "assets/materials/catalog/dirt_309f0889.azmaterial", "assets/materials/catalog/sky_5f280a4b.azmaterial" },  // Level 94
+        { "assets/materials/catalog/rock_fa49d036.azmaterial", "assets/materials/catalog/sand_fa334f48.azmaterial", "assets/materials/catalog/sky_5f280a4b.azmaterial" },  // Level 93
+        { "assets/materials/catalog/concrete_71266075.azmaterial", "assets/materials/catalog/dirt_309f0889.azmaterial", "assets/materials/catalog/sky_5f280a4b.azmaterial" },  // Level 94
         { "assets/materials/catalog/wallpaper_13163ed6.azmaterial", "assets/materials/catalog/carpet_c4449de5.azmaterial", "assets/materials/catalog/ceilingtile_4a3afce6.azmaterial" },  // Level 95
         { "assets/materials/catalog/rock_5a516370.azmaterial", "assets/materials/catalog/rock_bbbc877c.azmaterial", "assets/materials/catalog/rock_bbbc877c.azmaterial" },  // Level 96
         { "assets/materials/catalog/wallpaper_fd02a9ee.azmaterial", "assets/materials/catalog/carpet_beda9eb9.azmaterial", "assets/materials/catalog/ceilingtile_2d8a273d.azmaterial" },  // Level 97

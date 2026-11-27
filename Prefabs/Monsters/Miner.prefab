@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Miner",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 1882610400538983434
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 1834308605686893352
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 1314196956397286137
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 2462178119623383293
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 4158147849309874356
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 4664735121132882264
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 3088184541663252313
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 4249504063904625522
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 3485046105901783464
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 3143620035951857184,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 3699737877940944862,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{EC3FF4E3-295E-58D5-B2DB-3C67BD862E6A}",
+                        "subId": 3855816339
+                    },
+                    "assetHint": "assets/models/monsters/miner/miner.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 6535051737582150063,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{81B1A09B-1321-59AD-9DFD-355ACE0D5ADD}",
+                            "subId": 1127291701
+                        },
+                        "assetHint": "assets/models/monsters/miner/miner_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 6705275142665312629,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{EE6A8F47-FBDD-521B-9F1E-7EFB665D958D}"
+                                    },
+                                    "assetHint": "assets/models/monsters/miner/miner.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 6074152440274397187,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.9
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.8,
+                        "Radius": 0.38
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 1416356154200952367
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 4435173267078002396,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Miner",
+                    "Kind": "Miner",
+                    "Motions": "assets/models/monsters/miner/miner"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

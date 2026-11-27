@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Partygoer",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 1114613040355389394
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 1161986508538276670
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 7352085515857679140
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 8551254939137358789
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 6073354112748848495
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 6928777890541852169
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 8390130442454748841
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 5000546028690937340
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 945795014091484730
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 3485162419526765723,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 2095610040707748805,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{60CA652E-0473-57CB-96CC-7C7C69FE9D21}",
+                        "subId": 14142077
+                    },
+                    "assetHint": "assets/models/monsters/partygoer/partygoer.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 3291986956277258835,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{024011F7-4D25-56DC-89A1-7C1E9CD76817}",
+                            "subId": 2643689493
+                        },
+                        "assetHint": "assets/models/monsters/partygoer/partygoer_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 1607793312854001705,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{916825CF-79B8-5649-85F6-5FCAE3A171AA}"
+                                    },
+                                    "assetHint": "assets/models/monsters/partygoer/partygoer.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 367675451293379676,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        1.1
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 2.2,
+                        "Radius": 0.4
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 3774670064290475063
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 8963664805278298157,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Partygoer",
+                    "Kind": "Partygoer",
+                    "Motions": "assets/models/monsters/partygoer/partygoer"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

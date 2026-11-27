@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Diver",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 6662373860026715511
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 108551603931233579
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 4736825375790793210
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 171757737807339309
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 5486255175291894748
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 470109588061990650
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 3826334036909128274
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 1974009809282168640
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 6074952239645674523
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 4228346107973034448,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 6542636950859613585,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{9BD07197-A094-5E01-BD78-8F29B85B0EC1}",
+                        "subId": 1701245561
+                    },
+                    "assetHint": "assets/models/monsters/diver/diver.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 8225992958971791984,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{7E6C2D1D-9305-5DF7-9BEF-E65E49CBEC2D}",
+                            "subId": 1952172398
+                        },
+                        "assetHint": "assets/models/monsters/diver/diver_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 3372106790647357890,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{01B9D338-7B28-573A-B25D-1AD089B86DF6}"
+                                    },
+                                    "assetHint": "assets/models/monsters/diver/diver.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 7595374366474092074,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.95
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.9,
+                        "Radius": 0.5
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 2542496112442735061
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 2605961229538081959,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Diver",
+                    "Kind": "Diver",
+                    "Motions": "assets/models/monsters/diver/diver"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

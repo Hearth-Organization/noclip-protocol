@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Patient",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 1746524745995832108
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 5361406758076721866
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 7964165353253670772
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 9190310351679680519
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 6049808940324518015
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 1348785248022640212
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 1715460802490580628
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 1850820895590525368
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 7070414481627771388
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 2111457629831990649,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 7013467888896186764,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{75D15AF0-2ACA-5C9F-A237-99C0956FD8AA}",
+                        "subId": 20636823
+                    },
+                    "assetHint": "assets/models/monsters/patient/patient.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 1554144827259184568,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{0CAC235D-B137-5E09-9E1A-53DD5ADB0242}",
+                            "subId": 3079171610
+                        },
+                        "assetHint": "assets/models/monsters/patient/patient_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 3286228900286228528,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{05E66EC5-1719-5E90-A4AC-3E1006F541ED}"
+                                    },
+                                    "assetHint": "assets/models/monsters/patient/patient.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 3100718233302217425,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.9
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.8,
+                        "Radius": 0.35
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 8499631805940526839
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 2463562448314301232,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Patient",
+                    "Kind": "Patient",
+                    "Motions": "assets/models/monsters/patient/patient"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}
