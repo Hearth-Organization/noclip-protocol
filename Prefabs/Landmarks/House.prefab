@@ -1,0 +1,112 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "House",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 8458340194673956878
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 4623880490616330641
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 2428094440289243503
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 3001176025277230992
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 5170108671799279433
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 1518069496307953225
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 2223752120838396008
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 5073802502345845234
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 930489130066140873
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 5378163974773621418
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 1454904123317904094,
+                "Parent Entity": ""
+            },
+            "AZ::Render::EditorMeshComponent": {
+                "$type": "AZ::Render::EditorMeshComponent",
+                "Id": 2787969583377165618,
+                "Controller": {
+                    "Configuration": {
+                        "ModelAsset": {
+                            "assetId": {
+                                "guid": "{FF25CA5E-E9EE-503E-8F3C-83F9EAC2A6D0}",
+                                "subId": 282409373
+                            },
+                            "assetHint": "assets/models/landmarks/house/house.fbx.azmodel"
+                        }
+                    }
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 6302800513304979559,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{498FB4F4-2CCD-53AA-9ED1-38D994AF30A7}"
+                                    },
+                                    "assetHint": "assets/models/landmarks/house/house.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 3882487239368445299,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        2.75
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 5.5,
+                        "Radius": 2.8
+                    }
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

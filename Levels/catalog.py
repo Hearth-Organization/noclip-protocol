@@ -264,9 +264,9 @@ SURFACES = sorted({v for r in L for v in r["surfaces"].values()})
 # sun or a moon, and fog. Mood: 0 day, 1 dusk, 2 night (from the light, or the look's words). Fog: colour and how far
 # you see (meters).
 OUTDOOR_FOG = {  # by keyword in the name or look: (colour, distance)
-    "swamp": ((0.30, 0.34, 0.28), 45.0), "snow": ((0.85, 0.88, 0.92), 55.0), "beach": ((0.70, 0.72, 0.75), 160.0),
-    "overcast": ((0.66, 0.68, 0.72), 140.0), "fog": ((0.55, 0.57, 0.60), 60.0), "void": ((0.0, 0.0, 0.0), 70.0),
-    "wheat": ((0.78, 0.76, 0.66), 220.0), "cartoon": ((0.75, 0.85, 1.0), 250.0),
+    "swamp": ((0.30, 0.34, 0.28), 45.0), "snow": ((0.85, 0.88, 0.92), 55.0), "beach": ((0.70, 0.72, 0.75), 320.0),
+    "overcast": ((0.66, 0.68, 0.72), 300.0), "fog": ((0.55, 0.57, 0.60), 60.0), "void": ((0.0, 0.0, 0.0), 70.0),
+    "wheat": ((0.78, 0.76, 0.66), 400.0), "cartoon": ((0.75, 0.85, 1.0), 450.0),
 }
 for row in L:
     if row["layout"] != "outdoor":
@@ -277,7 +277,7 @@ for row in L:
     night = re.search(r"\b(night|dark|graveyard|void)\b", text) or row["light"] in ("dark", "pitch")
     dusk = re.search(r"\b(dusk|evening|sunset)\b", text) or row["light"] == "dim"
     mood = 2 if night else (1 if dusk else 0)
-    colour, distance = {0: ((0.62, 0.68, 0.76), 180.0), 1: ((0.42, 0.30, 0.24), 110.0), 2: ((0.02, 0.025, 0.045), 55.0)}[mood]
+    colour, distance = {0: ((0.62, 0.68, 0.76), 400.0), 1: ((0.42, 0.30, 0.24), 180.0), 2: ((0.02, 0.025, 0.045), 55.0)}[mood]
     for word, (c, d) in OUTDOOR_FOG.items():
         if re.search(r"\b" + word, text):
             colour, distance = c, d

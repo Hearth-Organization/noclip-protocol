@@ -207,7 +207,7 @@ namespace NoclipProtocol::Level0
             settings.m_spawnRoomRadius = 0;
             settings.m_openFraction = 1.0f; settings.m_borderExtraOpen = 1.0f; settings.m_roomChance = 0.0f;
             settings.m_pillarChance = 0.3f; settings.m_pillarSize = 2.6f; settings.m_lightSpacing = 1;
-            settings.m_decalChance = 0.1f; settings.m_clutterChance = 0.25f; settings.m_scatterChance = 0.2f;
+            settings.m_decalChance = 0.0f; settings.m_clutterChance = 0.0f; settings.m_scatterChance = 0.0f; // no Backrooms junk outside
             break;
         case 4: // caves: wide winding tunnels, thick rock columns
             settings.m_chunkCells = 6; settings.m_cellSize = 5.0f; settings.m_ceilingHeight = 4.5f;

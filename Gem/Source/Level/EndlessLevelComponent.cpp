@@ -1388,7 +1388,7 @@ namespace NoclipProtocol
             const float far = AZStd::max(level.m_fogDistance, 20.0f);
             AZ::Render::DeferredFogRequestsBus::Event(environment, &AZ::Render::DeferredFogRequests::SetFogColor,
                 AZ::Vector3(level.m_fogColor[0], level.m_fogColor[1], level.m_fogColor[2]));
-            AZ::Render::DeferredFogRequestsBus::Event(environment, &AZ::Render::DeferredFogRequests::SetFogStartDistance, far * 0.25f);
+            AZ::Render::DeferredFogRequestsBus::Event(environment, &AZ::Render::DeferredFogRequests::SetFogStartDistance, far * 0.4f);
             AZ::Render::DeferredFogRequestsBus::Event(environment, &AZ::Render::DeferredFogRequests::SetFogEndDistance, far);
             AZ::Render::DeferredFogRequestsBus::Event(environment, &AZ::Render::DeferredFogRequests::SetFogMaxHeight, 60.0f);
             AZ::Render::ExposureControlRequestBus::Event(environment, &AZ::Render::ExposureControlRequests::SetManualCompensation, compensation[mood]);
