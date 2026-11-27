@@ -79,6 +79,8 @@ namespace NoclipProtocol
             AZStd::vector<AzFramework::EntitySpawnTicket> m_tickets;
             int m_pieces = 0; // walls, pillars, lights, stains... spawned for this chunk
             AZStd::vector<AZ::Vector3> m_noclipSpots;
+            AZStd::vector<Level0::ChunkLayout::Exit> m_exits;              // doors, stairs, drops into water
+            AZStd::vector<AzFramework::EntitySpawnTicket> m_exitTickets;
             AZStd::vector<AZ::Vector3> m_litLights; // working and dying lights (what lights the player up)
             struct LivePickup
             {
@@ -132,6 +134,9 @@ namespace NoclipProtocol
         AZ::Data::Asset<AzFramework::Spawnable> m_seamAsset;
         // The spawn room's reality anchor: the reason monsters stay out of the base (HearthMonsterComponent::InSafe).
         AZ::Data::Asset<AzFramework::Spawnable> m_anchorAsset;
+        AZ::Data::Asset<AzFramework::Spawnable> m_exitAssets[3]; // EXIT door, stairs down, drop into water
+        void CheckExits();
+        bool m_exiting = false;
         AZ::Data::Asset<AzFramework::Spawnable> m_anchorLightAsset;
         AzFramework::EntitySpawnTicket m_anchorTicket;
         AzFramework::EntitySpawnTicket m_anchorLightTicket;

@@ -9,6 +9,8 @@
 // (Weapons/Hit) and dies, and a Smiler drains sanity while it watches you and backs off from a flashlight or a flare.
 #pragma once
 
+#include <AzCore/Asset/AssetCommon.h>
+
 #include <AzCore/Component/Component.h>
 #include <AzCore/Component/TickBus.h>
 #include <AzCore/Math/Vector3.h>
@@ -60,6 +62,20 @@ namespace NoclipProtocol
                 { "Doll", 5.0f, 30.0f, 0.0f, 1.0e9f },       { "Mannequin", 6.0f, 30.0f, 0.0f, 1.0e9f },
                 { "Plush", 3.0f, 30.0f, 0.0f, 1.0e9f },      { "Watcher", 0.0f, 25.0f, 0.0f, 1.0e9f },
             };
+            // Models whose front isn't +Y walked sideways (owner, Nov 27). Found by lining every kind up facing the camera
+            // (monster_spawn all<N>): these showed a side; the turn (degrees) puts their face where they go.
+            struct Turn { const char* kind; float degrees; };
+            static const Turn turns[] = {
+                { "Smiler", -90.0f }, { "Scp096", 90.0f }, { "Wretch", -90.0f }, { "Hound", 90.0f }, { "Diver", -90.0f },
+                { "Farmthing", -90.0f },
+            };
+            for (const Turn& turn : turns)
+            {
+                if (kind == turn.kind)
+                {
+                    m_turn = turn.degrees * 0.0174532925f;
+                }
+            }
             for (const Stats& stats : more)
             {
                 if (kind == stats.kind)
@@ -214,6 +230,18 @@ namespace NoclipProtocol
         // The spawn room is the player's: monsters never go in, never hit anyone inside, and don't wait outside for
         // them (owner, Nov 27: "AI should not camp or be able to enter the spawn area"). One who'd have to go in to
         // reach the player turns away and goes off somewhere else for a while.
+        // Its sounds (MonsterSounds.h, made by Tools/Monsters/make_sounds.py), from the prefab's 3D sound player.
+        void LoadSounds();
+        void Sound(int event, bool force = false);
+        void Loop(bool on);
+        AZStd::vector<AZ::Data::Asset<AZ::Data::AssetData>> m_sounds[6]; // MiniAudio sound assets
+        float m_soundCooldown = 0.0f;
+        float m_idleSoundIn = 6.0f;
+        float m_alertCooldown = 0.0f;
+        bool m_looping = false;
+        bool m_wasChasing = false;
+        AZ::Vector3 m_lastAt = AZ::Vector3::CreateZero();
+
         bool InSafe(const CellPos& cell);
         CellPos LeaveGoal(const AZ::Vector3& at);
         bool m_safeKnown = false;

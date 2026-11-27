@@ -321,6 +321,15 @@ namespace NoclipProtocol
                 }
             });
         }
+        // exit_go [door|stairs|water]: in front of the nearest way on of that kind (testing, screenshots).
+        int s_exitGo = -2;
+        void ExitGo(const AZ::ConsoleCommandContainer& arguments)
+        {
+            const AZStd::string kind = arguments.empty() ? AZStd::string() : AZStd::string(arguments[0]);
+            s_exitGo = kind == "door" ? 0 : kind == "stairs" ? 1 : kind == "water" ? 2 : -1;
+        }
+        AZ_CONSOLEFREEFUNC("exit_go", ExitGo, AZ::ConsoleFunctorFlags::Null, "exit_go [door|stairs|water]: stand in front of the nearest one (testing)");
+
         // level_go N: straight to catalog level N (0-99), as if you had noclipped into it (testing).
         void LevelGo(const AZ::ConsoleCommandContainer& arguments)
         {
@@ -514,6 +523,10 @@ namespace NoclipProtocol
             }
             m_seamAsset.Release();
             m_anchorAsset.Release();
+            for (auto& exitAsset : m_exitAssets)
+            {
+                exitAsset.Release();
+            }
             m_anchorLightAsset.Release();
             m_anchorTicket = AzFramework::EntitySpawnTicket();
             m_anchorLightTicket = AzFramework::EntitySpawnTicket();
@@ -600,6 +613,13 @@ namespace NoclipProtocol
 
     bool EndlessLevelComponent::PieceAssetsReady() const
     {
+        for (const auto& asset : m_exitAssets)
+        {
+            if (asset.GetId().IsValid() && !asset.IsReady() && !asset.IsError())
+            {
+                return false;
+            }
+        }
         for (const auto& asset : m_landmarkAssets)
         {
             if (asset.GetId().IsValid() && !asset.IsReady() && !asset.IsError())
@@ -639,6 +659,46 @@ namespace NoclipProtocol
             SetUpOutdoors(deltaTime);
         }
         CheckNoclipSpots();
+        CheckExits();
+        if (s_exitGo != -2 && m_followEntity.IsValid())
+        {
+            const int want = s_exitGo;
+            s_exitGo = -2;
+            AZ::Vector3 me = AZ::Vector3::CreateZero();
+            AZ::TransformBus::EventResult(me, m_followEntity, &AZ::TransformBus::Events::GetWorldTranslation);
+            const Level0::ChunkLayout::Exit* best = nullptr;
+            float bestD = 1.0e9f;
+            for (const auto& [key, chunk] : m_chunks)
+            {
+                for (const Level0::ChunkLayout::Exit& exit : chunk.m_exits)
+                {
+                    const float d = std::hypot(exit.m_at.m_x - me.GetX(), exit.m_at.m_y - me.GetY());
+                    if ((want < 0 || exit.m_kind == want) && d < bestD)
+                    {
+                        bestD = d;
+                        best = &exit;
+                    }
+                }
+            }
+            AZ::Entity* entity = nullptr;
+            AZ::ComponentApplicationBus::BroadcastResult(entity, &AZ::ComponentApplicationRequests::FindEntity, m_followEntity);
+            auto* player = entity ? entity->FindComponent<FirstPersonControllerComponent>() : nullptr;
+            if (best && player)
+            {
+                // The way it faces (door) / the stairs' top end: R(yaw) * +Y.
+                const float fx = -std::sin(best->m_yaw), fy = std::cos(best->m_yaw);
+                const float reach = best->m_kind == 0 ? 3.0f : (best->m_kind == 1 ? (best->m_yaw != 0.0f ? best->m_halfX : best->m_halfY) + 2.2f : 3.2f);
+                const AZ::Vector3 stand(best->m_at.m_x + fx * reach, best->m_at.m_y + fy * reach, me.GetZ());
+                const float yaw = std::atan2(fx, -fy); // looking back at it
+                player->Teleport(stand, yaw, AZ::DegToRad(best->m_kind == 0 ? 0.0f : -25.0f), true, true);
+                AZ_Printf("NoclipProtocol", "exit_go: %s at %.1f %.1f (%.0f m away)", best->m_kind == 0 ? "door" : best->m_kind == 1 ? "stairs" : "water",
+                          best->m_at.m_x, best->m_at.m_y, bestD);
+            }
+            else
+            {
+                AZ_Printf("NoclipProtocol", "exit_go: none loaded nearby");
+            }
+        }
         PublishPlayerState();
         // First frame (every entity is active by now): turn the player toward the most open view,
         // so a run never starts staring at a wall.
@@ -1064,7 +1124,20 @@ namespace NoclipProtocol
         }
         if (layout.m_hasSlabs)
         {
-            SpawnBox(chunk.m_tickets[PieceFloor], layout.m_floor, true, 0.0f, false, 1);
+            // A hole only when its stairs or pool can go in it (their prefabs loaded), else the floor whole.
+            bool holesReady = true;
+            for (const Level0::ChunkLayout::Exit& exit : layout.m_exits)
+            {
+                holesReady = holesReady && (exit.m_kind == 0 || m_exitAssets[AZStd::clamp(exit.m_kind, 0, 2)].IsReady());
+            }
+            if (layout.m_floorParts.empty() || !holesReady)
+            {
+                SpawnBox(chunk.m_tickets[PieceFloor], layout.m_floor, true, 0.0f, false, 1);
+            }
+            for (const Level0::Box& part : holesReady ? layout.m_floorParts : std::vector<Level0::Box>())
+            {
+                SpawnBox(chunk.m_tickets[PieceFloor], part, true, 0.0f, false, 1); // round a hole (stairs, water)
+            }
             if (!IsOutdoors()) // outdoors: the sky
             {
                 SpawnBox(chunk.m_tickets[PieceCeiling], layout.m_ceiling, true, 0.0f, false, 2);
@@ -1146,6 +1219,17 @@ namespace NoclipProtocol
             }
         }
 
+        // The ways on (Level0Layout step 12): a door, stairs down, a drop into water.
+        for (const Level0::ChunkLayout::Exit& exit : layout.m_exits)
+        {
+            const auto& asset = m_exitAssets[AZStd::clamp(exit.m_kind, 0, 2)];
+            if (asset.IsReady())
+            {
+                chunk.m_exits.push_back(exit);
+                chunk.m_exitTickets.emplace_back(asset);
+                SpawnBox(chunk.m_exitTickets.back(), Level0::Box{ exit.m_at.m_x, exit.m_at.m_y, 0.0f, 1.0f, 1.0f, 1.0f }, false, exit.m_yaw);
+            }
+        }
         for (const Level0::Point& spot : layout.m_noclipSpots)
         {
             chunk.m_noclipSpots.push_back(AZ::Vector3(spot.m_x, spot.m_y, spot.m_z));
@@ -1590,6 +1674,14 @@ namespace NoclipProtocol
             AZ_Warning("NoclipProtocol", false, "Base building: '%s' not found", path);
             return false;
         };
+        // The ways on: an EXIT door, stairs down, a drop into water (Tools/Levels/make_exits.py).
+        m_exiting = false;
+        if (!m_mainMenu && m_settings.m_style != 3)
+        {
+            load("prefabs/levels/exit_door.spawnable", m_exitAssets[0]);
+            load("prefabs/levels/exit_stairs.spawnable", m_exitAssets[1]);
+            load("prefabs/levels/exit_water.spawnable", m_exitAssets[2]);
+        }
         // The reality anchor in every spawn room (not the menu or the intro).
         m_anchorTicket = AzFramework::EntitySpawnTicket();
         m_anchorLightTicket = AzFramework::EntitySpawnTicket();
@@ -2098,6 +2190,89 @@ namespace NoclipProtocol
         }
     }
 
+    void EndlessLevelComponent::CheckExits()
+    {
+        if (m_noclipping || m_exiting || !m_followEntity.IsValid() || m_mainMenu)
+        {
+            return;
+        }
+        AZ::Vector3 at = AZ::Vector3::CreateZero();
+        AZ::TransformBus::EventResult(at, m_followEntity, &AZ::TransformBus::Events::GetWorldTranslation);
+        for (const auto& [key, chunk] : m_chunks)
+        {
+            for (const Level0::ChunkLayout::Exit& exit : chunk.m_exits)
+            {
+                const float dx = at.GetX() - exit.m_at.m_x, dy = at.GetY() - exit.m_at.m_y;
+                bool through = false;
+                if (exit.m_kind == 0)
+                {
+                    // Walking into the doorway: close to the door's face, between its jambs.
+                    const float fx = -std::sin(exit.m_yaw), fy = std::cos(exit.m_yaw);
+                    const float ahead = dx * fx + dy * fy, across = dx * fy - dy * fx;
+                    through = ahead < 0.45f && ahead > -0.3f && std::fabs(across) < 0.5f && std::fabs(at.GetZ()) < 2.5f;
+                }
+                else
+                {
+                    // Down the stairs / into the water: inside the hole and below the floor.
+                    through = std::fabs(dx) < exit.m_halfX && std::fabs(dy) < exit.m_halfY && at.GetZ() < (exit.m_kind == 1 ? -0.7f : -0.4f);
+                }
+                if (!through)
+                {
+                    continue;
+                }
+                m_exiting = true;
+                // Where it goes. A door: the next level. Stairs: the next stairwell level on (or deeper). Water: a
+                // water level (The Poolrooms first). From Levels 0-2, their own next levels for a door.
+                const int from = m_settings.m_catalog >= 0 ? m_settings.m_catalog : AZStd::clamp(m_settings.m_style, 0, 2);
+                auto nextWith = [from](int layout, int fallback)
+                {
+                    for (int step = 1; step < Catalog::LevelCount; ++step)
+                    {
+                        const int n = (from + step) % Catalog::LevelCount;
+                        if (n > 2 && Catalog::Levels[n].m_layout == layout)
+                        {
+                            return n;
+                        }
+                    }
+                    return fallback;
+                };
+                int to = exit.m_kind == 0 ? AZStd::min(from + 1, Catalog::LevelCount - 1)
+                       : exit.m_kind == 1 ? nextWith(6, AZStd::min(from + 2, Catalog::LevelCount - 1))
+                                          : (from < 37 ? 37 : nextWith(5, 37));
+                if (from == Catalog::LevelCount - 1 && exit.m_kind == 0)
+                {
+                    to = 0;
+                }
+                const AZStd::string target = LevelFileFor(to);
+                auto* registry = AZ::SettingsRegistry::Get();
+                double now = 0.0;
+                if (registry)
+                {
+                    registry->Get(now, "/NoclipProtocol/Hud/time");
+                    if (to > 2)
+                    {
+                        registry->Set("/NoclipProtocol/Level/Number", static_cast<AZ::s64>(to));
+                    }
+                    static const char* const toasts[3] = { "You step through the door...", "The stairs go down further than they should...",
+                                                           "You drop into the water..." };
+                    registry->Set("/NoclipProtocol/Hud/toast", AZStd::string(toasts[AZStd::clamp(exit.m_kind, 0, 2)]));
+                    registry->Set("/NoclipProtocol/Hud/toast.until", now + 3.0);
+                    registry->Set("/NoclipProtocol/Level/Arrived", AZStd::string("noclip"));
+                }
+                AZ_Printf("NoclipProtocol", "Exit (%s) at %.1f %.1f: into level %d (%s)", exit.m_kind == 0 ? "door" : exit.m_kind == 1 ? "stairs" : "water",
+                          exit.m_at.m_x, exit.m_at.m_y, to, target.c_str());
+                AZ::TickBus::QueueFunction([target]()
+                {
+                    if (auto* console = AZ::Interface<AZ::IConsole>::Get())
+                    {
+                        console->PerformCommand(AZStd::string::format("LoadLevel %s", target.c_str()).c_str());
+                    }
+                });
+                return;
+            }
+        }
+    }
+
     void EndlessLevelComponent::UpdateHums(float deltaTime)
     {
         for (size_t i = 0; i < m_pendingHums.size();)
@@ -2139,6 +2314,18 @@ namespace NoclipProtocol
             }
         }
         chunk.m_tickets.clear();
+        if (auto* spawner = AzFramework::SpawnableEntitiesInterface::Get())
+        {
+            for (auto& ticket : chunk.m_exitTickets)
+            {
+                if (ticket.IsValid())
+                {
+                    spawner->DespawnAllEntities(ticket);
+                }
+            }
+        }
+        chunk.m_exitTickets.clear();
+        chunk.m_exits.clear();
         if (auto* spawner = AzFramework::SpawnableEntitiesInterface::Get())
         {
             for (auto& pickup : chunk.m_pickups)

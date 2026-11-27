@@ -45,6 +45,7 @@ namespace NoclipProtocol::Level0
         float m_propChance = 0.0f;     // Level 1: crates per cell; Level 2: pipes per wall segment
         float m_pickupChance = 0.05f; // per cell: scrap, wire, fuel or Almond Water lying about (ApplyStyle: fewer in Level 2)
         float m_noclipChance = 0.08f;  // chance a chunk has a noclip spot (a tear you walk through into the next level)
+        float m_exitChance = 0.22f;    // chance a chunk has a way on: an EXIT door, stairs down or a drop into water
         float m_clutterChance = 0.6f;  // per cell: something that ended up here (ApplyStyle sets it per level; 0 = none)
         float m_scatterChance = 0.4f;  // per cell: small things lying about (cans, papers, a backpack)
 
@@ -119,6 +120,17 @@ namespace NoclipProtocol::Level0
         std::vector<Decal> m_decals;
         std::vector<Box> m_props;    // Level 1 crates, Level 2 pipes (one stretched box each)
         std::vector<Point> m_noclipSpots; // on the floor, in the middle of a cell
+        //! Ways into other levels besides the tears (owner, Nov 27: "doorways or stairs or a drop off into water").
+        struct Exit
+        {
+            Point m_at;      // door: on the wall's face, at the floor; stairs and water: the middle of the hole
+            float m_yaw;     // radians: the way the door faces / the way the stairs go down (0 = toward -Y)
+            int m_kind;      // 0 EXIT door, 1 stairs down, 2 drop into water
+            float m_halfX;   // the hole's half size (stairs, water), turned with m_yaw
+            float m_halfY;
+        };
+        std::vector<Exit> m_exits;
+        std::vector<Box> m_floorParts;    // the floor in pieces round a hole (stairs, water); empty: m_floor whole
         bool m_hasSlabs = true;           // false: no floor or ceiling (the empty chunks around the intro facility)
         std::vector<Box> m_frames;        // Breach 4-A's hazard-striped frame (columns and lintel)
         std::vector<Box> m_voids;         // the breach itself where it is not a way out (Level 0's end of Breach 4-A)

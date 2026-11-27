@@ -562,6 +562,9 @@ def build_prefab(name, spec, template, folder="Prefabs/Clutter", mat_guid=None):
     if spec["collide"]:
         w, d, h = spec["size"]
         add_entity("Blocker", "box", (0, 0, h / 2), (w, d, h), None, None, mesh=False, collider=True)
+    # Or colliders of their own (stairs: one per step), as (center, size, yaw degrees or None).
+    for i, (center, size, rot) in enumerate(spec.get("blockers", [])):
+        add_entity(f"Blocker{i}", "box", center, size, None, rot, mesh=False, collider=True)
     data["Entities"] = entities
     data["ContainerEntity"]["Components"]["EditorEntitySortComponent"]["Child Entity Order"] = order
     with open(path(folder, f"{name}.prefab"), "w") as f:

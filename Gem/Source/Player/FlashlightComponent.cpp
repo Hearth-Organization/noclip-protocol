@@ -125,10 +125,10 @@ namespace NoclipProtocol
             AZ::TransformBus::Event(m_lightEntity, &AZ::TransformBus::Events::SetLocalTranslation, AZ::Vector3(0.16f, 0.95f, -0.10f));
             AZ::Render::AreaLightRequestBus::Event(m_lightEntity, [](AZ::Render::AreaLightRequests* light)
             {
-                light->SetIntensity(380.0f);
+                light->SetIntensity(450.0f);
                 light->SetAttenuationRadius(30.0f);
-                light->SetInnerShutterAngle(16.0f);
-                light->SetOuterShutterAngle(36.0f);
+                light->SetInnerShutterAngle(13.0f);
+                light->SetOuterShutterAngle(30.0f);
             });
         }
         else if (!visible && lightEntity->GetState() == AZ::Entity::State::Active)

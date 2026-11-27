@@ -63,6 +63,10 @@ AZ_CVAR(int, hud_orders_layers, 4, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Foundation requisitions page: half-alpha layers over its dark backdrop");
 AZ_CVAR(int, hud_term_layers, 7, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Terminal page: how many times its shapes are laid down (7 at 0.5 alpha covers 99% of the game behind)");
+// Off (Nov 27): drawn with the HUD's see-through shapes it came out as a bright oval with coloured fringes in
+// game, lighter outside rather than darker (the renderer, not the shape: same code as when it looked right).
+AZ_CVAR(int, hud_vignette, 0, nullptr, AZ::ConsoleFunctorFlags::Null,
+    "The HUD's edge vignette: 1 on, 0 off");
 AZ_CVAR(int, hud_wheel, -1, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Show the weapon wheel with slice 0-5 picked (testing; -1 off)");
 AZ_CVAR(int, hud_page, -1, nullptr, AZ::ConsoleFunctorFlags::Null,
@@ -1687,6 +1691,7 @@ namespace NoclipProtocol
         if (deathPhase == 0 && m_page != Page::Terminal && !m_inMenu && m_page != Page::Build && m_page != Page::Orders && m_page != Page::Settings)
         {
             // ---- vignette: radial-gradient(ellipse at center, transparent 55%, rgba(8,7,4,0.55) 100%) ----
+            if (hud_vignette != 0)
             {
                 const AZ::Color edge(8 / 255.0f, 7 / 255.0f, 4 / 255.0f, 0.55f);
                 const AZ::Color clear(8 / 255.0f, 7 / 255.0f, 4 / 255.0f, 0.0f);

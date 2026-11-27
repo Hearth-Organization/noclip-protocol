@@ -53,6 +53,12 @@ BASE_MATERIALS = {
     "piece_olive":       ([0.06, 0.07, 0.03], 0.4, 0.55, None),
     "piece_seam":        ([0.55, 0.50, 1.00], 0.0, 0.2, ([0.6, 0.55, 1.0], 10.0)),
     "piece_anchor":      ([0.50, 0.55, 1.00], 0.0, 0.2, ([0.55, 0.6, 1.0], 6.0)),
+    # The ways on (Tools/Levels/make_exits.py): pool water and tiles, the stairwell's concrete.
+    "piece_water":       ([0.03, 0.16, 0.20], 0.0, 0.04, ([0.10, 0.45, 0.55], 1.2)),
+    "piece_tile":        ([0.80, 0.84, 0.82], 0.0, 0.25, None),
+    "piece_door":        ([0.30, 0.31, 0.30], 0.6, 0.45, None),
+    "piece_void":        ([0.0, 0.0, 0.0], 0.0, 1.0, None),
+    "piece_exit_sign":   ([0.02, 0.55, 0.12], 0.0, 0.3, ([0.05, 0.9, 0.2], 1.4)),
 }
 
 

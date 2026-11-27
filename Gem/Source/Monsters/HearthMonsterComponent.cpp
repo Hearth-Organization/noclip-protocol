@@ -3,6 +3,11 @@
 #include "../Level/Level0Layout.h"
 #include "../Player/FirstPersonControllerComponent.h"
 #include "SimpleMotionComponentBus.h"
+#include "MonsterSounds.h"
+#include "../Hud/GameSettings.h"
+#include <MiniAudio/MiniAudioPlaybackBus.h>
+#include <MiniAudio/SoundAsset.h>
+#include <AzCore/Asset/AssetManager.h>
 
 #include <AzCore/Asset/AssetManagerBus.h>
 
@@ -117,6 +122,15 @@ namespace NoclipProtocol
             m_name = GetEntity()->GetName();
         }
         LoadSenses();
+        LoadSounds();
+        if (m_turn != 0.0f)
+        {
+            // It was placed facing the way it should look: turn the model so its face is that way.
+            AZ::Quaternion q = AZ::Quaternion::CreateIdentity();
+            AZ::TransformBus::EventResult(q, GetEntityId(), &AZ::TransformBus::Events::GetWorldRotationQuaternion);
+            AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion,
+                AZ::Quaternion::CreateRotationZ(m_turn) * q);
+        }
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
             AZStd::string list;
@@ -208,6 +222,19 @@ namespace NoclipProtocol
             {
                 m_blocked.insert(MonsterEdgeKey(horizontal ? 0 : 1, line, first + i));
             }
+        }
+        // Holes in the floor (stairs down, a drop into water): walled off for walking, so nothing floats across them.
+        for (const Level0::ChunkLayout::Exit& exit : layout.m_exits)
+        {
+            if (exit.m_kind == 0)
+            {
+                continue;
+            }
+            const CellPos c = Cell(AZ::Vector3(exit.m_at.m_x, exit.m_at.m_y, 0.0f));
+            m_blocked.insert(MonsterEdgeKey(0, c.y, c.x));
+            m_blocked.insert(MonsterEdgeKey(0, c.y + 1, c.x));
+            m_blocked.insert(MonsterEdgeKey(1, c.x, c.y));
+            m_blocked.insert(MonsterEdgeKey(1, c.x + 1, c.y));
         }
     }
 
@@ -413,6 +440,15 @@ namespace NoclipProtocol
                             m_provoked = 12.0f;
                         }
                         m_health -= static_cast<float>(damage);
+                        if (m_health <= 0.0f)
+                        {
+                            Loop(false);
+                            Sound(MonsterSounds::Die, true);
+                        }
+                        else if (damage > 0.0)
+                        {
+                            Sound(MonsterSounds::Hurt, true);
+                        }
                         m_heardAt = shooterAt;   // it knows where that came from
                         m_sinceHeard = 0.0f;
                         AZ_Printf("Noclip", "monster: %s hit for %.0f (%.0f left)%s", m_name.c_str(), damage, AZStd::max(0.0f, m_health),
@@ -460,6 +496,30 @@ namespace NoclipProtocol
             }
         }
         m_stepsSeen = steps;
+
+        // Sounds: now and then while it's near; its loop (SCP-173's scrape while it moves, SCP-096's crying).
+        {
+            m_soundCooldown = AZStd::max(0.0f, m_soundCooldown - deltaTime);
+            m_alertCooldown = AZStd::max(0.0f, m_alertCooldown - deltaTime);
+            const float moved = deltaTime > 0.0f ? (at - m_lastAt).GetLength() / deltaTime : 0.0f;
+            m_lastAt = at;
+            if (m_kind == "Scp173" || m_kind == "Mannequin")
+            {
+                Loop(moved > 0.2f && moved < 30.0f && distance < 40.0f);
+            }
+            else if (m_kind == "Scp096")
+            {
+                Loop(m_mood == 0 && distance < 40.0f);
+            }
+            else if ((m_idleSoundIn -= deltaTime) <= 0.0f)
+            {
+                m_idleSoundIn = 6.0f + static_cast<float>(std::rand() % 900) / 100.0f;
+                if (distance < 30.0f && m_health > 0.0f)
+                {
+                    Sound(MonsterSounds::Idle);
+                }
+            }
+        }
         // A gunshot carries much further than a step: heard out to four times the hearing distance (a knife is quiet).
         AZ::s64 shots = 0;
         if (registry)
@@ -550,6 +610,7 @@ namespace NoclipProtocol
                 if (m_attack < 0.0f && distance < 1.7f && m_attackCooldown <= 0.0f)
                 {
                     m_attack = 0.0f;
+                    Sound(MonsterSounds::Attack, true);
                     m_struck = false;
                 }
                 if (m_attack >= 0.0f)
@@ -629,6 +690,7 @@ namespace NoclipProtocol
                 if (m_moodTime <= 0.0f)
                 {
                     m_mood = 2;
+                    Sound(MonsterSounds::Alert, true);
                     m_lostFor = 0.0f;
                     m_heardAt = playerAt;
                 }
@@ -648,6 +710,7 @@ namespace NoclipProtocol
                 if (m_attack < 0.0f && seesYou && distance < 1.8f)
                 {
                     m_attack = 0.0f;
+                    Sound(MonsterSounds::Attack, true);
                     m_struck = false;
                 }
                 if (m_attack >= 0.0f)
@@ -675,6 +738,7 @@ namespace NoclipProtocol
                 if (seesYou && distance < m_sight && self.GetBasisY().GetNormalized().Dot(flat / AZStd::max(distance, 0.01f)) >= 0.5f)
                 {
                     m_mood = 2;
+                    Sound(MonsterSounds::Alert, true);
                     m_lostFor = 0.0f;
                     m_heardAt = playerAt;
                     return;
@@ -798,6 +862,7 @@ namespace NoclipProtocol
                 registry->Set("/NoclipProtocol/Player/LastHitBy", m_kind);
                 drainSanity(0.3);
                 AZ_Printf("Noclip", "monster: %s reached you", m_name.c_str());
+                Sound(MonsterSounds::Attack, true);
                 Report(at, "Reached " + playerName);
                 return;
             }
@@ -836,6 +901,7 @@ namespace NoclipProtocol
                 registry->Set("/NoclipProtocol/Player/LastHitBy", m_kind);
                 drainSanity(0.12);
                 m_attackCooldown = 2.0f;
+                Sound(MonsterSounds::Attack, true);
                 Report(at, "Reached " + playerName);
                 return;
             }
@@ -916,6 +982,7 @@ namespace NoclipProtocol
             if (m_attack < 0.0f && touches && m_attackCooldown <= 0.0f)
             {
                 m_attack = 0.0f;
+                Sound(MonsterSounds::Attack, true);
                 m_struck = false;
             }
             if (m_attack >= 0.0f)
@@ -947,6 +1014,7 @@ namespace NoclipProtocol
         {
             m_attack = 0.0f;
             m_struck = false;
+            Sound(MonsterSounds::Attack, true);
         }
         if (m_attack >= 0.0f)
         {
@@ -1044,6 +1112,92 @@ namespace NoclipProtocol
         return true;
     }
 
+    void HearthMonsterComponent::LoadSounds()
+    {
+        for (auto& takes : m_sounds)
+        {
+            takes.clear();
+        }
+        for (const MonsterSounds::Kind& kind : MonsterSounds::Kinds)
+        {
+            if (m_kind != kind.m_kind)
+            {
+                continue;
+            }
+            for (int e = 0; e < MonsterSounds::EventCount; ++e)
+            {
+                for (int n = 1; n <= kind.m_takes[e]; ++n)
+                {
+                    const AZStd::string product = AZStd::string::format("%s/%s_%d.wav.%s", kind.m_folder, MonsterSounds::EventNames[e], n,
+                                                                        MiniAudio::SoundAsset::FileExtension);
+                    AZ::Data::AssetId id;
+                    AZ::Data::AssetCatalogRequestBus::BroadcastResult(id, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath, product.c_str(),
+                                                                      azrtti_typeid<MiniAudio::SoundAsset>(), false);
+                    if (id.IsValid())
+                    {
+                        m_sounds[e].push_back(AZ::Data::AssetManager::Instance().GetAsset(
+                            id, azrtti_typeid<MiniAudio::SoundAsset>(), AZ::Data::AssetLoadBehavior::PreLoad));
+                    }
+                }
+            }
+        }
+    }
+
+    void HearthMonsterComponent::Sound(int event, bool force)
+    {
+        if (event < 0 || event >= MonsterSounds::EventCount || m_sounds[event].empty() || (!force && m_soundCooldown > 0.0f))
+        {
+            return;
+        }
+        // A take that's loaded, never the same one twice running if there's a choice.
+        const int count = static_cast<int>(m_sounds[event].size());
+        int pick = std::rand() % count;
+        for (int tries = 0; tries < count && !m_sounds[event][pick].IsReady(); ++tries)
+        {
+            pick = (pick + 1) % count;
+        }
+        if (!m_sounds[event][pick].IsReady())
+        {
+            return;
+        }
+        m_looping = false;
+        const AZ::EntityId self = GetEntityId();
+        MiniAudio::MiniAudioPlaybackRequestBus::Event(self, &MiniAudio::MiniAudioPlaybackRequests::Stop);
+        MiniAudio::MiniAudioPlaybackRequestBus::Event(self, &MiniAudio::MiniAudioPlaybackRequests::SetLooping, false);
+        MiniAudio::MiniAudioPlaybackRequestBus::Event(self, &MiniAudio::MiniAudioPlaybackRequests::SetSoundAsset,
+                                                      AZ::Data::Asset<MiniAudio::SoundAsset>(m_sounds[event][pick]));
+        MiniAudio::MiniAudioPlaybackRequestBus::Event(self, &MiniAudio::MiniAudioPlaybackRequests::SetVolumePercentage,
+                                                      100.0f * GameSettings::Gain("vol_monsters"));
+        MiniAudio::MiniAudioPlaybackRequestBus::Event(self, &MiniAudio::MiniAudioPlaybackRequests::Play);
+        m_soundCooldown = event == MonsterSounds::Attack ? 0.8f : 2.0f;
+    }
+
+    void HearthMonsterComponent::Loop(bool on)
+    {
+        auto& takes = m_sounds[MonsterSounds::Loop];
+        if (on == m_looping || takes.empty() || (on && !takes[0].IsReady()))
+        {
+            return;
+        }
+        // A one-off sound (an attack) finishes before the loop comes back.
+        if (on && m_soundCooldown > 0.0f)
+        {
+            return;
+        }
+        m_looping = on;
+        const AZ::EntityId self = GetEntityId();
+        MiniAudio::MiniAudioPlaybackRequestBus::Event(self, &MiniAudio::MiniAudioPlaybackRequests::Stop);
+        if (on)
+        {
+            MiniAudio::MiniAudioPlaybackRequestBus::Event(self, &MiniAudio::MiniAudioPlaybackRequests::SetSoundAsset,
+                                                          AZ::Data::Asset<MiniAudio::SoundAsset>(takes[0]));
+            MiniAudio::MiniAudioPlaybackRequestBus::Event(self, &MiniAudio::MiniAudioPlaybackRequests::SetLooping, true);
+            MiniAudio::MiniAudioPlaybackRequestBus::Event(self, &MiniAudio::MiniAudioPlaybackRequests::SetVolumePercentage,
+                                                          100.0f * GameSettings::Gain("vol_monsters"));
+            MiniAudio::MiniAudioPlaybackRequestBus::Event(self, &MiniAudio::MiniAudioPlaybackRequests::Play);
+        }
+    }
+
     bool HearthMonsterComponent::InSafe(const CellPos& cell)
     {
         if (!m_safeKnown)
@@ -1121,6 +1275,12 @@ namespace NoclipProtocol
             m_repath = 0.0f;
             AZ_Printf("Noclip", "monster: %s turns away from the reality anchor's field", m_name.c_str());
         }
+        if (closeIn && !m_wasChasing && m_alertCooldown <= 0.0f && m_kind != "Scp096")
+        {
+            m_alertCooldown = 12.0f;
+            Sound(MonsterSounds::Alert, true);
+        }
+        m_wasChasing = closeIn;
         const bool leaving = m_leaveFor > 0.0f;
         if (leaving)
         {

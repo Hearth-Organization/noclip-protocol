@@ -77,6 +77,11 @@ def main():
             "ShapeConfiguration": {"ShapeType": 2, "Capsule": {"Height": height, "Radius": radius}},
         },
         "EditorStaticRigidBodyComponent": {"$type": "EditorStaticRigidBodyComponent", "Id": nid()},
+        # Its voice (Tools/Monsters/make_sounds.py): heard in 3D from where it is; the game picks the sound.
+        "EditorMiniAudioPlaybackComponent": {"$type": "EditorMiniAudioPlaybackComponent", "Id": nid(),
+                                             "Controller": {"Config": {"Autoplay": False, "Volume": 100.0, "Loop": False,
+                                                                       "Spatialization": True, "Min Distance": 2.0,
+                                                                       "Max Distance": 32.0, "Auto-follow": True}}},
         "HearthMonster": {"$type": "GenericComponentWrapper", "Id": nid(),
                           "m_template": {"$type": "HearthMonsterComponent", "Name": name, "Kind": name,
                                          "Motions": f"{folder}/{name.lower()}"}},

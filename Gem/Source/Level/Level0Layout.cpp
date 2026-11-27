@@ -75,6 +75,7 @@ namespace NoclipProtocol::Level0
             TagNoclip = 20,
             TagPickup = 21,
             TagClutter = 22,
+            TagExit = 23,
         };
 
         float Smooth(float t) { return t * t * (3.0f - 2.0f * t); }
@@ -961,6 +962,105 @@ namespace NoclipProtocol::Level0
                         }
                     }
                 }
+            }
+        }
+
+        // 12. Now and then a way on that isn't a tear (owner, Nov 27): an EXIT door in a wall, stairs going down
+        //     through the floor, or a drop through the floor into water. Never by the arrival area or the spawn room.
+        if (settings.m_exitChance > 0.0f && layout.m_hasSlabs && settings.m_style != 3)
+        {
+            const uint64_t he = Hash(settings.m_seed, TagExit, chunkX, chunkY);
+            const bool nearOrigin = std::abs(chunkX) + std::abs(chunkY) <= 1;
+            const bool outdoors = settings.m_layout == 3;
+            if (!nearOrigin && Unit(he) < settings.m_exitChance)
+            {
+                const float roll = Unit(Mix(he ^ 3));
+                int kind = roll < 0.45f ? 0 : (roll < 0.75f ? 1 : 2);
+                if (outdoors || (kind == 1 && cell < 3.8f) || (kind == 2 && cell < 2.8f))
+                {
+                    kind = 0; // no holes outdoors or in small cells: a door instead
+                }
+                if (kind == 0)
+                {
+                    // An EXIT door on one face of one of the chunk's wall segments.
+                    std::vector<const Box*> walls;
+                    for (const Box& w : layout.m_walls)
+                    {
+                        if (std::max(w.m_sx, w.m_sy) >= cell * 0.9f)
+                        {
+                            walls.push_back(&w);
+                        }
+                    }
+                    if (!walls.empty())
+                    {
+                        const Box& w = *walls[static_cast<size_t>(Mix(he ^ 4) % walls.size())];
+                        const bool alongX = w.m_sx > w.m_sy;
+                        const float side = (Mix(he ^ 5) & 1u) ? 1.0f : -1.0f;
+                        const float half = (alongX ? w.m_sy : w.m_sx) * 0.5f;
+                        ChunkLayout::Exit door{};
+                        door.m_kind = 0;
+                        door.m_at = alongX ? Point{ w.m_cx, w.m_cy + side * half, 0.0f } : Point{ w.m_cx + side * half, w.m_cy, 0.0f };
+                        // Front (+Y of the door) toward the room it opens into.
+                        door.m_yaw = alongX ? (side > 0.0f ? 0.0f : 3.14159265f) : (side > 0.0f ? -1.5707963f : 1.5707963f);
+                        layout.m_exits.push_back(door);
+                    }
+                }
+                else
+                {
+                    const int cx = static_cast<int>(Mix(he ^ 6) % static_cast<uint64_t>(n));
+                    const int cy = static_cast<int>(Mix(he ^ 7) % static_cast<uint64_t>(n));
+                    ChunkLayout::Exit hole{};
+                    hole.m_kind = kind;
+                    hole.m_at = Point{ (static_cast<float>(baseX + cx) + 0.5f) * cell, (static_cast<float>(baseY + cy) + 0.5f) * cell, 0.0f };
+                    const bool turned = (Mix(he ^ 8) & 1u) != 0;
+                    hole.m_yaw = turned ? 1.5707963f : 0.0f;
+                    const float hx = kind == 1 ? 0.85f : 1.1f, hy = kind == 1 ? 1.65f : 1.1f;
+                    hole.m_halfX = turned ? hy : hx;
+                    hole.m_halfY = turned ? hx : hy;
+                    layout.m_exits.push_back(hole);
+                    // The floor in four pieces round the hole.
+                    const Box& f = layout.m_floor;
+                    const float x0 = f.m_cx - f.m_sx * 0.5f, x1 = f.m_cx + f.m_sx * 0.5f, y0 = f.m_cy - f.m_sy * 0.5f, y1 = f.m_cy + f.m_sy * 0.5f;
+                    const float a0 = hole.m_at.m_x - hole.m_halfX, a1 = hole.m_at.m_x + hole.m_halfX;
+                    const float b0 = hole.m_at.m_y - hole.m_halfY, b1 = hole.m_at.m_y + hole.m_halfY;
+                    auto part = [&](float px0, float px1, float py0, float py1)
+                    {
+                        if (px1 - px0 > 0.01f && py1 - py0 > 0.01f)
+                        {
+                            layout.m_floorParts.push_back(Box{ (px0 + px1) * 0.5f, (py0 + py1) * 0.5f, f.m_cz, px1 - px0, py1 - py0, f.m_sz });
+                        }
+                    };
+                    part(x0, x1, y0, b0);
+                    part(x0, x1, b1, y1);
+                    part(x0, a0, b0, b1);
+                    part(a1, x1, b0, b1);
+                    // Nothing left standing in it.
+                    auto inside = [&](float x, float y, float margin)
+                    {
+                        return x > a0 - margin && x < a1 + margin && y > b0 - margin && y < b1 + margin;
+                    };
+                    layout.m_clutter.erase(std::remove_if(layout.m_clutter.begin(), layout.m_clutter.end(),
+                        [&](const ChunkLayout::Clutter& c) { return inside(c.m_at.m_x, c.m_at.m_y, 0.8f); }), layout.m_clutter.end());
+                    layout.m_pickups.erase(std::remove_if(layout.m_pickups.begin(), layout.m_pickups.end(),
+                        [&](const ChunkLayout::Pickup& p) { return inside(p.m_at.m_x, p.m_at.m_y, 0.4f); }), layout.m_pickups.end());
+                    layout.m_noclipSpots.erase(std::remove_if(layout.m_noclipSpots.begin(), layout.m_noclipSpots.end(),
+                        [&](const Point& p) { return inside(p.m_x, p.m_y, 1.0f); }), layout.m_noclipSpots.end());
+                    layout.m_decals.erase(std::remove_if(layout.m_decals.begin(), layout.m_decals.end(),
+                        [&](const Decal& d) { return inside(d.m_position.m_x, d.m_position.m_y, d.m_size * 0.5f); }), layout.m_decals.end());
+                    layout.m_props.erase(std::remove_if(layout.m_props.begin(), layout.m_props.end(),
+                        [&](const Box& b) { return b.m_cz < 1.5f && inside(b.m_cx, b.m_cy, std::max(b.m_sx, b.m_sy) * 0.5f); }), layout.m_props.end());
+                }
+            }
+        }
+        // A door's doorway is kept clear too.
+        for (const ChunkLayout::Exit& e : layout.m_exits)
+        {
+            if (e.m_kind == 0)
+            {
+                const float fx = -std::sin(e.m_yaw), fy = std::cos(e.m_yaw);
+                const float mx = e.m_at.m_x + fx * 1.0f, my = e.m_at.m_y + fy * 1.0f;
+                layout.m_clutter.erase(std::remove_if(layout.m_clutter.begin(), layout.m_clutter.end(),
+                    [&](const ChunkLayout::Clutter& c) { return std::hypot(c.m_at.m_x - mx, c.m_at.m_y - my) < 1.4f; }), layout.m_clutter.end());
             }
         }
 

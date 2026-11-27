@@ -53,7 +53,7 @@ LOG_DIR = PROJECT / "user" / "log"
 LAUNCHER = PROJECT / "build" / "linux" / "bin" / "profile" / "NoclipProtocol.GameLauncher"
 BUILD_TARGETS = ["NoclipProtocol.GameLauncher", "NoclipProtocol.HeadlessServerLauncher",
                  "NoclipProtocol.ServerLauncher", "NoclipProtocol.UnifiedLauncher", "Editor"]
-VERSION = "1.9"
+VERSION = "1.10"
 ENGINE_DIR = Path.home() / "O3DE" / "Engines" / "hearth-engine"
 ENGINE_REPO = "https://github.com/Dragongamer9/hearth-engine"
 ENGINE_BRANCH = "hearth/main"
@@ -1927,6 +1927,35 @@ def op_project_copy(args):
 
 
 OPS.update({"project_copy": op_project_copy})
+
+
+def op_unpack(args):
+    """unpack {"zip": "user/HearthAgent/drop/name.zip", "to": "."}: unpacks a zip (one commit instead of hundreds of
+    files) into a folder inside the project, keeping its folders. Refuses anything that would land outside the project."""
+    import zipfile
+    zpath = (PROJECT / args["zip"]).resolve()
+    dst = (PROJECT / args.get("to", ".")).resolve()
+    root = PROJECT.resolve()
+    if root not in zpath.parents or (dst != root and root not in dst.parents) or not zpath.is_file():
+        return {"ok": False, "error": "the zip and the folder must be inside the project"}
+    written = 0
+    with zipfile.ZipFile(zpath) as z:
+        for info in z.infolist():
+            target = (dst / info.filename).resolve()
+            if root not in target.parents:
+                return {"ok": False, "error": f"refused {info.filename}: outside the project"}
+            if info.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(z.read(info))
+            written += 1
+    if args.get("delete", True):
+        zpath.unlink(missing_ok=True)
+    return {"ok": True, "written": written, "to": str(dst)}
+
+
+OPS.update({"unpack": op_unpack})
 
 # ---------- request loop ----------
 
