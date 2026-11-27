@@ -62,7 +62,7 @@ namespace NoclipProtocol
         AZ::EntityId m_player;
         AZ::EntityId m_camera;
 
-        enum Phase : int { Alive = 0, Hit, PullOut, Card, Beacon, NextAgent };
+        enum Phase : int { Alive = 0, Hit, PullOut, Card, Beacon, NextAgent, WalkOut };
 
         void Activate() override
         {
@@ -71,7 +71,11 @@ namespace NoclipProtocol
             if (auto* r = AZ::SettingsRegistry::Get())
             {
                 r->Set("/NoclipProtocol/Death/Phase", 0.0);
-                r->Set("/NoclipProtocol/Player/Dead", false);
+                bool walkOut = false;
+                r->Get(walkOut, "/NoclipProtocol/Death/WalkOut");
+                m_walkPending = walkOut;
+                m_walkWait = 1.2f;
+                r->Set("/NoclipProtocol/Player/Dead", walkOut); // still in the cutscene until they've walked out
                 // The first agent of a run.
                 AZ::s64 number = 0;
                 if (!r->Get(number, AZStd::string(Agents::Root) + "/Number"))
@@ -95,6 +99,7 @@ namespace NoclipProtocol
                 AzFramework::SpawnableEntitiesInterface::Get()->DespawnAllEntities(*m_gearTicket);
             }
             m_gearTicket.reset();
+            DespawnBody();
         }
 
     private:
@@ -264,26 +269,15 @@ namespace NoclipProtocol
             AZ::TransformBus::Event(m_camera, &AZ::TransformBus::Events::SetLocalTM, m_cameraLocal);
             if (r)
             {
-                r->Set("/NoclipProtocol/Death/Phase", 0.0);
-                r->Set("/NoclipProtocol/Player/Dead", false);
                 r->Set("/NoclipProtocol/Player/Respawn", true);
-                double now = 0.0;
-                r->Get(now, "/NoclipProtocol/Hud/time");
-                r->Set("/NoclipProtocol/Death/BootUntil", now + 4.0);
                 r->Set("/NoclipProtocol/Agent/NumberText", AZStd::string::format("%d", static_cast<int>(m_next.m_number)));
                 r->Set("/NoclipProtocol/Player/LastHitBy", AZStd::string());
-                r->Set("/NoclipProtocol/Monsters/Enabled", true);
-                r->Set("/NoclipProtocol/Monsters/Spawn", true);
+                r->Set("/NoclipProtocol/Death/WalkOut", true); // the next agent walks out of Breach 4-A
             }
             if (m_level == 0)
             {
-                // Out of Breach 4-A (or at the beacon) in the spawn room, facing in.
-                AZ::Entity* entity = nullptr;
-                AZ::ComponentApplicationBus::BroadcastResult(entity, &AZ::ComponentApplicationRequests::FindEntity, m_player);
-                if (auto* player = entity ? entity->FindComponent<FirstPersonControllerComponent>() : nullptr)
-                {
-                    player->Teleport(AZ::Vector3(m_base.GetX(), m_base.GetY(), m_floorZ + 0.05f), 0.0f, 0.0f, true, true);
-                }
+                m_walkPending = true;
+                m_walkWait = 0.0f;
             }
             else
             {
@@ -300,6 +294,129 @@ namespace NoclipProtocol
                     }
                 });
             }
+        }
+
+        // ---- the next agent walks out of Breach 4-A (the owner, Nov 27: "the next agent walking thru the breach and the
+        // camera following them"): the camera waits in the spawn room facing the breach, backs away in front of them as
+        // they step out and walk in, then swings round into their eyes. Their body is the agent model for their gender
+        // (prefabs/agents/agent_male|female.spawnable, from Hearth Forge) once it's there.
+        void StartWalk()
+        {
+            auto* r = AZ::SettingsRegistry::Get();
+            m_walkPending = false;
+            m_phase = WalkOut;
+            m_clock = 0.0f;
+            AZ::Vector3 at = Where();
+            m_floorZ = at.GetZ();
+            AZ::TransformBus::EventResult(m_cameraLocal, m_camera, &AZ::TransformBus::Events::GetLocalTM);
+            Camera::CameraRequestBus::EventResult(m_nearClip, m_camera, &Camera::CameraComponentRequests::GetNearClipDistance);
+            if (r)
+            {
+                r->Set("/NoclipProtocol/Player/Dead", true);
+                r->Set("/NoclipProtocol/Death/WalkOut", false);
+                r->Set("/NoclipProtocol/Death/Phase", static_cast<double>(WalkOut));
+                r->Set("/NoclipProtocol/Monsters/Enabled", false);
+            }
+            const Agents::Agent agent = Agents::Load();
+            SpawnBody(agent.m_female ? "prefabs/agents/agent_female.spawnable" : "prefabs/agents/agent_male.spawnable");
+        }
+
+        void Walk(float deltaTime)
+        {
+            static const float length = 5.2f;
+            m_clock += deltaTime * AZStd::max(0.01f, static_cast<float>(death_speed));
+            const float t = AZStd::clamp(m_clock / length, 0.0f, 1.0f);
+            // The body: half a second in the breach's glow, then out and in to where agents arrive.
+            const float bx = Level0::Level0Breach::X, from = Level0::Level0Breach::Y + 0.4f, to = Level0::Level0Breach::ArriveY;
+            const float walk = Ease(AZStd::clamp((m_clock - 0.6f) / 3.0f, 0.0f, 1.0f));
+            const AZ::Vector3 body(bx, from + (to - from) * walk, m_floorZ);
+            AZ::Entity* entity = nullptr;
+            AZ::ComponentApplicationBus::BroadcastResult(entity, &AZ::ComponentApplicationRequests::FindEntity, m_player);
+            if (auto* player = entity ? entity->FindComponent<FirstPersonControllerComponent>() : nullptr)
+            {
+                player->Teleport(body + AZ::Vector3(0.0f, 0.0f, 0.02f), 0.0f, 0.0f, true, true);
+            }
+            if (m_bodyId.IsValid())
+            {
+                AZ::TransformBus::Event(m_bodyId, &AZ::TransformBus::Events::SetWorldTM,
+                                        AZ::Transform::CreateFromQuaternionAndTranslation(AZ::Quaternion::CreateIdentity(), body));
+            }
+            // The camera: in front of them, facing the breach, backing off as they come; then round into their eyes.
+            const AZ::Vector3 eye = body + m_cameraLocal.GetTranslation();
+            const AZ::Vector3 lead(bx + 0.9f, body.GetY() + 2.6f - 0.4f * walk, m_floorZ + 1.55f);
+            const float swing = Ease(AZStd::clamp((m_clock - 3.8f) / 1.2f, 0.0f, 1.0f));
+            const AZ::Vector3 camAt = lead.Lerp(eye, swing);
+            // Looking back at their chest (south, a little to the west), turning to look north into the room.
+            const AZ::Vector3 look = body + AZ::Vector3(0.0f, 0.0f, 1.3f) - lead;
+            const float lookYaw = std::atan2(-look.GetX(), look.GetY());
+            const float lookPitch = std::atan2(look.GetZ(), AZStd::sqrt(look.GetX() * look.GetX() + look.GetY() * look.GetY()));
+            float yaw = lookYaw + (0.0f - lookYaw) * swing;
+            if (lookYaw > 0.0f && swing > 0.0f)
+            {
+                yaw = lookYaw + (AZ::Constants::TwoPi - lookYaw) * swing; // the short way round
+            }
+            SetCamera(camAt, yaw, lookPitch * (1.0f - swing));
+            if (t >= 1.0f)
+            {
+                EndWalk();
+            }
+        }
+
+        void EndWalk()
+        {
+            auto* r = AZ::SettingsRegistry::Get();
+            m_phase = Alive;
+            DespawnBody();
+            Camera::CameraRequestBus::Event(m_camera, &Camera::CameraComponentRequests::SetNearClipDistance, m_nearClip);
+            AZ::TransformBus::Event(m_camera, &AZ::TransformBus::Events::SetLocalTM, m_cameraLocal);
+            if (r)
+            {
+                double now = 0.0;
+                r->Get(now, "/NoclipProtocol/Hud/time");
+                r->Set("/NoclipProtocol/Player/Respawn", true);
+                r->Set("/NoclipProtocol/Hud/player.health", 1.0); // so the next tick doesn't read the old zero
+                r->Set("/NoclipProtocol/Death/Phase", 0.0);
+                r->Set("/NoclipProtocol/Player/Dead", false);
+                r->Set("/NoclipProtocol/Death/BootUntil", now + 4.0);
+                r->Set("/NoclipProtocol/Monsters/Enabled", true);
+                r->Set("/NoclipProtocol/Monsters/Spawn", true);
+            }
+            m_grace = 1.5f;
+        }
+
+        void SpawnBody(const char* path)
+        {
+            DespawnBody();
+            AZ::Data::AssetId id;
+            AZ::Data::AssetCatalogRequestBus::BroadcastResult(id, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath, path,
+                                                              azrtti_typeid<AzFramework::Spawnable>(), false);
+            if (!id.IsValid())
+            {
+                AZ_Printf("Noclip", "death: no agent model yet (%s)", path);
+                return;
+            }
+            m_bodyAsset = AZ::Data::AssetManager::Instance().GetAsset<AzFramework::Spawnable>(id, AZ::Data::AssetLoadBehavior::PreLoad);
+            m_bodyTicket = AZStd::make_shared<AzFramework::EntitySpawnTicket>(m_bodyAsset);
+            AzFramework::SpawnAllEntitiesOptionalArgs args;
+            AZ::EntityId* out = &m_bodyId;
+            args.m_preInsertionCallback = [out](AzFramework::EntitySpawnTicket::Id, AzFramework::SpawnableEntityContainerView view)
+            {
+                if (!view.empty())
+                {
+                    *out = (*view.begin())->GetId();
+                }
+            };
+            AzFramework::SpawnableEntitiesInterface::Get()->SpawnAllEntities(*m_bodyTicket, AZStd::move(args));
+        }
+
+        void DespawnBody()
+        {
+            if (m_bodyTicket && m_bodyTicket->IsValid())
+            {
+                AzFramework::SpawnableEntitiesInterface::Get()->DespawnAllEntities(*m_bodyTicket);
+            }
+            m_bodyTicket.reset();
+            m_bodyId = AZ::EntityId();
         }
 
         // The dead agent's backpack: on the floor where they fell, until the next agent walks up to it.
@@ -397,10 +514,31 @@ namespace NoclipProtocol
             r->Get(now, "/NoclipProtocol/Hud/time");
             r->Get(health, "/NoclipProtocol/Hud/player.health");
             r->Get(menu, "/NoclipProtocol/Menu/Active");
+            if (m_phase == WalkOut)
+            {
+                Walk(deltaTime);
+                return;
+            }
+            if (m_phase == Alive && m_walkPending)
+            {
+                // Wait for Level 0 to be up (and the arrival to have put the player in the spawn room), then walk out.
+                const EndlessLevelComponent* level = Level();
+                m_walkWait -= deltaTime;
+                if (level && level->GetLevelNumber() == 0 && m_walkWait <= 0.0f)
+                {
+                    StartWalk();
+                }
+                return;
+            }
             if (m_phase == Alive)
             {
                 if (menu)
                 {
+                    return;
+                }
+                if (m_grace > 0.0f)
+                {
+                    m_grace -= deltaTime;
                     return;
                 }
                 // Deepest level this agent has reached.
@@ -436,7 +574,7 @@ namespace NoclipProtocol
                     m_clock = 1e6f;
                 }
             }
-            static const float lengths[6] = { 0.0f, 1.6f, 3.2f, 4.5f, 3.8f, 3.4f };
+            static const float lengths[7] = { 0.0f, 1.6f, 3.2f, 4.5f, 3.8f, 3.4f, 5.2f };
             m_clock += deltaTime * AZStd::max(0.01f, static_cast<float>(death_speed));
             const float t = AZStd::clamp(m_clock / lengths[m_phase], 0.0f, 1.0f);
             const float e = Ease(t);
@@ -536,6 +674,12 @@ namespace NoclipProtocol
         float m_deepestClock = 0.0f;
         float m_objectiveClock = 0.0f;
         bool m_gearSpawned = false;
+        bool m_walkPending = false;
+        float m_walkWait = 0.0f;
+        float m_grace = 0.0f;
+        AZ::EntityId m_bodyId;
+        AZ::Data::Asset<AzFramework::Spawnable> m_bodyAsset;
+        AZStd::shared_ptr<AzFramework::EntitySpawnTicket> m_bodyTicket;
         AZ::Data::Asset<AzFramework::Spawnable> m_gearAsset;
         AZStd::shared_ptr<AzFramework::EntitySpawnTicket> m_gearTicket;
     };

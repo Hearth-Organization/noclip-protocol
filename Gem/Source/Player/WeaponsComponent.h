@@ -1049,6 +1049,12 @@ namespace NoclipProtocol
             m_bobSpeed = AZ::Lerp(m_bobSpeed, AZStd::min(speed, 6.0f), AZStd::min(1.0f, dt * 8.0f));
             m_bobPhase += dt * (4.0f + m_bobSpeed * 1.6f);
             const float bob = AZStd::min(m_bobSpeed / 4.0f, 1.0f);
+            // Dying and the next agent's walk-out are filmed from outside the eyes: no gun on the camera then.
+            bool cutscene = false;
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Get(cutscene, "/NoclipProtocol/Player/Dead");
+            }
             for (int i = 0; i < Weapons::Count; ++i)
             {
                 const AZ::EntityId entity = m_slots->m_views[i];
@@ -1057,7 +1063,7 @@ namespace NoclipProtocol
                     continue;
                 }
                 AZ::Transform tm = AZ::Transform::CreateTranslation(AZ::Vector3(0.0f, 0.0f, -500.0f));
-                if (i == w.m_equipped && !w.m_wheelOpen)
+                if (i == w.m_equipped && !w.m_wheelOpen && !cutscene)
                 {
                     // Camera space: x right, y ahead, z up.
                     static const AZ::Vector3 hold[Weapons::Count] = {
