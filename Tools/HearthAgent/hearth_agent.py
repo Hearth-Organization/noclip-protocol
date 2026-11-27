@@ -1908,6 +1908,26 @@ def op_engine_python(args):
 
 OPS.update({"engine_python": op_engine_python})
 
+def op_project_copy(args):
+    """project_copy {"from": "Voice", "to": "Assets/Sounds/Voice", "glob": "*.wav"}: copies files inside the project
+    (keeping the sub-folders), e.g. Voice Studio's recordings to where the asset processor makes game sounds of them."""
+    src = (PROJECT / args["from"]).resolve()
+    dst = (PROJECT / args["to"]).resolve()
+    if PROJECT.resolve() not in src.parents or PROJECT.resolve() not in dst.parents:
+        return {"ok": False, "error": "both folders must be inside the project"}
+    copied = 0
+    for f in src.rglob(args.get("glob", "*")):
+        if f.is_file():
+            target = dst / f.relative_to(src)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if not target.exists() or target.stat().st_mtime < f.stat().st_mtime or target.stat().st_size != f.stat().st_size:
+                shutil.copy2(f, target)
+                copied += 1
+    return {"ok": True, "copied": copied, "to": str(dst)}
+
+
+OPS.update({"project_copy": op_project_copy})
+
 # ---------- request loop ----------
 
 def meminfo():

@@ -5,9 +5,9 @@ namespace NoclipProtocol::VoiceLines
 {
     struct Line { const char* m_id; const char* m_text; };
 
-    inline constexpr const char* CommandFolder = "voice/dying";
-    inline constexpr const char* ManFolder = "voice/agent-man";
-    inline constexpr const char* WomanFolder = "voice/agent-woman";
+    inline constexpr const char* CommandFolder = "assets/sounds/voice/dying";
+    inline constexpr const char* ManFolder = "assets/sounds/voice/agent-man";
+    inline constexpr const char* WomanFolder = "assets/sounds/voice/agent-woman";
 
     inline constexpr Line Command[45] = {
         { "cmd01", "Epsilon-6, we've lost the agent's signal. Notify the family. Sending the next one through." },

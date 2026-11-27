@@ -114,7 +114,8 @@ namespace NoclipProtocol::GameSettings
         r->Set("/Hearth/Audio/Buses/Player", Decibels(Number("vol_effects")));
         r->Set("/Hearth/Audio/Buses/Entities", Decibels(Number("vol_monsters")));
         r->Set("/Hearth/Audio/Buses/Ambience", Decibels(Number("vol_ambience")));
-        r->Set("/Hearth/Audio/Buses/Lights", Decibels(Number("vol_ambience")));
+        // The fluorescent hum and buzz: the owner, Nov 27: "turn the light hum way down" (24 dB under the Ambience slider).
+        r->Set("/Hearth/Audio/Buses/Lights", Decibels(Number("vol_ambience")) - 24.0);
         Command("hearth_audioRefresh");
 
         // ---- controls ----
