@@ -66,6 +66,13 @@ namespace NoclipProtocol
             m_sanity = AZStd::clamp(static_cast<float>(player_sanity_set), 0.0f, 1.0f);
             player_sanity_set = -1.0f;
         }
+        // A level's own starting sanity (Level 0 from the intro: 75%), once.
+        double sanityStart = -1.0;
+        if (registry->Get(sanityStart, "/NoclipProtocol/Player/SanityStart") && sanityStart >= 0.0)
+        {
+            m_sanity = AZStd::clamp(static_cast<float>(sanityStart), 0.0f, 1.0f);
+            registry->Set("/NoclipProtocol/Player/SanityStart", -1.0);
+        }
         // (Also while paused: the main menu is paused.) Film grain only creeps in as sanity goes: none above 60%, up to 0.3 at none left.
         const float grain = 0.3f * AZStd::clamp((0.6f - m_sanity) / 0.6f, 0.0f, 1.0f);
         // Sent again every second too: the level's post effects can come up after the player does.

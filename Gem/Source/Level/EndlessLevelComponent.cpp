@@ -285,6 +285,23 @@ namespace NoclipProtocol
             }
         }
         AZ_CONSOLEFREEFUNC("base_deliver", BaseDeliver, AZ::ConsoleFunctorFlags::Null, "base_deliver brings the next Foundation crate now (testing)");
+
+        // noclip_cross: arrive in Level 0 as if through Breach 4-A (testing what the crossing does, without walking it).
+        void NoclipCross([[maybe_unused]] const AZ::ConsoleCommandContainer& arguments)
+        {
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Set("/NoclipProtocol/Level/Arrived", AZStd::string("breach"));
+            }
+            AZ::TickBus::QueueFunction([]()
+            {
+                if (auto* console = AZ::Interface<AZ::IConsole>::Get())
+                {
+                    console->PerformCommand("LoadLevel levels/level0/level0.spawnable");
+                }
+            });
+        }
+        AZ_CONSOLEFREEFUNC("noclip_cross", NoclipCross, AZ::ConsoleFunctorFlags::Null, "noclip_cross arrives in Level 0 as if through Breach 4-A (testing)");
     } // namespace
 
     void EndlessLevelComponent::Activate()
@@ -357,6 +374,15 @@ namespace NoclipProtocol
             registry->Set("/NoclipProtocol/Menu/Active", m_mainMenu);
             if (!m_mainMenu)
             {
+                // Coming into Level 0 from the intro, through Breach 4-A (a one-way trip: no Backrooms level ever leads back):
+                // the crossing has shaken you, so sanity starts at 75% (the player's vitals pick this up on their next tick).
+                AZStd::string previous, arrived;
+                registry->Get(previous, "/NoclipProtocol/Save/Level");
+                registry->Get(arrived, "/NoclipProtocol/Level/Arrived");
+                if (m_settings.m_style == 0 && (arrived == "breach" || previous == "Intro"))
+                {
+                    registry->Set("/NoclipProtocol/Player/SanityStart", 0.75);
+                }
                 static const char* const levels[] = { "Level0", "Level1", "Level2", "Intro" };
                 registry->Set("/NoclipProtocol/Save/Level", AZStd::string(levels[AZStd::clamp(m_settings.m_style, 0, 3)]));
             }

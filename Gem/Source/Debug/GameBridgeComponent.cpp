@@ -136,12 +136,27 @@ namespace NoclipProtocol
         else if (str("op") == "console")
         {
             const AZStd::string command = str("command");
+            // A command that loads a level tears down this level's entities, this bridge included, so it can't run while the
+            // bridge is still answering (that crashed the game): such commands run next frame, after the answer is written.
+            const bool loadsLevel = command.find("LoadLevel") == 0 || command.find("loadlevel") == 0 || command.find("UnloadLevel") == 0;
             bool ran = false;
-            if (auto* console = AZ::Interface<AZ::IConsole>::Get())
+            if (loadsLevel)
+            {
+                AZ::TickBus::QueueFunction([command]()
+                {
+                    if (auto* console = AZ::Interface<AZ::IConsole>::Get())
+                    {
+                        console->PerformCommand(command.c_str());
+                    }
+                });
+                ran = true;
+            }
+            else if (auto* console = AZ::Interface<AZ::IConsole>::Get())
             {
                 ran = static_cast<bool>(console->PerformCommand(command.c_str()));
             }
-            answer = AZStd::string::format("{\"ok\": %s, \"command\": %s}", ran ? "true" : "false", Escape(command).c_str());
+            answer = AZStd::string::format("{\"ok\": %s, \"command\": %s%s}", ran ? "true" : "false", Escape(command).c_str(),
+                loadsLevel ? ", \"queued\": true" : "");
         }
         else if (str("op") == "screenshot")
         {
