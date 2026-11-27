@@ -50,6 +50,24 @@ namespace NoclipProtocol
                 m_sight = 14.0f;
                 m_hearing = 9.0f;
             }
+            else if (kind == "Faceling")
+            {
+                m_speed = 2.2f;   // slow: a walk even when it follows you
+                m_sight = 9.0f;
+                m_hearing = 6.0f;
+            }
+            else if (kind == "Scp096")
+            {
+                m_speed = 6.5f;
+                m_sight = 20.0f;
+                m_hearing = 5.0f;
+            }
+            else if (kind == "Scp106")
+            {
+                m_speed = 1.8f;
+                m_sight = 12.0f;
+                m_hearing = 12.0f;
+            }
         }
         bool IsDead() const { return m_health <= 0.0f; }
         float SinceDeath() const { return m_sinceDeath; }

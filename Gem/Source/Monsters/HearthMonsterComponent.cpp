@@ -357,6 +357,33 @@ namespace NoclipProtocol
         }
         AZ::Vector3 at = AZ::Vector3::CreateZero();
         AZ::TransformBus::EventResult(at, GetEntityId(), &AZ::TransformBus::Events::GetWorldTranslation);
+        // Shot (also while frozen for testing): Weapons/Hit names the entity a bullet struck.
+        {
+            AZ::Vector3 shooterAt = AZ::Vector3::CreateZero();
+            AZ::TransformBus::EventResult(shooterAt, MonsterPlayer(), &AZ::TransformBus::Events::GetWorldTranslation);
+            AZ::s64 hits = 0;
+            if (registry)
+            {
+                registry->Get(hits, "/NoclipProtocol/Weapons/Hit/Serial");
+                if (m_hitsSeen >= 0 && hits > m_hitsSeen)
+                {
+                    AZ::u64 hitEntity = 0;
+                    double damage = 0.0;
+                    registry->Get(hitEntity, "/NoclipProtocol/Weapons/Hit/Entity");
+                    registry->Get(damage, "/NoclipProtocol/Weapons/Hit/Damage");
+                    if (hitEntity == static_cast<AZ::u64>(GetEntityId()) && m_health > 0.0f)
+                    {
+                        m_health -= static_cast<float>(damage);
+                        m_heardAt = shooterAt;   // it knows where that came from
+                        m_sinceHeard = 0.0f;
+                        AZ_Printf("Noclip", "monster: %s hit for %.0f (%.0f left)%s", m_name.c_str(), damage, AZStd::max(0.0f, m_health),
+                                  m_health <= 0.0f ? ", dies" : "");
+                        m_fleeing = AZStd::max(0.0f, m_fleeing - 1.0f);
+                    }
+                }
+            }
+            m_hitsSeen = hits;
+        }
         if (!enabled || !Settings())
         {
             Report(at, enabled ? "Waiting for the level" : "Off");
@@ -413,27 +440,6 @@ namespace NoclipProtocol
         const bool sees = player.IsValid() && distance <= m_sight && distance > 0.01f &&
             self.GetBasisY().GetNormalized().Dot(flat / distance) >= 0.5f && LineOfSight(at, playerAt);
 
-        // Shot: Weapons/Hit names the entity a bullet struck.
-        AZ::s64 hits = 0;
-        if (registry)
-        {
-            registry->Get(hits, "/NoclipProtocol/Weapons/Hit/Serial");
-            if (m_hitsSeen >= 0 && hits > m_hitsSeen)
-            {
-                AZ::u64 hitEntity = 0;
-                double damage = 0.0;
-                registry->Get(hitEntity, "/NoclipProtocol/Weapons/Hit/Entity");
-                registry->Get(damage, "/NoclipProtocol/Weapons/Hit/Damage");
-                if (hitEntity == static_cast<AZ::u64>(GetEntityId()) && m_health > 0.0f)
-                {
-                    m_health -= static_cast<float>(damage);
-                    m_heardAt = playerAt;   // it knows where that came from
-                    m_sinceHeard = 0.0f;
-                    m_fleeing = AZStd::max(0.0f, m_fleeing - 1.0f);
-                }
-            }
-        }
-        m_hitsSeen = hits;
         if (m_health <= 0.0f)
         {
             // Dead: it sinks back into the dark (the spawner removes it shortly after).
@@ -495,10 +501,10 @@ namespace NoclipProtocol
                     registry->Get(shield, "/NoclipProtocol/Player/Shield");
                     double damage = 0.0;
                     registry->Get(damage, "/NoclipProtocol/Player/Damage");
-                    registry->Set("/NoclipProtocol/Player/Damage", damage + (shield ? 0.05 : 0.22));
+                    registry->Set("/NoclipProtocol/Player/Damage", damage + (shield ? 0.04 : 0.15));
                     double add = 0.0;
                     registry->Get(add, "/NoclipProtocol/Player/SanityAdd");
-                    registry->Set("/NoclipProtocol/Player/SanityAdd", add - 0.04);
+                    registry->Set("/NoclipProtocol/Player/SanityAdd", add - 0.03);
                 }
             }
             if (distance > 0.01f)
@@ -510,7 +516,7 @@ namespace NoclipProtocol
             if (m_attack >= 1.1f)
             {
                 m_attack = -1.0f;
-                m_attackCooldown = 0.8f;
+                m_attackCooldown = 1.2f;
                 m_playing.clear();
             }
             Report(at, "Attacking " + playerName);

@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Faceling",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 4716736617296203427
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 7703303734429286979
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 6849202756041428021
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 1186593126949345848
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 8424280225246942285
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 7819490056189287056
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 1277990893855440344
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 7867268039660809811
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 7987403904152770743
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 6909947532466068452,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 1557825849911306540,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{65A21AEB-5A1B-59D0-AF83-05D709CD661B}",
+                        "subId": 2524206702
+                    },
+                    "assetHint": "assets/models/monsters/faceling/faceling.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 5897312673380059623,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{66114B24-406A-545C-B290-76B612998957}",
+                            "subId": 3351120359
+                        },
+                        "assetHint": "assets/models/monsters/faceling/faceling_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 5910362637690943339,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{7699EC1D-F996-58AD-BDB0-3605E9D87432}"
+                                    },
+                                    "assetHint": "assets/models/monsters/faceling/faceling.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 6725460209045534434,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.925
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.85,
+                        "Radius": 0.35
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 2294989837163908111
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 1353744946610716216,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Faceling",
+                    "Kind": "Faceling",
+                    "Motions": "assets/models/monsters/faceling/faceling"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

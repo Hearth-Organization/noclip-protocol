@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Scp106",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 2985748435163074138
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 5010136955490810282
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 4774856324643166368
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 4731537728181611085
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 3113522957335849479
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 2367182038096140058
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 6583385175741649166
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 4342692867085850864
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 866305389286863603
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 2147744883153880641,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 349913993050480587,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{ECE40537-CBD4-57FA-9C85-031C6B7F6598}",
+                        "subId": 2545967529
+                    },
+                    "assetHint": "assets/models/monsters/scp106/scp106.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 3800379778048202310,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{EA60A681-E537-58E5-AD20-0A4FBCCDF858}",
+                            "subId": 1363007021
+                        },
+                        "assetHint": "assets/models/monsters/scp106/scp106_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 4006977961145437535,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{535D40CA-365D-5300-A8DD-60A465329992}"
+                                    },
+                                    "assetHint": "assets/models/monsters/scp106/scp106.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 38919338358643201,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.9
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.8,
+                        "Radius": 0.4
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 3114167188297673597
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 7676922431829972447,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Scp106",
+                    "Kind": "Scp106",
+                    "Motions": "assets/models/monsters/scp106/scp106"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

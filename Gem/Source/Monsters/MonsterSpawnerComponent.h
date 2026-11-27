@@ -75,6 +75,10 @@ namespace NoclipProtocol
         {
             static const Kind kinds[] = {
                 { "Smiler", "prefabs/monsters/smiler.spawnable", "assets/models/monsters/smiler/smiler", 2, 45.0f, 60.0f },
+                // Models in, behaviour still to be decided with the owner: only monster_spawn brings these in for now.
+                { "Faceling", "prefabs/monsters/faceling.spawnable", "assets/models/monsters/faceling/faceling", 0, 0.0f, 0.0f },
+                { "Scp096", "prefabs/monsters/scp096.spawnable", "assets/models/monsters/scp096/scp096", 0, 0.0f, 0.0f },
+                { "Scp106", "prefabs/monsters/scp106.spawnable", "assets/models/monsters/scp106/scp106", 0, 0.0f, 0.0f },
             };
             count = static_cast<int>(sizeof(kinds) / sizeof(kinds[0]));
             return kinds;
