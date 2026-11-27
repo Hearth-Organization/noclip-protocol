@@ -44,36 +44,6 @@
                 "Id": 5718618205516191038,
                 "Parent Entity": ""
             },
-            "EditorActorComponent": {
-                "$type": "EditorActorComponent",
-                "Id": 1350318407855563148,
-                "ActorAsset": {
-                    "assetId": {
-                        "guid": "{A609E391-60C5-51CD-9045-623E52F23694}",
-                        "subId": 2467364348
-                    },
-                    "assetHint": "assets/models/monsters/crawler/crawler.actor"
-                },
-                "UpdateJointTransformsWhenOutOfView": false
-            },
-            "EditorSimpleMotionComponent": {
-                "$type": "EditorSimpleMotionComponent",
-                "Id": 8763479519222298914,
-                "Configuration": {
-                    "MotionAsset": {
-                        "assetId": {
-                            "guid": "{DFCE1BDF-6000-5C63-A863-8870339945F2}",
-                            "subId": 3987434577
-                        },
-                        "assetHint": "assets/models/monsters/crawler/crawler_walk.motion"
-                    },
-                    "Loop": true,
-                    "PlayOnActivation": true,
-                    "InPlace": true,
-                    "BlendIn": 0.25,
-                    "BlendOut": 0.25
-                }
-            },
             "EditorMaterialComponent": {
                 "$type": "EditorMaterialComponent",
                 "Id": 8768389090280000661,
@@ -128,7 +98,22 @@
                     "$type": "HearthMonsterComponent",
                     "Name": "Crawler",
                     "Kind": "Crawler",
-                    "Motions": "assets/models/monsters/crawler/crawler"
+                    "Motions": ""
+                }
+            },
+            "AZ::Render::EditorMeshComponent": {
+                "$type": "AZ::Render::EditorMeshComponent",
+                "Id": 6499646804176485628,
+                "Controller": {
+                    "Configuration": {
+                        "ModelAsset": {
+                            "assetId": {
+                                "guid": "{A609E391-60C5-51CD-9045-623E52F23694}",
+                                "subId": 271474338
+                            },
+                            "assetHint": "assets/models/monsters/crawler/crawler.fbx.azmodel"
+                        }
+                    }
                 }
             }
         }

@@ -122,7 +122,7 @@ namespace NoclipProtocol
                 { "Miner", "prefabs/monsters/miner.spawnable", "assets/models/monsters/miner/miner", 2, 150.0f, 300.0f },
                 { "Frostwraith", "prefabs/monsters/frostwraith.spawnable", "assets/models/monsters/frostwraith/frostwraith", 1, 180.0f, 400.0f },
                 { "Farmthing", "prefabs/monsters/farmthing.spawnable", "assets/models/monsters/farmthing/farmthing", 1, 200.0f, 450.0f },
-                { "Crawler", "prefabs/monsters/crawler.spawnable", "assets/models/monsters/crawler/crawler", 1, 240.0f, 500.0f },
+                { "Crawler", "prefabs/monsters/crawler.spawnable", "", 1, 240.0f, 500.0f },
                 { "Doll", "prefabs/monsters/doll.spawnable", "", 2, 90.0f, 240.0f },
                 { "Mannequin", "prefabs/monsters/mannequin.spawnable", "", 2, 90.0f, 240.0f },
                 { "Plush", "prefabs/monsters/plush.spawnable", "", 1, 150.0f, 300.0f },
