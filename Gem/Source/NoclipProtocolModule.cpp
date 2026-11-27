@@ -20,6 +20,7 @@ namespace NoclipProtocol
     AZ::ComponentDescriptor* CreateWeaponsDescriptor(); // Player/FirstPersonControllerComponent.cpp (the weapons need Atom's headers)
     AZ::ComponentDescriptor* CreateMonsterSpawnerDescriptor(); // Player/FirstPersonControllerComponent.cpp too
     AZ::ComponentDescriptor* CreateDeathSequenceDescriptor();  // Player/FirstPersonControllerComponent.cpp too
+    AZ::ComponentDescriptor* CreateVoicesDescriptor();         // Player/FirstPersonControllerComponent.cpp too
 }
 
 #include <NoclipProtocol/NoclipProtocolTypeIds.h>
@@ -54,6 +55,7 @@ namespace NoclipProtocol
                 CreateWeaponsDescriptor(),
                 CreateMonsterSpawnerDescriptor(),
                 CreateDeathSequenceDescriptor(),
+                CreateVoicesDescriptor(),
             });
         }
 

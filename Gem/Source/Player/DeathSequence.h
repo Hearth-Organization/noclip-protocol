@@ -14,6 +14,7 @@
 #pragma once
 
 #include "Agents.h"
+#include "Voices.h"
 #include "FirstPersonControllerComponent.h"
 #include "../Base/BaseBuilding.h"
 #include "../Level/EndlessLevelComponent.h"
@@ -37,6 +38,9 @@
 #include <AzFramework/Spawnable/SpawnableEntitiesInterface.h>
 
 #include <cmath>
+
+// Testing: death_speed 0.1 plays the sequence at a tenth of the speed (for screenshots of every phase).
+AZ_CVAR(float, death_speed, 1.0f, nullptr, AZ::ConsoleFunctorFlags::Null, "Speed of the death sequence (testing; 1 = normal)");
 
 namespace NoclipProtocol
 {
@@ -66,7 +70,7 @@ namespace NoclipProtocol
             m_gearSpawned = false;
             if (auto* r = AZ::SettingsRegistry::Get())
             {
-                r->Set("/NoclipProtocol/Death/Phase", static_cast<AZ::s64>(0));
+                r->Set("/NoclipProtocol/Death/Phase", 0.0);
                 r->Set("/NoclipProtocol/Player/Dead", false);
                 // The first agent of a run.
                 AZ::s64 number = 0;
@@ -145,7 +149,7 @@ namespace NoclipProtocol
             // Above the ceiling, clip it away so the floor below shows (the near plane just past the ceiling slab).
             const float overCeiling = at.GetZ() - m_floorZ - m_ceiling;
             const float nearClip = overCeiling > -0.2f ? overCeiling + 0.45f : m_nearClip;
-            Camera::CameraRequestBus::Event(m_camera, &Camera::CameraRequests::SetNearClipDistance, nearClip);
+            Camera::CameraRequestBus::Event(m_camera, &Camera::CameraComponentRequests::SetNearClipDistance, nearClip);
         }
 
         void Begin()
@@ -160,8 +164,8 @@ namespace NoclipProtocol
             AZ::TransformBus::EventResult(body, m_player, &AZ::TransformBus::Events::GetWorldTM);
             m_yaw0 = body.GetRotation().GetEulerRadians().GetZ();
             m_floorZ = m_fell.GetZ();
-            Camera::CameraRequestBus::EventResult(m_nearClip, m_camera, &Camera::CameraRequests::GetNearClipDistance);
-            Camera::CameraRequestBus::EventResult(m_fov, m_camera, &Camera::CameraRequests::GetFovRadians);
+            Camera::CameraRequestBus::EventResult(m_nearClip, m_camera, &Camera::CameraComponentRequests::GetNearClipDistance);
+            Camera::CameraRequestBus::EventResult(m_fov, m_camera, &Camera::CameraComponentRequests::GetFovRadians);
             m_ceiling = 3.0f;
             m_level = -1;
             AZStd::string levelName = "Sublevel 4";
@@ -256,11 +260,11 @@ namespace NoclipProtocol
             auto* r = AZ::SettingsRegistry::Get();
             Agents::Store(m_next);
             m_phase = Alive;
-            Camera::CameraRequestBus::Event(m_camera, &Camera::CameraRequests::SetNearClipDistance, m_nearClip);
+            Camera::CameraRequestBus::Event(m_camera, &Camera::CameraComponentRequests::SetNearClipDistance, m_nearClip);
             AZ::TransformBus::Event(m_camera, &AZ::TransformBus::Events::SetLocalTM, m_cameraLocal);
             if (r)
             {
-                r->Set("/NoclipProtocol/Death/Phase", static_cast<AZ::s64>(0));
+                r->Set("/NoclipProtocol/Death/Phase", 0.0);
                 r->Set("/NoclipProtocol/Player/Dead", false);
                 r->Set("/NoclipProtocol/Player/Respawn", true);
                 double now = 0.0;
@@ -433,7 +437,7 @@ namespace NoclipProtocol
                 }
             }
             static const float lengths[6] = { 0.0f, 1.6f, 3.2f, 4.5f, 3.8f, 3.4f };
-            m_clock += deltaTime;
+            m_clock += deltaTime * AZStd::max(0.01f, static_cast<float>(death_speed));
             const float t = AZStd::clamp(m_clock / lengths[m_phase], 0.0f, 1.0f);
             const float e = Ease(t);
             const float above = m_ceiling + 6.0f; // over the ceiling, looking down on the room
@@ -494,7 +498,7 @@ namespace NoclipProtocol
             default:
                 break;
             }
-            r->Set("/NoclipProtocol/Death/Phase", static_cast<AZ::s64>(m_phase));
+            r->Set("/NoclipProtocol/Death/Phase", static_cast<double>(m_phase));
             r->Set("/NoclipProtocol/Death/T", static_cast<double>(t));
             if (m_clock >= lengths[m_phase])
             {
@@ -506,6 +510,11 @@ namespace NoclipProtocol
                 else
                 {
                     m_phase = static_cast<Phase>(m_phase + 1);
+                    if (m_phase == Beacon)
+                    {
+                        // Foundation Command on the radio (one of the 45 recorded lines).
+                        r->Set("/NoclipProtocol/Death/Radio", VoicesComponent::SayCommand());
+                    }
                 }
             }
         }

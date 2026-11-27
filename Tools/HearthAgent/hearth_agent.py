@@ -1669,6 +1669,142 @@ OPS.update({"forge_status": op_forge_status, "forge_service": op_forge_service, 
             "forge_make": op_forge_make, "forge_made": op_forge_made, "forge_import": op_forge_import})
 
 
+# ---------- Voice Studio (the owner, Nov 27 2026: the Foundation's lines, made "in voice studio") ----------
+# The same server and lines file as the editor's Voice Studio (Code/Editor/HearthVoiceStudio.cpp): the server and its
+# key come from ~/.config/hearth-engine/settings.ini (voice/server, voice/apiKey) and stay on this PC; lines go into
+# <project>/Voice/voice_lines.json and the .wav, .srt next to them, so they show up in the editor's Voice Studio.
+
+VOICE_MOODS = ["Calm", "Urgent", "Whisper", "Over radio"]
+VOICE_MOOD_INSTRUCTIONS = ["calm, steady, clear", "urgent, fast, tense", "whispering, quiet, close", "speaking over a radio, clipped"]
+VOICE_ROOM_FILTERS = ["", "aecho=0.8:0.6:20:0.25", "aecho=0.8:0.7:40|70:0.3|0.2", "aecho=0.8:0.8:80|140:0.35|0.25",
+                      "aecho=0.8:0.9:200|350:0.4|0.3"]
+
+
+def _voice_settings():
+    import configparser
+    ini = Path.home() / ".config" / "hearth-engine" / "settings.ini"
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.read(ini)
+    section = parser["voice"] if parser.has_section("voice") else {}
+    server = (section.get("server") or "").strip()
+    if server and "://" not in server:
+        server = "http://" + server
+    if server and not server.rsplit(":", 1)[-1].strip("/").isdigit():
+        server += ":8890"
+    return server.rstrip("/"), (section.get("apiKey") or "").strip()
+
+
+def _voice_http(method, path, body=None, timeout=120):
+    import urllib.request
+    import urllib.error
+    server, key = _voice_settings()
+    if not server:
+        return 0, {"error": "Voice Studio has no Hearth server set (Hearth Engine › Voice Studio › Server)"}
+    data = json.dumps(body).encode() if body is not None else None
+    headers = {"Content-Type": "application/json"} if data else {}
+    if key:
+        headers["Authorization"] = "Bearer " + key
+    request = urllib.request.Request(server + path, data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw = response.read()
+            return response.status, (json.loads(raw) if "json" in response.headers.get("Content-Type", "") else raw)
+    except urllib.error.HTTPError as error:
+        try:
+            return error.code, json.loads(error.read())
+        except ValueError:
+            return error.code, {"error": str(error)}
+    except (urllib.error.URLError, OSError) as error:
+        return 0, {"error": f"the Hearth server isn't answering at {server} ({error})"}
+
+
+def op_voice_status(args):
+    """Is Voice Studio's server set and answering, and which voices it has (no key in the answer)."""
+    server, key = _voice_settings()
+    code, health = _voice_http("GET", "/health", timeout=15)
+    vcode, voices = _voice_http("GET", "/v1/audio/voices", timeout=30)
+    return {"server": server, "has_key": bool(key), "health_code": code, "health": health if isinstance(health, dict) else None,
+            "voices_code": vcode, "voices": voices.get("voices") if isinstance(voices, dict) else voices}
+
+
+def op_voice_design(args):
+    """voice_design {"name": ..., "description": ...}: a new designed voice on the server (as Voice Studio's Design)."""
+    code, answer = _voice_http("POST", "/api/voices/design", {"name": args["name"], "description": args["description"]}, timeout=300)
+    return {"ok": code == 200, "code": code, "answer": answer if isinstance(answer, dict) else str(answer)[:300]}
+
+
+def _voice_srt(path, text, seconds):
+    import re
+    parts = [p for p in re.split(r"(?<=[.!?])\s+", text) if p] or [text]
+    total = sum(len(p) for p in parts) or 1
+    stamp = lambda t: "%02d:%02d:%02d,%03d" % (t // 3600, t % 3600 // 60, t % 60, round(t * 1000) % 1000)
+    out, at = [], 0.0
+    for i, part in enumerate(parts):
+        end = seconds if i == len(parts) - 1 else at + seconds * len(part) / total
+        out.append(f"{i + 1}\n{stamp(at)} --> {stamp(end)}\n{part}\n")
+        at = end
+    Path(path).write_text("\n".join(out))
+
+
+def op_voice_lines(args):
+    """voice_lines {"scene": name, "lines": [{"id", "who", "voice", "text", "mood", "speed", "room", "usedIn"}], "remake": false}:
+    adds (or updates, by id) the lines in the project's Voice Studio and makes each one that's new or changed."""
+    import hashlib
+    import wave
+    import re
+    folder = PROJECT / "Voice"
+    folder.mkdir(parents=True, exist_ok=True)
+    data_file = folder / "voice_lines.json"
+    data = json.loads(data_file.read_text()) if data_file.is_file() else {}
+    scenes = data.get("scenes") or [{"name": n, "lines": []} for n in ("Foundation intro", "PA announcements", "Player radio", "Level 0 whispers")]
+    scene = next((x for x in scenes if x["name"] == args["scene"]), None)
+    if scene is None:
+        scene = {"name": args["scene"], "lines": []}
+        scenes.append(scene)
+    data["scenes"] = scenes
+    scene_folder = re.sub(r"[^a-z0-9]+", "-", args["scene"].lower())
+    (folder / scene_folder).mkdir(exist_ok=True)
+    made, failed = [], []
+    for wanted in args["lines"]:
+        line = next((l for l in scene["lines"] if l.get("id") == wanted["id"]), None)
+        if line is None:
+            line = {"id": wanted["id"]}
+            scene["lines"].append(line)
+        for k, default in (("voice", ""), ("who", "Someone"), ("text", ""), ("mood", "Calm"), ("speed", 1.0), ("room", 0), ("usedIn", "")):
+            line[k] = wanted.get(k, line.get(k, default))
+        key = "%s|%s|%s|%.2f|%d" % (line["text"], line["voice"], line["mood"], float(line["speed"]), int(line["room"]))
+        digest = hashlib.sha1(key.encode()).hexdigest()[:12]
+        relative = f"{scene_folder}/{line['id']}.wav"
+        if (line.get("made") or {}).get("hash") == digest and (folder / relative).is_file() and not args.get("remake"):
+            continue
+        mood = VOICE_MOODS.index(line["mood"]) if line["mood"] in VOICE_MOODS else 0
+        code, audio = _voice_http("POST", "/v1/audio/speech", {"input": line["text"], "voice": line["voice"], "speed": float(line["speed"]),
+                                                              "response_format": "wav", "instructions": VOICE_MOOD_INSTRUCTIONS[mood]}, timeout=300)
+        if code != 200 or not isinstance(audio, bytes) or not audio.startswith(b"RIFF"):
+            failed.append({"id": line["id"], "code": code, "error": str(audio)[:200]})
+            continue
+        final = folder / relative
+        filters = [f for f in (("highpass=f=300,lowpass=f=3200" if mood == 3 else ""), VOICE_ROOM_FILTERS[max(0, min(4, int(line["room"])))]) if f]
+        raw = final.with_suffix(".raw.wav")
+        (raw if filters else final).write_bytes(audio)
+        if filters:
+            done = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(raw), "-af", ",".join(filters), str(final)])
+            if done.returncode != 0:
+                raw.replace(final)
+            raw.unlink(missing_ok=True)
+        with wave.open(str(final)) as w:
+            seconds = w.getnframes() / float(w.getframerate() or 24000)
+        _voice_srt(folder / f"{scene_folder}/{line['id']}.srt", line["text"], seconds)
+        line["made"] = {"hash": digest, "file": relative, "takes": [], "subtitles": f"{scene_folder}/{line['id']}.srt",
+                        "lipsync": "", "seconds": round(seconds, 3)}
+        made.append({"id": line["id"], "seconds": round(seconds, 2)})
+        data_file.write_text(json.dumps(data, indent=4))
+    data_file.write_text(json.dumps(data, indent=4))
+    return {"ok": not failed, "made": made, "failed": failed, "lines_file": str(data_file)}
+
+
+OPS.update({"voice_status": op_voice_status, "voice_design": op_voice_design, "voice_lines": op_voice_lines})
+
 # ---------- request loop ----------
 
 def meminfo():

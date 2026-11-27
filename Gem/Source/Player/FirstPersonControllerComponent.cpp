@@ -232,6 +232,11 @@ namespace NoclipProtocol
         return DeathSequenceComponent::CreateDescriptor();
     }
 
+    AZ::ComponentDescriptor* CreateVoicesDescriptor()
+    {
+        return VoicesComponent::CreateDescriptor();
+    }
+
     AZ::ComponentDescriptor* CreateMonsterSpawnerDescriptor()
     {
         return MonsterSpawnerComponent::CreateDescriptor();
@@ -334,6 +339,7 @@ namespace NoclipProtocol
         auto* death = m_uiEntity->CreateComponent<DeathSequenceComponent>();
         death->m_player = GetEntityId();
         death->m_camera = m_cameraEntity;
+        m_uiEntity->CreateComponent<VoicesComponent>()->m_player = GetEntityId();
         m_uiEntity->Init();
         m_uiEntity->Activate();
     }

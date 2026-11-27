@@ -47,14 +47,16 @@ namespace NoclipProtocol::Agents
         if (auto* r = AZ::SettingsRegistry::Get())
         {
             const AZStd::string root = Root;
+            // Get() appends to a string that already holds something, so start them empty.
+            AZStd::string first, last, rank, family;
+            if (r->Get(first, root + "/First")) { a.m_first = first; }
+            if (r->Get(last, root + "/Last")) { a.m_last = last; }
+            if (r->Get(rank, root + "/Rank")) { a.m_rank = rank; }
+            if (r->Get(family, root + "/Family")) { a.m_family = family; }
             r->Get(a.m_number, root + "/Number");
             r->Get(a.m_female, root + "/Female");
-            r->Get(a.m_first, root + "/First");
-            r->Get(a.m_last, root + "/Last");
-            r->Get(a.m_rank, root + "/Rank");
             r->Get(a.m_born, root + "/Born");
             r->Get(a.m_service, root + "/Service");
-            r->Get(a.m_family, root + "/Family");
             r->Get(a.m_since, root + "/Since");
             r->Get(a.m_deepest, root + "/Deepest");
         }
@@ -76,6 +78,7 @@ namespace NoclipProtocol::Agents
             r->Set(root + "/Family", a.m_family);
             r->Set(root + "/Since", a.m_since);
             r->Set(root + "/Deepest", a.m_deepest);
+            r->Set(root + "/NumberText", AZStd::string::format("%d", static_cast<int>(a.m_number)));
         }
     }
 

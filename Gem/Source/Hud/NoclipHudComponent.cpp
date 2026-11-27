@@ -1178,7 +1178,7 @@ namespace NoclipProtocol
                 text(Face::Mono, "AGT. " + number, dx + 22.0f * s, dy - 10.0f * s, 12.0f, Hex(0xd8d0bc), 0, 2.0f);
                 text(Face::Mono, "SIGNAL LOST", dx + 22.0f * s, dy - 10.0f * s + 14.4f * s, 12.0f, Muted, 0, 2.0f);
                 // Command on the radio, then the line.
-                const AZStd::string radio = "Epsilon-6, we've lost " + number + "'s signal. Notify the family. Sending the next one through.";
+                const AZStd::string radio = RegString("/NoclipProtocol/Death/Radio", "Epsilon-6, we've lost the agent's signal. Notify the family. Sending the next one through.");
                 const float radioW = measure(Face::Mono, radio, 14.0f, 0.0f) + measure(Face::Mono, "FOUNDATION  ", 11.0f, 3.0f);
                 rect(cx - radioW * 0.5f - 18.0f * s, H - 128.0f * s, radioW + 36.0f * s, 34.0f * s, Panel);
                 const float rl = cx - radioW * 0.5f;
@@ -1197,6 +1197,26 @@ namespace NoclipProtocol
             text(Face::Mono, "FIELD UNIT \xc2\xb7 AGT. " + RegString("/NoclipProtocol/Agent/NumberText", "") +
                  " \xc2\xb7 BOOTING \xe2\x96\xb8 VITALS \xe2\x96\xb8 COMPASS \xe2\x96\xb8 RADIO CH 3",
                  W * 0.5f, 300.0f * s, 12.0f, AZ::Color(127 / 255.0f, 224 / 255.0f, 160 / 255.0f, 0.85f), 1, 2.0f);
+        }
+        // Voice lines (Voices.h): the speaker small, the words on a dark band, low in the middle of the screen.
+        if (!mock && deathPhase == 0 && RegNumber("/NoclipProtocol/Hud/voice.until", 0.0) > RegNumber("/NoclipProtocol/Hud/time", 0.0) &&
+            m_page != Page::Terminal && !m_inMenu)
+        {
+            bool command = false;
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Get(command, "/NoclipProtocol/Hud/voice.command");
+            }
+            const AZStd::string who = RegString("/NoclipProtocol/Hud/voice.who", "");
+            const AZStd::string words = RegString("/NoclipProtocol/Hud/voice.text", "");
+            const float wordsW = measure(Face::Mono, words, 14.0f, 0.0f);
+            const float whoW = measure(Face::Mono, who, 11.0f, 3.0f);
+            const float total = whoW + 12.0f * s + wordsW;
+            const float left = W * 0.5f - total * 0.5f;
+            const float top = H - 150.0f * s;
+            rect(left - 18.0f * s, top - 9.0f * s, total + 36.0f * s, 34.0f * s, Panel);
+            text(Face::Mono, who, left, top + 1.0f * s, 11.0f, command ? Gold : Hex(0x7fe0a0), 0, 3.0f);
+            text(Face::Mono, words, left + whoW + 12.0f * s, top, 14.0f, Cream);
         }
 
         // The HUD itself; the terminal covers the whole screen (and text always draws over shapes), so not under it.
@@ -1664,7 +1684,7 @@ namespace NoclipProtocol
                 const float px0 = x0 + 14.0f;
                 float y = y0 + 12.0f;
                 hudIcon(HudIcons::Icon_foundation, AX(BL, px0), AY(BL, y), AS(14), Olive);
-                atext(BL, Face::Mono, "FIELD UNIT \xc2\xb7 AGT. 4417", px0 + 20.0f, y + 1.0f, 10.0f, Olive, 0, 2.0f);
+                atext(BL, Face::Mono, "FIELD UNIT \xc2\xb7 AGT. " + RegString("/NoclipProtocol/Agent/NumberText", "4417"), px0 + 20.0f, y + 1.0f, 10.0f, Olive, 0, 2.0f);
                 {
                     char clock[16] = {};
                     const std::time_t now = std::time(nullptr);
