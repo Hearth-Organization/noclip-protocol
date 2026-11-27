@@ -3,6 +3,7 @@
 #include "../Hud/NoclipHudComponent.h"
 #include "PlayerVitalsComponent.h"
 #include "../Debug/GameBridgeComponent.h"
+#include "WeaponsComponent.h"
 
 #include <AzCore/Settings/SettingsRegistry.h>
 #include <AzCore/Console/IConsole.h>
@@ -99,7 +100,68 @@ namespace NoclipProtocol
         }
         AZ_CONSOLEFREEFUNC("noclip_walk", NoclipWalk, AZ::ConsoleFunctorFlags::Null,
             "Walk the player forward: noclip_walk <seconds> [sprint 0/1]");
+
+        // weapon_give <all | pistol | shotgun | carbine | flaregun | knife | shield | ammo | flares | medkit>: as if the
+        // Foundation's crate had brought it (testing).
+        void WeaponGive(const AZ::ConsoleCommandContainer& arguments)
+        {
+            const AZStd::string what = arguments.empty() ? AZStd::string("all") : AZStd::string(arguments[0]);
+            Base::State& base = Base::Get();
+            auto give = [&](const char* key, const char* name)
+            {
+                if (what == "all" || what == key)
+                {
+                    base.Unpack(name);
+                }
+            };
+            give("pistol", "Service pistol");
+            give("shotgun", "Pump shotgun");
+            if (what == "all" || what == "carbine")
+            {
+                base.m_weaponsI = true; // the carbine needs Weapons I
+                base.Unpack("Carbine");
+                base.Unpack("Carbine magazines");
+            }
+            give("flaregun", "Flare gun");
+            give("knife", "Combat knife");
+            give("shield", "Riot shield");
+            give("ammo", "Ammunition crate");
+            give("flares", "Flares");
+            give("medkit", "Medkit");
+            if (what == "all")
+            {
+                base.Unpack("Pistol rounds");
+                base.Unpack("Shotgun shells");
+                base.Unpack("Flare gun cartridges");
+            }
+            base.Save();
+            AZ_Printf("Noclip", "weapon_give %s", what.c_str());
+        }
+        AZ_CONSOLEFREEFUNC("weapon_give", WeaponGive, AZ::ConsoleFunctorFlags::Null,
+            "weapon_give <all|pistol|shotgun|carbine|flaregun|knife|shield|ammo|flares|medkit> (testing)");
+
+        // weapon_do <fire | aim 0/1 | reload | melee | flare | medkit | switch 1-3 | equip 0-5 | wheel 0-5 / -1>: the
+        // weapon keys without a keyboard (testing).
+        void WeaponDo(const AZ::ConsoleCommandContainer& arguments)
+        {
+            AZ::Entity* ui = s_activePlayer ? s_activePlayer->UiEntity() : nullptr;
+            WeaponsComponent* weapons = ui ? ui->FindComponent<WeaponsComponent>() : nullptr;
+            if (!weapons || arguments.empty())
+            {
+                AZ_Printf("Noclip", "weapon_do <fire|aim|reload|melee|flare|medkit|switch n|equip n|wheel n>%s", weapons ? "" : " (no player)");
+                return;
+            }
+            const int value = arguments.size() > 1 ? AZStd::stoi(AZStd::string(arguments[1])) : 0;
+            weapons->Command(AZStd::string(arguments[0]), value);
+        }
+        AZ_CONSOLEFREEFUNC("weapon_do", WeaponDo, AZ::ConsoleFunctorFlags::Null,
+            "weapon_do <fire|aim 0/1|reload|melee|flare|medkit|switch 1-3|equip 0-5|wheel 0-5/-1> (testing)");
     } // namespace
+
+    AZ::ComponentDescriptor* CreateWeaponsDescriptor()
+    {
+        return WeaponsComponent::CreateDescriptor();
+    }
 
     void FirstPersonControllerComponent::Teleport(const AZ::Vector3& position, float yaw, float pitch, bool setYaw, bool setPitch)
     {
@@ -193,6 +255,7 @@ namespace NoclipProtocol
         m_uiEntity->CreateComponent<NoclipHudComponent>();
         m_uiEntity->CreateComponent<PlayerVitalsComponent>();
         m_uiEntity->CreateComponent<GameBridgeComponent>();
+        m_uiEntity->CreateComponent<WeaponsComponent>()->m_player = GetEntityId();
         m_uiEntity->Init();
         m_uiEntity->Activate();
     }
@@ -363,7 +426,23 @@ namespace NoclipProtocol
             }
         }
 
-        // --- Look ---
+        // --- Look --- (held still while the weapon wheel is open; a shot's recoil kicks the view up)
+        bool lookLocked = false;
+        double recoil = 0.0;
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Get(lookLocked, "/NoclipProtocol/Player/LookLocked");
+            if (registry->Get(recoil, "/NoclipProtocol/Player/Recoil") && recoil != 0.0)
+            {
+                registry->Set("/NoclipProtocol/Player/Recoil", 0.0);
+            }
+        }
+        if (lookLocked)
+        {
+            m_mouseDeltaX = 0.0f;
+            m_mouseDeltaY = 0.0f;
+        }
+        m_pitch += static_cast<float>(recoil);
         if (m_cursorCaptured)
         {
             m_yaw -= m_mouseDeltaX * m_mouseSensitivity;

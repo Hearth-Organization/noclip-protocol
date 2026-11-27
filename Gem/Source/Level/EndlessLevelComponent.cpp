@@ -1184,6 +1184,16 @@ namespace NoclipProtocol
                 light = AZStd::max(light, lit);
             }
         }
+        // The spawn room's own working ceiling lights (the forward base's room): they light you like any other.
+        if (m_settings.m_style == 0 && !m_mainMenu)
+        {
+            for (const auto& lamp : Base::Get().m_roomLights)
+            {
+                const float dx = lamp.first - at.GetX();
+                const float dy = lamp.second - at.GetY();
+                light = AZStd::max(light, AZStd::clamp(1.0f - (std::sqrt(dx * dx + dy * dy) - 1.0f) / reach, 0.0f, 1.0f));
+            }
+        }
         // The base's own lights that are on.
         if (m_buildEnabled)
         {
@@ -1198,6 +1208,11 @@ namespace NoclipProtocol
                 }
             }
         }
+        registry->Set("/NoclipProtocol/Player/HasBase", Base::Get().m_beaconUp); // lets sanity recover past 80%
+        // A burning flare (thrown, or from the flare gun) lights you too.
+        double flareLight = 0.0;
+        registry->Get(flareLight, "/NoclipProtocol/Player/FlareLight");
+        light = AZStd::max(light, static_cast<float>(flareLight));
         registry->Set("/NoclipProtocol/Player/Light", static_cast<double>(light));
         UpdatePickups(at);
         // The forward base is the arrival room around the spawn point.

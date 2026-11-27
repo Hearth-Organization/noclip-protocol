@@ -1,0 +1,905 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "WeaponSounds",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 4693454596187413078,
+                "Child Entity Order": [
+                    "Entity_[199145304345]",
+                    "Entity_[533715382443]",
+                    "Entity_[226901487878]",
+                    "Entity_[901669237195]",
+                    "Entity_[652372165625]",
+                    "Entity_[744186770406]",
+                    "Entity_[697107051712]",
+                    "Entity_[875376885155]",
+                    "Entity_[923575144531]",
+                    "Entity_[1041275687215]",
+                    "Entity_[902514363178]",
+                    "Entity_[911029721989]"
+                ]
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 1834635381968650062
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 3013043118080318660
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 3876007165472267863
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 2617582832045171859
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 5005206769716265794
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 4623742076630109514
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 1884199419037877263
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 6062789019873288191
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 5281876485647344839,
+                "Parent Entity": ""
+            }
+        }
+    },
+    "Entities": {
+        "Entity_[199145304345]": {
+            "Id": "Entity_[199145304345]",
+            "Name": "Sound_pistol_shot",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 6017199896462910740
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 9125679395502569935
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 7377386476579664293
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 130955537157530574
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 3830957907799246711
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 1536803576985362823
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 3433666043632330635
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 9009581844018135912
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 6381720183182025745,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 524754169250494318,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{BE8F1293-4ECD-5C1A-BDA0-04E563D7D86A}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/weapons/pistol_shot.wav.miniaudio"
+                            },
+                            "Volume": 85.0,
+                            "Loop": false,
+                            "Spatialization": false,
+                            "Auto-follow": false
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[533715382443]": {
+            "Id": "Entity_[533715382443]",
+            "Name": "Sound_shotgun_shot",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 1743883086028592240
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 3488780174767060985
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 4789599803676935031
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 4062258556190922064
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 2511774999356924604
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 3404281136402907460
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 770427001639884747
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 8733330933337755818
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 1902705168697549722,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 4851592320342008270,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{2846E4F5-067E-58E8-A6C4-79F68628ADA7}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/weapons/shotgun_shot.wav.miniaudio"
+                            },
+                            "Volume": 95.0,
+                            "Loop": false,
+                            "Spatialization": false,
+                            "Auto-follow": false
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[226901487878]": {
+            "Id": "Entity_[226901487878]",
+            "Name": "Sound_carbine_shot",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 488605119768721517
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 2225868161935495036
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 7052781226343141507
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 9121412672872580732
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 5096425504878056996
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 8379223649003000825
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 1595752437861740667
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 3379617394069117777
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 9214371832200930886,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 5137207443335978015,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{0C7A2718-E568-5AC3-B99A-85CC1D4C2601}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/weapons/carbine_shot.wav.miniaudio"
+                            },
+                            "Volume": 80.0,
+                            "Loop": false,
+                            "Spatialization": false,
+                            "Auto-follow": false
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[901669237195]": {
+            "Id": "Entity_[901669237195]",
+            "Name": "Sound_flare_shot",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 9133185715649084630
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 7277090318772708542
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 6624388179555218478
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 1482376082795777288
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 346424383774229760
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 8135721430899161125
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 3028503643119909425
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 7716974378929489122
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 924493536244094455,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 7651836347819184790,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{3D895E4A-B937-5CD8-AF6F-BCD620EAF802}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/weapons/flare_shot.wav.miniaudio"
+                            },
+                            "Volume": 70.0,
+                            "Loop": false,
+                            "Spatialization": false,
+                            "Auto-follow": false
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[652372165625]": {
+            "Id": "Entity_[652372165625]",
+            "Name": "Sound_dry_click",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 7262794717802191357
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 1459017144141818268
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 446724641575785121
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 130753201886769869
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 2190491056256541146
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 6368308236909818298
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 173903803190388692
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 541092613066535768
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 8953329175120291752,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 1623291754641593477,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{A6C5884D-713F-5082-974E-62642EB34187}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/weapons/dry_click.wav.miniaudio"
+                            },
+                            "Volume": 50.0,
+                            "Loop": false,
+                            "Spatialization": false,
+                            "Auto-follow": false
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[744186770406]": {
+            "Id": "Entity_[744186770406]",
+            "Name": "Sound_reload_mag",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 7989742437421281913
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 3664694476366798517
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 4776163481746976272
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 5626087807749046926
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 674955136422730952
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 6582203604093428221
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 1764975181419319425
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 5348335288359217381
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 1288621220785372798,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 2042669474339721209,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{A2B4E4D5-4A55-51FE-BF3E-ADD13B12651C}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/weapons/reload_mag.wav.miniaudio"
+                            },
+                            "Volume": 60.0,
+                            "Loop": false,
+                            "Spatialization": false,
+                            "Auto-follow": false
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[697107051712]": {
+            "Id": "Entity_[697107051712]",
+            "Name": "Sound_shell_in",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 8264564387146416388
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 4563636506339724026
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 8174246131402864693
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 2168157905019413791
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 9185197371809402052
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 3251548751750469425
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 2412747865043165450
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 3211382734634892425
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 6919175377093083828,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 3891796410776999658,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{C6A93183-4672-5178-BDF4-91C83C5A3B04}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/weapons/shell_in.wav.miniaudio"
+                            },
+                            "Volume": 55.0,
+                            "Loop": false,
+                            "Spatialization": false,
+                            "Auto-follow": false
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[875376885155]": {
+            "Id": "Entity_[875376885155]",
+            "Name": "Sound_pump",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 6890009511027923622
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 2734123522052710560
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 3376069761486648985
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 660107075921631955
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 8866245683701262852
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 3685760927512426531
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 612750491542930874
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 6569761907836304342
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 3182634743682637926,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 6581238390715024595,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{F9CD2648-B9F7-5A02-816C-DC14CA21391F}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/weapons/pump.wav.miniaudio"
+                            },
+                            "Volume": 65.0,
+                            "Loop": false,
+                            "Spatialization": false,
+                            "Auto-follow": false
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[923575144531]": {
+            "Id": "Entity_[923575144531]",
+            "Name": "Sound_knife_swish",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 1339560049420717653
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 6707728405797902640
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 3705668903418049167
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 7663284259730947352
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 6384109452173444424
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 9071961597234716030
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 317751445265193917
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 990880077047106849
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 1412038501217939357,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 140424445099359978,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{AE8133B2-D454-5B53-9B3F-B66271ACD458}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/weapons/knife_swish.wav.miniaudio"
+                            },
+                            "Volume": 45.0,
+                            "Loop": false,
+                            "Spatialization": false,
+                            "Auto-follow": false
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[1041275687215]": {
+            "Id": "Entity_[1041275687215]",
+            "Name": "Sound_knife_hit",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 2126044322655508882
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 6824212188466809312
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 2665527087844932790
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 175532403965593279
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 5006798894090336418
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 7361519854025227123
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 7525786597518362391
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 3022208488822066550
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 2208255782210950645,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 6538306876486770768,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{8CDABC24-3983-5D46-98BC-43F70756514C}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/weapons/knife_hit.wav.miniaudio"
+                            },
+                            "Volume": 60.0,
+                            "Loop": false,
+                            "Spatialization": false,
+                            "Auto-follow": false
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[902514363178]": {
+            "Id": "Entity_[902514363178]",
+            "Name": "Sound_impact",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 2490014578094361245
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 855004482740175621
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 1510759734855519728
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 6040553137282631670
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 7350980569290941954
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 2519941431489317705
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 9199164072377435671
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 4727409890476697611
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 4628502867505220503,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 591914078407637296,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{C353AE76-9FD5-596A-9DFC-EAA6D2B8F66D}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/weapons/impact.wav.miniaudio"
+                            },
+                            "Volume": 35.0,
+                            "Loop": false,
+                            "Spatialization": false,
+                            "Auto-follow": false
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[911029721989]": {
+            "Id": "Entity_[911029721989]",
+            "Name": "Sound_flare_strike",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 7811745203336552474
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 6184315652550395186
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 1129080174419776552
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 5776912970510744266
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 3627980283205028702
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 4223944313533357841
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 2231931381982371299
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 8978488465329607019
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 4511367106552816463,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 9195775211832202968,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{E1DE4C58-6406-542D-80FC-753348F1FCAF}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/weapons/flare_strike.wav.miniaudio"
+                            },
+                            "Volume": 55.0,
+                            "Loop": false,
+                            "Spatialization": false,
+                            "Auto-follow": false
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

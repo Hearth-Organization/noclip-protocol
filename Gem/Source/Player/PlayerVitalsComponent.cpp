@@ -137,7 +137,15 @@ namespace NoclipProtocol
         }
         else if (dark < 0.3f)
         {
-            m_sanity += m_sanityLightRegen * deltaTime;
+            // Light only steadies you so far without a base to come back to: up to 80% (the owner, Nov 26); with the
+            // Foundation beacon up, all the way. (Almond Water and the base's comfort still add on top.)
+            bool hasBase = false;
+            registry->Get(hasBase, "/NoclipProtocol/Player/HasBase");
+            const float cap = hasBase ? 1.0f : 0.8f;
+            if (m_sanity < cap)
+            {
+                m_sanity = AZStd::min(cap, m_sanity + m_sanityLightRegen * deltaTime);
+            }
         }
         m_sanity = AZStd::clamp(m_sanity, 0.0f, 1.0f);
 

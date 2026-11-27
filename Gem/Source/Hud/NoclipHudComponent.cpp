@@ -8,6 +8,7 @@
 #include "../Base/BaseBuilding.h"
 #include "BuildIcons.h"
 #include "HudIcons.h"
+#include "../Player/Weapons.h"
 #include <AzCore/Console/IConsole.h>
 #include <AzCore/IO/FileIO.h>
 #include <AzCore/Math/MathUtils.h>
@@ -57,6 +58,8 @@ AZ_CVAR(int, hud_orders_layers, 4, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Foundation requisitions page: half-alpha layers over its dark backdrop");
 AZ_CVAR(int, hud_term_layers, 7, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Terminal page: how many times its shapes are laid down (7 at 0.5 alpha covers 99% of the game behind)");
+AZ_CVAR(int, hud_wheel, -1, nullptr, AZ::ConsoleFunctorFlags::Null,
+    "Show the weapon wheel with slice 0-5 picked (testing; -1 off)");
 AZ_CVAR(int, hud_page, -1, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Open a menu page without a keyboard (for testing): 0 none, 1 pause, 2 settings, 3 terminal, 4 main menu");
 
@@ -789,6 +792,7 @@ namespace NoclipProtocol
         if (registry)
         {
             registry->Set("/NoclipProtocol/Hud/time", static_cast<double>(m_time));
+            registry->Set("/NoclipProtocol/Hud/pageOpen", m_page != Page::None || m_inMenu); // the weapons stay still
             bool menu = false;
             registry->Get(menu, "/NoclipProtocol/Menu/Active");
             if (menu != m_inMenu)
@@ -1594,6 +1598,8 @@ namespace NoclipProtocol
                 if (!weapon.empty())
                 {
                     // right 40, bottom 104, 300 wide, padding 12 14: mode + icon, the name, mag / reserve, the magazine's pips, the state line
+                    // (PlayerWeapons: a melee weapon or the shield has no rounds, just its keys under the name).
+                    const bool melee = !mock && RegString("/NoclipProtocol/Hud/weapon.kind", "gun") == "melee";
                     const int mag = mock ? 9 : static_cast<int>(RegNumber("/NoclipProtocol/Hud/weapon.mag", 0.0));
                     const int cap = mock ? 12 : AZ::GetClamp(static_cast<int>(RegNumber("/NoclipProtocol/Hud/weapon.cap", 1.0)), 1, 40);
                     const int reserve = mock ? 36 : static_cast<int>(RegNumber("/NoclipProtocol/Hud/weapon.reserve", 0.0));
@@ -1602,10 +1608,12 @@ namespace NoclipProtocol
                     const AZStd::string roundsName = mock ? "rounds" : RegString("/NoclipProtocol/Hud/weapon.rounds", "rounds");
                     const AZStd::string state = mock ? "" : RegString("/NoclipProtocol/Hud/weapon.state", "");
                     const AZStd::string extra = mock ? "" : RegString("/NoclipProtocol/Hud/weapon.note", "");
+                    const float reload = mock ? -1.0f : static_cast<float>(RegNumber("/NoclipProtocol/Hud/weapon.reload", -1.0));
                     const bool low = !mock && RegNumber("/NoclipProtocol/Hud/weapon.low", 0.0) > 0.5;
                     const float right = 1240.0f, w = 300.0f;
-                    const float h = 12.0f + 30.0f + 2.0f + 21.0f + 4.0f + 40.0f + 6.0f + 16.0f + (state.empty() ? 0.0f : 6.0f + 15.0f) +
-                        (extra.empty() ? 0.0f : 6.0f + 15.0f) + 12.0f;
+                    const float h = melee ? 12.0f + 30.0f + 21.0f + 4.0f + 16.0f + 12.0f
+                                          : 12.0f + 30.0f + 2.0f + 21.0f + 4.0f + 40.0f + 6.0f + 16.0f + (state.empty() ? 0.0f : 6.0f + 15.0f) +
+                                                (extra.empty() ? 0.0f : 6.0f + 15.0f) + 12.0f;
                     const float bottom = 720.0f - 104.0f, top = bottom - h, x0 = right - w;
                     // linear-gradient(270deg, .72 at the right to .2 at the left); border-right 3px gold
                     const AZ::Color dark = Hex(0x0a0906, 0.72f), light = Hex(0x0a0906, 0.2f);
@@ -1617,27 +1625,47 @@ namespace NoclipProtocol
                     float y = top + 12.0f;
                     hudIcon(HudIcons::Find(iconName.c_str()), AX(BR, px - 30.0f), AY(BR, y), AS(30), Cream);
                     atext(BR, Face::Mono, mode, px - 40.0f, y + 8.0f, 11.0f, Muted, 2, 2.0f);
-                    y += 30.0f + 2.0f;
+                    y += 30.0f + (melee ? 0.0f : 2.0f);
                     atext(BR, Face::Oswald, weapon, px, y, 16.0f, Cream, 2, 3.0f);
                     y += 21.0f + 4.0f;
-                    hudIcon(HudIcons::Find(roundsName.c_str()), AX(BR, px - 18.0f), AY(BR, y + 20.0f), AS(18), Muted);
-                    const float resW = atext(BR, Face::Mono, AZStd::string::format("/ %d", reserve), px - 18.0f - 8.0f, y + 19.0f, 16.0f, Muted, 2) / (s * K);
-                    atext(BR, Face::Oswald, AZStd::string::format("%d", mag), px - 18.0f - 8.0f - resW - 8.0f, y - 4.0f, 40.0f, low ? Alarm : Bright, 2);
-                    y += 40.0f + 6.0f;
-                    for (int k = 0; k < cap; ++k)
+                    if (melee)
                     {
-                        const float x = px - (cap - k) * 6.0f - (cap - 1 - k) * 3.0f;
-                        rect(AX(BR, x), AY(BR, y), AS(6), AS(16), k < mag ? (low ? Alarm : Cream) : AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.15f));
+                        atext(BR, Face::Mono, extra, px, y, 12.0f, state.empty() ? Muted : Gold, 2);
                     }
-                    y += 16.0f;
-                    if (!state.empty())
+                    else
                     {
-                        atext(BR, Face::Mono, state, px, y + 6.0f, 11.0f, Gold, 2, 2.0f);
-                        y += 21.0f;
-                    }
-                    if (!extra.empty())
-                    {
-                        atext(BR, Face::Mono, extra, px, y + 6.0f, 11.0f, Muted, 2);
+                        hudIcon(HudIcons::Find(roundsName.c_str()), AX(BR, px - 18.0f), AY(BR, y + 20.0f), AS(18), Muted);
+                        const float resW = atext(BR, Face::Mono, AZStd::string::format("/ %d", reserve), px - 18.0f - 8.0f, y + 19.0f, 16.0f, Muted, 2) / (s * K);
+                        atext(BR, Face::Oswald, AZStd::string::format("%d", mag), px - 18.0f - 8.0f - resW - 8.0f, y - 4.0f, 40.0f, low ? Alarm : Bright, 2);
+                        y += 40.0f + 6.0f;
+                        for (int k = 0; k < cap; ++k)
+                        {
+                            const float x = px - (cap - k) * 6.0f - (cap - 1 - k) * 3.0f;
+                            rect(AX(BR, x), AY(BR, y), AS(6), AS(16), k < mag ? (low ? Alarm : Cream) : AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.15f));
+                        }
+                        y += 16.0f;
+                        if (!state.empty())
+                        {
+                            // RELOADING then five bars filling up (the mockup's ▮▮▮▯▯; the font has no such glyph, so they're drawn).
+                            float sx = px;
+                            if (reload >= 0.0f)
+                            {
+                                const int filled = AZ::GetClamp(static_cast<int>(reload * 5.0f + 0.5f), 0, 5);
+                                for (int k = 4; k >= 0; --k)
+                                {
+                                    sx -= 7.0f;
+                                    rect(AX(BR, sx), AY(BR, y + 7.0f), AS(5), AS(11), k < filled ? Gold : AZ::Color(240 / 255.0f, 207 / 255.0f, 90 / 255.0f, 0.25f));
+                                    sx -= 1.5f;
+                                }
+                                sx -= 6.0f;
+                            }
+                            atext(BR, Face::Mono, state, sx, y + 6.0f, 11.0f, Gold, 2, 2.0f);
+                            y += 21.0f;
+                        }
+                        if (!extra.empty())
+                        {
+                            atext(BR, Face::Mono, extra, px, y + 6.0f, 11.0f, Muted, 2);
+                        }
                     }
                 }
                 struct Slot { int icon; int count; const char* key; };
@@ -1660,6 +1688,75 @@ namespace NoclipProtocol
                     }
                     atext(BR, Face::MonoSemiBold, slots[k].key, x + 3.0f, y, 10.0f, Hex(0x0b0a07));
                 }
+            }
+
+            // ---- the weapon wheel (PlayerWeapons): hold [C]; six slices clockwise from the top, the one you point at in gold ----
+            if (Weapons::Get().m_wheelOpen || static_cast<int>(hud_wheel) >= 0)
+            {
+                const Weapons::State& arms = Weapons::Get();
+                const int pick = static_cast<int>(hud_wheel) >= 0 ? Weapons::WheelOrder[static_cast<int>(hud_wheel) % Weapons::Count] : arms.m_wheelPick;
+                const float cx = 640.0f, cy = 360.0f; // the svg's 210, 210 at left 430, top 150
+                auto disc = [&](float r0, float r1, float a0, float a1, const AZ::Color& c, int steps)
+                {
+                    AZStd::vector<AZ::Vector3> tri;
+                    for (int q = 0; q < steps; ++q)
+                    {
+                        const float b0 = a0 + (a1 - a0) * q / steps, b1 = a0 + (a1 - a0) * (q + 1) / steps;
+                        const AZ::Vector3 i0 = P(C(cx + std::cos(b0) * r0), Y(cy + std::sin(b0) * r0)), i1 = P(C(cx + std::cos(b1) * r0), Y(cy + std::sin(b1) * r0));
+                        const AZ::Vector3 o0 = P(C(cx + std::cos(b0) * r1), Y(cy + std::sin(b0) * r1)), o1 = P(C(cx + std::cos(b1) * r1), Y(cy + std::sin(b1) * r1));
+                        tri.insert(tri.end(), { i0, o0, o1, i0, o1, i1 });
+                    }
+                    triangles(tri, { c });
+                };
+                auto ring = [&](float r, const AZ::Color& c)
+                {
+                    for (int q = 0; q < 72; ++q)
+                    {
+                        const float b0 = AZ::Constants::TwoPi * q / 72, b1 = AZ::Constants::TwoPi * (q + 1) / 72;
+                        line(C(cx + std::cos(b0) * r), Y(cy + std::sin(b0) * r), C(cx + std::cos(b1) * r), Y(cy + std::sin(b1) * r), AZStd::max(1.0f, s), c);
+                    }
+                };
+                const AZ::Color edge(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.3f);
+                disc(70.0f, 190.0f, 0.0f, AZ::Constants::TwoPi, Hex(0x0a0906, 0.72f), 72);
+                disc(0.0f, 70.0f, 0.0f, AZ::Constants::TwoPi, Hex(0x0a0906, 0.85f), 48);
+                ring(190.0f, edge);
+                ring(70.0f, edge);
+                const AZ::Color dim = Hex(0x8a8168);
+                for (int k = 0; k < Weapons::Count; ++k)
+                {
+                    const int id = Weapons::WheelOrder[k];
+                    const float a0 = AZ::DegToRad(-90.0f - 30.0f + k * 60.0f), a1 = a0 + AZ::DegToRad(60.0f);
+                    const bool sel = id == pick;
+                    if (sel)
+                    {
+                        disc(72.0f, 188.0f, a0, a1, AZ::Color(240 / 255.0f, 207 / 255.0f, 90 / 255.0f, 0.22f), 16);
+                    }
+                    const AZ::Color sep(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.2f);
+                    line(C(cx + std::cos(a0) * 72.0f), Y(cy + std::sin(a0) * 72.0f), C(cx + std::cos(a0) * 188.0f), Y(cy + std::sin(a0) * 188.0f), AZStd::max(1.0f, s), sep);
+                    const bool locked = Weapons::State::Locked(id);
+                    const bool owned = Weapons::State::Owned(id) || (mock && id != Weapons::Carbine);
+                    const Weapons::Def& d = Weapons::Info(id);
+                    const float am = (a0 + a1) * 0.5f;
+                    const float ix = cx + 130.0f * std::cos(am), iy = cy + 130.0f * std::sin(am);
+                    const AZ::Color col = sel ? Gold : ((locked || !owned) ? dim : Cream);
+                    hudIcon(HudIcons::Find(locked ? "lock" : d.m_icon), C(ix - 16.0f), Y(iy - 26.0f), 32.0f * s, col);
+                    text(Face::Mono, d.m_wheel, C(ix), Y(iy + 22.0f - 11.0f), 11.0f, col, 1, 2.0f);
+                    AZStd::string sub;
+                    if (locked) { sub = "Weapons I"; }
+                    else if (!owned) { sub = "not issued"; }
+                    else if (Weapons::State::UsesAmmo(id))
+                    {
+                        sub = mock ? (id == Weapons::Shotgun ? "2 / 18" : (id == Weapons::Pistol ? "9 / 36" : "1 / 3"))
+                                   : AZStd::string::format("%d / %d", Weapons::State::Mag(id), Weapons::State::Reserve(id));
+                    }
+                    if (!sub.empty())
+                    {
+                        text(Face::Mono, sub, C(ix), Y(iy + 37.0f - 10.0f), 10.0f, Muted, 1);
+                    }
+                }
+                const AZStd::string name = pick >= 0 ? AZStd::string(Weapons::Info(pick).m_wheel) : AZStd::string("HOLSTER");
+                text(Face::Oswald, name, C(cx), Y(cy - 5.0f - 17.0f), 18.0f, Bright, 1, 3.0f);
+                text(Face::Mono, "release to equip", C(cx), Y(cy + 16.0f - 11.0f), 11.0f, Muted, 1);
             }
 
             // ---- toast (noclip, arrivals) ----

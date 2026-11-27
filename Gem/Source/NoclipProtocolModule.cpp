@@ -15,6 +15,10 @@
 #include "Hud/HearthHudComponent.h"
 #include "Debug/HearthDebugOverlayComponent.h"
 #include "Monsters/HearthMonsterComponent.h"
+namespace NoclipProtocol
+{
+    AZ::ComponentDescriptor* CreateWeaponsDescriptor(); // Player/FirstPersonControllerComponent.cpp (the weapons need Atom's headers)
+}
 
 #include <NoclipProtocol/NoclipProtocolTypeIds.h>
 
@@ -45,6 +49,7 @@ namespace NoclipProtocol
                 GameBridgeComponent::CreateDescriptor(),
                 HearthDebugOverlayComponent::CreateDescriptor(),
                 HearthMonsterComponent::CreateDescriptor(),
+                CreateWeaponsDescriptor(),
             });
         }
 

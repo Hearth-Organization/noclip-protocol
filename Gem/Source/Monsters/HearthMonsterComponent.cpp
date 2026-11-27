@@ -359,6 +359,18 @@ namespace NoclipProtocol
             }
         }
         m_stepsSeen = steps;
+        // A gunshot carries much further than a step: heard out to four times the hearing distance (a knife is quiet).
+        AZ::s64 shots = 0;
+        if (registry)
+        {
+            registry->Get(shots, "/NoclipProtocol/Player/Shots");
+        }
+        if (m_shotsSeen >= 0 && shots > m_shotsSeen && distance <= m_hearing * 4.0f)
+        {
+            m_heardAt = playerAt;
+            m_sinceHeard = 0.0f;
+        }
+        m_shotsSeen = shots;
 
         // Sight: within the distance, in front (60° each way), nothing in between.
         AZ::Transform self = AZ::Transform::CreateIdentity();

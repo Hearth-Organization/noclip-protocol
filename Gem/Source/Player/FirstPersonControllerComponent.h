@@ -27,6 +27,7 @@ namespace NoclipProtocol
 
         //! Developer teleport (console command noclip_tp).
         void Teleport(const AZ::Vector3& position, float yaw, float pitch, bool setYaw, bool setPitch);
+        AZ::Entity* UiEntity() const { return m_uiEntity; } // the HUD, vitals and weapons
         //! Walk forward for a while as if W were held (the noclip_walk dev command).
         void WalkFor(float seconds, bool sprint) { m_autoWalkSeconds = seconds; m_autoWalkSprint = sprint; }
 

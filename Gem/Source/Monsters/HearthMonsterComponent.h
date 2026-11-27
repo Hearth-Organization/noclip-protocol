@@ -61,6 +61,7 @@ namespace NoclipProtocol
         AZStd::vector<CellPos> m_path;
         float m_repath = 0.0f;
         AZ::s64 m_stepsSeen = -1;
+        AZ::s64 m_shotsSeen = -1;
         AZ::Vector3 m_heardAt = AZ::Vector3::CreateZero();
         float m_sinceHeard = 100.0f;
         CellPos m_wander;

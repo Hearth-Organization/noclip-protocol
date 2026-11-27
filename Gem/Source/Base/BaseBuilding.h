@@ -277,6 +277,48 @@ namespace NoclipProtocol::Base
             m_gear.push_back({ AZStd::string(name), n });
         }
 
+        // A crate's contents into the gear: boxes of ammunition become rounds (Player/Weapons.h reads them), a weapon
+        // comes loaded.
+        void Unpack(const char* name)
+        {
+            const AZStd::string n(name);
+            struct Box { const char* m_name; const char* m_key; int m_count; };
+            static const Box boxes[] = {
+                { "Pistol rounds", "ammo.pistol", 24 }, { "Shotgun shells", "ammo.shells", 12 }, { "Carbine magazines", "ammo.carbine", 30 },
+                { "Flare gun cartridges", "ammo.flare", 4 }, { "Flares", "Flares", 6 },
+            };
+            for (const Box& box : boxes)
+            {
+                if (n == box.m_name)
+                {
+                    AddGear(box.m_key, box.m_count);
+                    return;
+                }
+            }
+            if (n == "Ammunition crate")
+            {
+                AddGear("ammo.pistol", 24);
+                AddGear("ammo.shells", 12);
+                AddGear("ammo.flare", 2);
+                if (m_weaponsI)
+                {
+                    AddGear("ammo.carbine", 30);
+                }
+                return;
+            }
+            // A weapon: comes with a full magazine (only the first one; a second of the same is spare parts).
+            struct Gun { const char* m_name; int m_cap; };
+            static const Gun guns[] = { { "Service pistol", 12 }, { "Pump shotgun", 6 }, { "Carbine", 30 }, { "Flare gun", 1 } };
+            for (const Gun& gun : guns)
+            {
+                if (n == gun.m_name && GearCount(gun.m_name) == 0)
+                {
+                    AddGear((AZStd::string("mag:") + gun.m_name).c_str(), gun.m_cap);
+                }
+            }
+            AddGear(name, 1);
+        }
+
         // ------------------------------------------------------------ save
 
         static constexpr const char* SavePath = "@user@/Saves/expedition.json";
@@ -872,7 +914,7 @@ namespace NoclipProtocol::Base
                 }
                 else
                 {
-                    AddGear(req.m_name, 1);
+                    Unpack(req.m_name);
                 }
                 text = AZStd::string::format("FOUNDATION CRATE \xc2\xb7 %s", req.m_name);
                 for (char& c : text)
