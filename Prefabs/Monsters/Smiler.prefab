@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Smiler",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 8163832433150579948
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 8819660028750370589
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 7350832161663807115
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 3058948410089262491
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 805343888511204959
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 736468649153899495
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 3447000444707547197
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 2126039087112946916
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 3649414127992761345
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 7851155681341105468,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 7207280003307908163,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{AF7270A7-7075-534A-8016-66FDE4DB6552}",
+                        "subId": 3158272521
+                    },
+                    "assetHint": "assets/models/monsters/smiler/smiler.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 2540284462001070676,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{D06CE24B-FC4E-54C6-B87E-BCFB862B1247}",
+                            "subId": 401693293
+                        },
+                        "assetHint": "assets/models/monsters/smiler/smiler_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 4432190295915417672,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{4AA4B5C9-B3B3-5F5A-BAE5-67371DB3944D}"
+                                    },
+                                    "assetHint": "assets/models/monsters/smiler/smiler.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 4409069672261923218,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        1.15
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 2.3,
+                        "Radius": 0.35
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 3466961340589451935
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 3135143680025546657,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Smiler",
+                    "Kind": "Smiler",
+                    "Motions": "assets/models/monsters/smiler/smiler"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

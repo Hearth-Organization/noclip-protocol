@@ -18,6 +18,7 @@
 namespace NoclipProtocol
 {
     AZ::ComponentDescriptor* CreateWeaponsDescriptor(); // Player/FirstPersonControllerComponent.cpp (the weapons need Atom's headers)
+    AZ::ComponentDescriptor* CreateMonsterSpawnerDescriptor(); // Player/FirstPersonControllerComponent.cpp too
 }
 
 #include <NoclipProtocol/NoclipProtocolTypeIds.h>
@@ -50,6 +51,7 @@ namespace NoclipProtocol
                 HearthDebugOverlayComponent::CreateDescriptor(),
                 HearthMonsterComponent::CreateDescriptor(),
                 CreateWeaponsDescriptor(),
+                CreateMonsterSpawnerDescriptor(),
             });
         }
 

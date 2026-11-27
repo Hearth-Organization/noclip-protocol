@@ -167,11 +167,55 @@ def write_flare():
         json.dump(data, f, indent=4)
 
 
+# The real models (Tools/Weapons/make_weapon_models.py, from Tripo3D) replace the primitives once the Asset
+# Processor has made them: their ids are in Tools/Weapons/model_ids.json (Tools/Assets/asset_ids.py writes it).
+MODEL_IDS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model_ids.json")
+
+
+def model_view(name, template):
+    """View_<name>.prefab holding one mesh: Assets/Models/Weapons/<name>/<name>.fbx with its own material."""
+    try:
+        with open(MODEL_IDS) as f:
+            ids = json.load(f)
+    except OSError:
+        return False
+    key = f"assets/models/weapons/{name.lower()}/{name.lower()}.fbx.azmodel"
+    if key not in ids:
+        return False
+    rnd = random.Random(f"View_{name}-model")
+    data = copy.deepcopy(template)
+    data["ContainerEntity"]["Name"] = f"View_{name}"
+    for comp in data["ContainerEntity"]["Components"].values():
+        comp["Id"] = rnd.getrandbits(63)
+    e = copy.deepcopy(next(iter(template["Entities"].values())))
+    eid = f"Entity_[{rnd.getrandbits(40)}]"
+    e["Id"], e["Name"] = eid, f"View_{name}_Model"
+    comps = e["Components"]
+    for comp in comps.values():
+        comp["Id"] = rnd.getrandbits(63)
+    for k in [k for k, c in comps.items() if "Collider" in c.get("$type", "") or "RigidBody" in c.get("$type", "")]:
+        del comps[k]
+    comps["AZ::Render::EditorMeshComponent"]["Controller"]["Configuration"]["ModelAsset"] = {
+        "assetId": {"guid": ids[key]["guid"], "subId": ids[key]["subId"]}, "assetHint": key}
+    comps["EditorMaterialComponent"]["Controller"]["Configuration"]["materials"]["{}"]["MaterialAsset"]["assetId"]["guid"] = \
+        asset_guid(f"Assets/Models/Weapons/{name}/{name}.material")
+    comps["EditorNonUniformScaleComponent"]["NonUniformScale"] = [1.0, 1.0, 1.0]
+    comps["TransformComponent"]["Transform Data"] = {"Translate": [0.0, 0.0, 0.0]}
+    comps["TransformComponent"]["Parent Entity"] = "ContainerEntity"
+    data["Entities"] = {eid: e}
+    data["ContainerEntity"]["Components"]["EditorEntitySortComponent"]["Child Entity Order"] = [eid]
+    with open(path("Prefabs/Weapons", f"View_{name}.prefab"), "w") as f:
+        json.dump(data, f, indent=4)
+    return True
+
+
 def write_views():
     with open(path("Prefabs/Level0", "L0_Pillar.prefab")) as f:
         template = json.load(f)
     os.makedirs(path("Prefabs/Weapons"), exist_ok=True)
     for name, parts in VIEWS.items():
+        if model_view(name, template):
+            continue
         spec = {"parts": parts, "size": mc.bounds(parts), "collide": False}
         mc.build_prefab(f"View_{name}", spec, template, folder="Prefabs/Weapons", mat_guid=mat_guid)
 

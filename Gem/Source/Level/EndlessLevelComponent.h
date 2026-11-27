@@ -37,6 +37,8 @@ namespace NoclipProtocol
         AZ::u64 GetSeed() const { return m_settings.m_seed; }
         //! The layout settings in use (seed included), for monsters finding their way.
         const Level0::Settings& GetSettings() const { return m_settings; }
+        //! 0 = Level 0, 1 = Level 1, 2 = Level 2, 3 = the intro facility.
+        int GetStyle() const { return m_styleField; }
 
     protected:
         void Activate() override;

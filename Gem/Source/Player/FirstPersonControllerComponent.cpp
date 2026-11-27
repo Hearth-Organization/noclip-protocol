@@ -4,10 +4,12 @@
 #include "PlayerVitalsComponent.h"
 #include "../Debug/GameBridgeComponent.h"
 #include "WeaponsComponent.h"
+#include "../Monsters/MonsterSpawnerComponent.h"
 
 #include <AzCore/Settings/SettingsRegistry.h>
 #include <AzCore/Console/IConsole.h>
 #include <AzCore/std/string/conversions.h>
+#include <cctype>
 
 #include <AzCore/Component/ComponentApplicationBus.h>
 #include <AzCore/Component/Entity.h>
@@ -154,6 +156,53 @@ namespace NoclipProtocol
             const int value = arguments.size() > 1 ? AZStd::stoi(AZStd::string(arguments[1])) : 0;
             weapons->Command(AZStd::string(arguments[0]), value);
         }
+        // monster_spawn <smiler>: one monster 10 m ahead of the player, now (testing; Level 0 only).
+        void MonsterSpawn(const AZ::ConsoleCommandContainer& arguments)
+        {
+            AZStd::string kind = arguments.empty() ? AZStd::string("Smiler") : AZStd::string(arguments[0]);
+            if (!kind.empty())
+            {
+                kind[0] = static_cast<char>(toupper(kind[0]));
+            }
+            MonsterSpawnerComponent::Request(kind);
+            AZ_Printf("Noclip", "monster_spawn %s", kind.c_str());
+        }
+        AZ_CONSOLEFREEFUNC("monster_spawn", MonsterSpawn, AZ::ConsoleFunctorFlags::Null, "monster_spawn <smiler> (testing, Level 0)");
+
+        // monster_debug [freeze 0/1]: lists every monster (where it is, its components); freeze 1 stops them in
+        // place (they keep playing their idle) for screenshots, freeze 0 lets them go again.
+        void MonsterDebug(const AZ::ConsoleCommandContainer& arguments)
+        {
+            if (arguments.size() >= 2 && AZStd::string(arguments[0]) == "freeze")
+            {
+                const bool freeze = AZStd::string(arguments[1]) != "0";
+                if (auto* registry = AZ::SettingsRegistry::Get())
+                {
+                    registry->Set("/NoclipProtocol/Monsters/Enabled", !freeze);
+                }
+                AZ_Printf("Noclip", "monster_debug: %s", freeze ? "frozen" : "moving");
+                return;
+            }
+            AZ::ComponentApplicationBus::Broadcast(&AZ::ComponentApplicationRequests::EnumerateEntities, [](AZ::Entity* entity)
+            {
+                if (!entity->FindComponent<HearthMonsterComponent>())
+                {
+                    return;
+                }
+                AZ::Transform tm = AZ::Transform::CreateIdentity();
+                AZ::TransformBus::EventResult(tm, entity->GetId(), &AZ::TransformBus::Events::GetWorldTM);
+                AZStd::string comps;
+                for (AZ::Component* c : entity->GetComponents())
+                {
+                    comps += AZStd::string(c->RTTI_GetTypeName()) + " ";
+                }
+                AZ_Printf("Noclip", "monster %s [%s] at %.2f %.2f %.2f scale %.2f state %d: %s", entity->GetName().c_str(),
+                    entity->GetId().ToString().c_str(), tm.GetTranslation().GetX(), tm.GetTranslation().GetY(), tm.GetTranslation().GetZ(),
+                    tm.GetUniformScale(), static_cast<int>(entity->GetState()), comps.c_str());
+            });
+        }
+        AZ_CONSOLEFREEFUNC("monster_debug", MonsterDebug, AZ::ConsoleFunctorFlags::Null, "monster_debug [freeze 0/1] (testing)");
+
         AZ_CONSOLEFREEFUNC("weapon_do", WeaponDo, AZ::ConsoleFunctorFlags::Null,
             "weapon_do <fire|aim 0/1|reload|melee|flare|medkit|switch 1-3|equip 0-5|wheel 0-5/-1> (testing)");
     } // namespace
@@ -161,6 +210,11 @@ namespace NoclipProtocol
     AZ::ComponentDescriptor* CreateWeaponsDescriptor()
     {
         return WeaponsComponent::CreateDescriptor();
+    }
+
+    AZ::ComponentDescriptor* CreateMonsterSpawnerDescriptor()
+    {
+        return MonsterSpawnerComponent::CreateDescriptor();
     }
 
     void FirstPersonControllerComponent::Teleport(const AZ::Vector3& position, float yaw, float pitch, bool setYaw, bool setPitch)
@@ -256,6 +310,7 @@ namespace NoclipProtocol
         m_uiEntity->CreateComponent<PlayerVitalsComponent>();
         m_uiEntity->CreateComponent<GameBridgeComponent>();
         m_uiEntity->CreateComponent<WeaponsComponent>()->m_player = GetEntityId();
+        m_uiEntity->CreateComponent<MonsterSpawnerComponent>()->m_player = GetEntityId();
         m_uiEntity->Init();
         m_uiEntity->Activate();
     }

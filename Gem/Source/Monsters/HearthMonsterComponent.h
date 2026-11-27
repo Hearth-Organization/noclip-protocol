@@ -3,6 +3,10 @@
 // within its hearing distance, sees the player within its sight distance and 60° of where it faces (walls block it),
 // walks the shortest way through the doorways, and wanders otherwise. It reports where it is and what it's doing
 // under /NoclipProtocol/Monsters so the editor shows it live. /NoclipProtocol/Monsters/Enabled = false stops them.
+//
+// With a Kind and a motions path it is a real creature: an Actor and a Simple Motion component on the same entity
+// play its Tripo3D animations (idle, walk, run, an attack) as it moves; it strikes the player up close, can be shot
+// (Weapons/Hit) and dies, and a Smiler drains sanity while it watches you and backs off from a flashlight or a flare.
 #pragma once
 
 #include <AzCore/Component/Component.h>
@@ -32,6 +36,24 @@ namespace NoclipProtocol
         void Deactivate() override;
         void OnTick(float deltaTime, AZ::ScriptTimePoint time) override;
 
+        //! Set by the monster spawner before the entity activates: its own name (Monster pathing), its kind
+        //! (senses and behaviour), and its motions, a product path prefix ("assets/models/monsters/smiler/smiler":
+        //! the motions are <prefix>_idle.motion, _walk, _run and _slash).
+        void Setup(const AZStd::string& name, const AZStd::string& kind, const AZStd::string& motions)
+        {
+            m_name = name;
+            m_kind = kind;
+            m_motions = motions;
+            if (kind == "Smiler")
+            {
+                m_speed = 4.2f;   // hunting: a run; it wanders at 40 % (a walk)
+                m_sight = 14.0f;
+                m_hearing = 9.0f;
+            }
+        }
+        bool IsDead() const { return m_health <= 0.0f; }
+        float SinceDeath() const { return m_sinceDeath; }
+
     private:
         struct CellPos
         {
@@ -49,7 +71,19 @@ namespace NoclipProtocol
         CellPos Cell(const AZ::Vector3& at) const;
         AZ::Vector3 Centre(const CellPos& cell, float z) const;
         void Report(const AZ::Vector3& at, const AZStd::string& state);
+        void Play(const char* motion, bool loop, float speed);
 
+        AZStd::string m_kind;
+        AZStd::string m_motions;
+        AZStd::string m_playing;
+        float m_health = 160.0f;
+        float m_sinceDeath = 0.0f;
+        float m_attack = -1.0f;      // seconds into an attack, or < 0
+        bool m_struck = false;       // this attack's blow has landed (or missed)
+        float m_attackCooldown = 0.0f;
+        float m_lit = 0.0f;          // seconds in the player's flashlight
+        float m_fleeing = 0.0f;      // seconds left backing off from light
+        AZ::s64 m_hitsSeen = -1;
         AZStd::string m_name;
         float m_hearing = 7.0f;
         float m_sight = 12.0f;
