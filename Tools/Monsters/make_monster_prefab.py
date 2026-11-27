@@ -4,6 +4,7 @@ component (idle to start; the Hearth Monster switches motions as it moves), its 
 hit, and the Hearth Monster itself (the spawner fills in its name and kind).
 
   python3 Tools/Monsters/make_monster_prefab.py NAME ACTOR_SUBID IDLE_SUBID HEIGHT_M RADIUS_M
+  python3 Tools/Monsters/make_monster_prefab.py NAME --mesh MODEL_SUBID HEIGHT_M RADIUS_M     (no skeleton: a plain mesh)
 
 The actor's and the idle motion's product sub ids come from the Asset Processor's database once it has processed
 Assets/Models/Monsters/NAME/NAME.fbx and NAME_idle.fbx (the source guid is the name UUID of the source path).
@@ -27,7 +28,15 @@ def _guid(rel):
 
 
 def main():
-    name, actor_sub, idle_sub, height, radius = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), float(sys.argv[4]), float(sys.argv[5])
+    name = sys.argv[1]
+    mesh = sys.argv[2] == "--mesh"
+    # IDLE_SUBID may be "walk:SUBID" for a four-legged rig that only has a walk.
+    first = "idle"
+    if not mesh and ":" in sys.argv[3]:
+        first, sys.argv[3] = sys.argv[3].split(":")
+    actor_sub, idle_sub = (0, 0) if mesh else (int(sys.argv[2]), int(sys.argv[3]))
+    model_sub = int(sys.argv[3]) if mesh else 0
+    height, radius = float(sys.argv[4]), float(sys.argv[5])
     folder = f"assets/models/monsters/{name.lower()}"
     rnd = random.Random(name + "-monster")
     nid = lambda: rnd.getrandbits(63)
@@ -51,8 +60,8 @@ def main():
         "EditorSimpleMotionComponent": {
             "$type": "EditorSimpleMotionComponent", "Id": nid(),
             "Configuration": {
-                "MotionAsset": {"assetId": {"guid": _guid(f"{folder}/{name.lower()}_idle.fbx"), "subId": idle_sub},
-                                "assetHint": f"{folder}/{name.lower()}_idle.motion"},
+                "MotionAsset": {"assetId": {"guid": _guid(f"{folder}/{name.lower()}_{first}.fbx"), "subId": idle_sub},
+                                "assetHint": f"{folder}/{name.lower()}_{first}.motion"},
                 "Loop": True, "PlayOnActivation": True, "InPlace": True, "BlendIn": 0.25, "BlendOut": 0.25,
             },
         },
@@ -72,6 +81,15 @@ def main():
                           "m_template": {"$type": "HearthMonsterComponent", "Name": name, "Kind": name,
                                          "Motions": f"{folder}/{name.lower()}"}},
     }
+    if mesh:
+        del comps["EditorActorComponent"]
+        del comps["EditorSimpleMotionComponent"]
+        comps["AZ::Render::EditorMeshComponent"] = {
+            "$type": "AZ::Render::EditorMeshComponent", "Id": nid(),
+            "Controller": {"Configuration": {"ModelAsset": {
+                "assetId": {"guid": _guid(f"{folder}/{name.lower()}.fbx"), "subId": model_sub},
+                "assetHint": f"{folder}/{name.lower()}.fbx.azmodel"}}}}
+        comps["HearthMonster"]["m_template"]["Motions"] = ""
     prefab = {"ContainerEntity": {"Id": "ContainerEntity", "Name": name, "Components": comps}, "Entities": {}}
     out = ROOT / "Prefabs" / "Monsters" / f"{name}.prefab"
     out.parent.mkdir(parents=True, exist_ok=True)

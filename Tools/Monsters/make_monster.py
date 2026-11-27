@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Turns a Tripo3D monster (model + rig + animation .glb files) into game assets.
 
-  python3 Tools/Monsters/make_monster.py NAME TRIPO_DIR HEIGHT_M ANIM [ANIM ...]
+  python3 Tools/Monsters/make_monster.py NAME TRIPO_DIR HEIGHT_M [--turn DEG] [--length] ANIM [ANIM ...]
+
+--turn DEG: an extra turn about Z for a model Tripo made facing another way than -Y (a side-view prompt).
+--length: HEIGHT_M is the body's length instead (four-legged creatures).
 
 TRIPO_DIR holds NAME-rig.glb and NAME-<anim>.glb (from hearth-workspace tools/tripo/tripo.py).
 Writes Assets/Models/Monsters/NAME/:
@@ -36,14 +39,18 @@ def load(glb):
     return arm, meshes
 
 
-def fit(arm, meshes, height):
+def fit(arm, meshes, height, by_length=False):
     """Scale to height, feet on the ground, centred, turned to face +Y. Tripo models face -Y after glTF import."""
     bpy.context.view_layer.update()
     pts = [m.matrix_world @ mathutils.Vector(c) for m in meshes for c in m.bound_box]
     lo = min(p.z for p in pts); hi = max(p.z for p in pts)
     cx = (min(p.x for p in pts) + max(p.x for p in pts)) / 2; cy = (min(p.y for p in pts) + max(p.y for p in pts)) / 2
-    s = height / (hi - lo)
+    span = max(max(p.x for p in pts) - min(p.x for p in pts), max(p.y for p in pts) - min(p.y for p in pts)) if by_length else hi - lo
+    s = height / span
     return s, mathutils.Vector((-cx, -cy, -lo))
+
+
+TURN = 0.0
 
 
 def place(arm, s, offset):
@@ -53,6 +60,7 @@ def place(arm, s, offset):
     arm.rotation_mode = "XYZ"
     # Not turned: O3DE's FBX import turns a model half way round (Blender's -Y comes in as the game's +Y; seen in
     # game, Nov 27), and Tripo models already face Blender's -Y, so they come in facing +Y, the way they walk.
+    arm.rotation_euler.z += TURN
     # Applying rescales the rest pose; the keyed bone movement (hips) is scaled to match by hand.
     if arm.animation_data and arm.animation_data.action:
         act = arm.animation_data.action
@@ -119,11 +127,19 @@ def textures(name, meshes, outdir):
 
 
 def main():
-    name, src, height, anims = sys.argv[1], Path(sys.argv[2]), float(sys.argv[3]), sys.argv[4:]
+    global TURN
+    name, src, height, rest = sys.argv[1], Path(sys.argv[2]), float(sys.argv[3]), sys.argv[4:]
+    by_length = "--length" in rest
+    rest = [a for a in rest if a != "--length"]
+    if rest[:1] == ["--turn"]:
+        import math
+        TURN = math.radians(float(rest[1]))
+        rest = rest[2:]
+    anims = rest
     outdir = ROOT / "Assets" / "Models" / "Monsters" / name
     outdir.mkdir(parents=True, exist_ok=True)
     arm, meshes = load(src / f"{name.lower()}-rig.glb")
-    s, offset = fit(arm, meshes, height)
+    s, offset = fit(arm, meshes, height, by_length)
     textures(name, meshes, outdir)
     for m in meshes:   # the actor's own material comes from NAME.material; keep the FBX free of images
         for slot in m.material_slots:

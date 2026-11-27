@@ -336,6 +336,13 @@ namespace NoclipProtocol
                                                               AZ::Data::s_invalidAssetType, false);
             if (!id.IsValid())
             {
+                // A four-legged rig only has a walk: it stands for every other motion (slowed for idle, quickened
+                // for a run or a strike).
+                if (AZStd::string(motion) != "walk")
+                {
+                    const float scaled = AZStd::string(motion) == "idle" ? 0.2f : speed * 1.4f;
+                    Play("walk", true, scaled);
+                }
                 return;
             }
             m_playing = motion;
@@ -390,6 +397,10 @@ namespace NoclipProtocol
                             {
                                 m_sink = 0.0f;
                             }
+                        }
+                        else if (m_kind == "Scp173")
+                        {
+                            damage = 0.0;            // concrete: bullets do nothing
                         }
                         else if (m_kind == "Faceling")
                         {
@@ -754,6 +765,109 @@ namespace NoclipProtocol
             return;
         }
 
+        if (m_kind == "Scp173")
+        {
+            // Moves only while nobody is looking at it, very fast, and kills on reaching you. Looked at, it can't
+            // move at all. It can't be hurt.
+            const bool watched = distance > 0.01f && playerAhead.Dot(-flat / distance) >= 0.55f && LineOfSight(playerAt, at);
+            if (watched)
+            {
+                Walk(at, Cell(at), 0.0f, deltaTime, false, playerAt);
+                Report(at, "Watched (still)");
+                return;
+            }
+            if (distance < 1.3f && registry)
+            {
+                double damage = 0.0;
+                registry->Get(damage, "/NoclipProtocol/Player/Damage");
+                registry->Set("/NoclipProtocol/Player/Damage", damage + 1.0);
+                drainSanity(0.3);
+                AZ_Printf("Noclip", "monster: %s reached you", m_name.c_str());
+                Report(at, "Reached " + playerName);
+                return;
+            }
+            at = Walk(at, Cell(playerAt), 9.0f, deltaTime, true, playerAt);
+            Report(at, "Moving (unwatched)");
+            return;
+        }
+
+        if (m_kind == "Deathmoth")
+        {
+            // Flutters about at head height and is drawn to light: a lit flashlight within 20 m and it comes for
+            // you, biting (a little health, more sanity). Easy to kill.
+            const float hover = m_floorZ + 2.1f + 0.25f * std::sin(m_moodTime * 3.7f);
+            m_moodTime += deltaTime;
+            at.SetZ(hover);
+            const bool drawn = (flashlight && distance < 20.0f) || (sees && distance < 6.0f);
+            if (drawn && distance < 1.4f && m_attackCooldown <= 0.0f && registry)
+            {
+                double damage = 0.0;
+                registry->Get(damage, "/NoclipProtocol/Player/Damage");
+                registry->Set("/NoclipProtocol/Player/Damage", damage + 0.04);
+                drainSanity(0.03);
+                m_attackCooldown = 1.2f;
+            }
+            const AZ::Vector3 swirl(std::cos(m_moodTime * 2.3f) * 0.8f, std::sin(m_moodTime * 1.9f) * 0.8f, 0.0f);
+            at = Walk(at, drawn ? Cell(playerAt) : WanderGoal(at), drawn ? 4.0f : 1.4f, deltaTime, drawn, playerAt + swirl);
+            Report(at, drawn ? "Drawn to your light" : "Fluttering");
+            return;
+        }
+
+        if (m_kind == "Clump")
+        {
+            // A slow rolling mass that smells you out to 25 m and never stops coming; a heavy hit up close.
+            m_moodTime += deltaTime;
+            AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetLocalUniformScale,
+                1.0f + 0.05f * std::sin(m_moodTime * 2.6f));
+            if (distance < 2.0f && m_attackCooldown <= 0.0f && registry)
+            {
+                double damage = 0.0;
+                registry->Get(damage, "/NoclipProtocol/Player/Damage");
+                registry->Set("/NoclipProtocol/Player/Damage", damage + 0.3);
+                drainSanity(0.05);
+                m_attackCooldown = 2.0f;
+            }
+            if (distance < 25.0f)
+            {
+                drainSanity(0.004 * deltaTime);
+                at = Walk(at, Cell(playerAt), 1.0f, deltaTime, true, playerAt);
+                Report(at, "Rolling after " + playerName);
+            }
+            else
+            {
+                at = Walk(at, WanderGoal(at), 0.5f, deltaTime, false, playerAt);
+                Report(at, "Rolling");
+            }
+            return;
+        }
+
+        if (m_kind == "Scp939")
+        {
+            // Blind: it hunts by sound alone (footsteps, gunshots) and only knows you're there by touch up close.
+            const bool touches = distance < 2.2f;
+            if (m_attack < 0.0f && touches && m_attackCooldown <= 0.0f)
+            {
+                m_attack = 0.0f;
+                m_struck = false;
+            }
+            if (m_attack >= 0.0f)
+            {
+                Strike(deltaTime, distance, flat, 0.35f, 0.05f, playerName, at);
+                return;
+            }
+            if (m_sinceHeard < 8.0f)
+            {
+                at = Walk(at, Cell(m_heardAt), 4.5f, deltaTime, touches, playerAt);
+                Report(at, AZStd::string::format("Heard you · %d m", static_cast<int>((m_heardAt - at).GetLength() + 0.5f)));
+            }
+            else
+            {
+                at = Walk(at, WanderGoal(at), 1.2f, deltaTime, false, playerAt);
+                Report(at, "Listening");
+            }
+            return;
+        }
+
         // ------------------------------------------------------------ Smiler (and the default)
         // Its grin in the dark wears on you.
         if (sees && m_kind == "Smiler")
@@ -768,7 +882,8 @@ namespace NoclipProtocol
         }
         if (m_attack >= 0.0f)
         {
-            Strike(deltaTime, distance, flat, 0.15f, 0.03f, playerName, at);
+            const float damage = m_kind == "Skinstealer" ? 0.25f : m_kind == "Hound" ? 0.12f : m_kind == "Wretch" ? 0.10f : 0.15f;
+            Strike(deltaTime, distance, flat, damage, 0.03f, playerName, at);
             return;
         }
 
@@ -786,6 +901,12 @@ namespace NoclipProtocol
         {
             state = "Hunting " + playerName;
             goal = Cell(playerAt);
+            if (m_kind == "Skinstealer" && distance > 6.0f)
+            {
+                // Wearing someone's skin it walks up slowly, like a lost agent, until it's close: then it lunges.
+                state = "Walking up to " + playerName;
+                speed = 1.2f;
+            }
         }
         else if (m_sinceHeard < 6.0f)
         {

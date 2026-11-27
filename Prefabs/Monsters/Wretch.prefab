@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Wretch",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 2237295715614770347
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 2693527930202762135
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 384190455639363249
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 1768274101765741744
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 1041570919181279064
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 7649259591110004997
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 918601256003452923
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 3974226143671549700
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 8298045853116102657
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 2362238818609976429,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 8153305574606097934,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{2CCE1CF6-72C6-5B79-8017-CDE2AC825345}",
+                        "subId": 92606509
+                    },
+                    "assetHint": "assets/models/monsters/wretch/wretch.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 8989393418015416856,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{EDF2DB11-96AA-5F60-83D1-0E649FD9CF6A}",
+                            "subId": 3602538244
+                        },
+                        "assetHint": "assets/models/monsters/wretch/wretch_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 4099995977296321502,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{197759F0-EB47-5E1B-87C7-94D4A7B53F4C}"
+                                    },
+                                    "assetHint": "assets/models/monsters/wretch/wretch.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 9003302941491948541,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.875
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.75,
+                        "Radius": 0.35
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 7547118477292929186
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 217271804707185654,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Wretch",
+                    "Kind": "Wretch",
+                    "Motions": "assets/models/monsters/wretch/wretch"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

@@ -79,6 +79,14 @@ namespace NoclipProtocol
                 { "Faceling", "prefabs/monsters/faceling.spawnable", "assets/models/monsters/faceling/faceling", 3, 40.0f, 45.0f },
                 { "Scp096", "prefabs/monsters/scp096.spawnable", "assets/models/monsters/scp096/scp096", 1, 300.0f, 1200.0f },
                 { "Scp106", "prefabs/monsters/scp106.spawnable", "assets/models/monsters/scp106/scp106", 1, 600.0f, 1500.0f },
+                { "Wretch", "prefabs/monsters/wretch.spawnable", "assets/models/monsters/wretch/wretch", 3, 60.0f, 50.0f },
+                { "Deathmoth", "prefabs/monsters/deathmoth.spawnable", "", 3, 90.0f, 70.0f },
+                { "Hound", "prefabs/monsters/hound.spawnable", "assets/models/monsters/hound/hound", 2, 150.0f, 120.0f },
+                { "Staff3008", "prefabs/monsters/staff3008.spawnable", "assets/models/monsters/staff3008/staff3008", 2, 200.0f, 150.0f },
+                { "Skinstealer", "prefabs/monsters/skinstealer.spawnable", "assets/models/monsters/skinstealer/skinstealer", 1, 240.0f, 300.0f },
+                { "Clump", "prefabs/monsters/clump.spawnable", "", 1, 360.0f, 600.0f },
+                { "Scp939", "prefabs/monsters/scp939.spawnable", "assets/models/monsters/scp939/scp939", 1, 420.0f, 900.0f },
+                { "Scp173", "prefabs/monsters/scp173.spawnable", "", 1, 900.0f, 1800.0f },
             };
             count = static_cast<int>(sizeof(kinds) / sizeof(kinds[0]));
             return kinds;
@@ -254,7 +262,10 @@ namespace NoclipProtocol
                 {
                     alive += live.m_kind == i ? 1 : 0;
                 }
-                if (alive >= kinds[i].m_most || m_nextIn[i] > 0.0f || m_inLevel < kinds[i].m_firstAfter)
+                // At most eight monsters about at once (any kinds), so a small laptop keeps up and it stays scary,
+                // not crowded.
+                if (alive >= kinds[i].m_most || m_nextIn[i] > 0.0f || m_inLevel < kinds[i].m_firstAfter ||
+                    static_cast<int>(m_live.size()) >= 8)
                 {
                     continue;
                 }

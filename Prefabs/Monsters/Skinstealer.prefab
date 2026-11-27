@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Skinstealer",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 1033770407594157082
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 3259621931664374081
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 5197868504735042211
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 2445645578382277559
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 1317776000000955615
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 903877946693061408
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 5007915252529772507
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 6353557595941202078
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 4938192210463201147
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 2653791807919980804,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 5948294635994682043,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{135FD674-2BE8-5510-B212-361C45E5E7AA}",
+                        "subId": 78156530
+                    },
+                    "assetHint": "assets/models/monsters/skinstealer/skinstealer.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 5549692073003540691,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{1893D418-C35C-5C87-B15E-25B7D728F2A2}",
+                            "subId": 1662709085
+                        },
+                        "assetHint": "assets/models/monsters/skinstealer/skinstealer_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 4751911017199536266,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{9B70FA61-3BAE-523B-B61C-C5234DEC52BB}"
+                                    },
+                                    "assetHint": "assets/models/monsters/skinstealer/skinstealer.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 1577215466637850763,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.975
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.95,
+                        "Radius": 0.35
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 7881037849620105637
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 6207624055851912140,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Skinstealer",
+                    "Kind": "Skinstealer",
+                    "Motions": "assets/models/monsters/skinstealer/skinstealer"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

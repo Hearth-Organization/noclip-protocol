@@ -1,0 +1,122 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Clump",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 9154743431343736233
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 3878530581290696294
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 8979595241647502698
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 1717852569336514132
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 9170559647081062326
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 2040839014523196154
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 1480264109479758833
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 4269640066109269291
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 1778994784933079197
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 2233327822030615952,
+                "Parent Entity": ""
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 244147321298145732,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{9ABB3798-591A-5B55-8765-DC44C7263000}"
+                                    },
+                                    "assetHint": "assets/models/monsters/clump/clump.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 3279609575284589289,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.9
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.8,
+                        "Radius": 0.85
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 721538455327471168
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 7930316335416012131,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Clump",
+                    "Kind": "Clump",
+                    "Motions": ""
+                }
+            },
+            "AZ::Render::EditorMeshComponent": {
+                "$type": "AZ::Render::EditorMeshComponent",
+                "Id": 5697753801180310949,
+                "Controller": {
+                    "Configuration": {
+                        "ModelAsset": {
+                            "assetId": {
+                                "guid": "{5700F363-4C5E-56FD-B997-949DA9A79C57}",
+                                "subId": 271350870
+                            },
+                            "assetHint": "assets/models/monsters/clump/clump.fbx.azmodel"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

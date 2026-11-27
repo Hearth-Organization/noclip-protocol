@@ -44,7 +44,9 @@ namespace NoclipProtocol
             m_name = name;
             m_kind = kind;
             m_motions = motions;
-            m_health = kind == "Faceling" ? 90.0f : (kind == "Scp096" || kind == "Scp106") ? 1.0e9f : 160.0f;
+            m_health = kind == "Faceling" ? 90.0f : (kind == "Scp096" || kind == "Scp106" || kind == "Scp173") ? 1.0e9f
+                     : kind == "Hound" ? 70.0f : kind == "Wretch" ? 60.0f : kind == "Skinstealer" ? 200.0f : kind == "Staff3008" ? 120.0f
+                     : kind == "Scp939" ? 300.0f : kind == "Clump" ? 400.0f : kind == "Deathmoth" ? 25.0f : 160.0f;
             if (kind == "Smiler")
             {
                 m_speed = 4.2f;   // hunting: a run; it wanders at 40 % (a walk)
@@ -68,6 +70,36 @@ namespace NoclipProtocol
                 m_speed = 1.8f;
                 m_sight = 12.0f;
                 m_hearing = 12.0f;
+            }
+            else if (kind == "Hound")
+            {
+                m_speed = 5.5f;   // a pack runner with sharp ears
+                m_sight = 12.0f;
+                m_hearing = 16.0f;
+            }
+            else if (kind == "Wretch")
+            {
+                m_speed = 1.8f;   // shambles; it never runs
+                m_sight = 10.0f;
+                m_hearing = 10.0f;
+            }
+            else if (kind == "Skinstealer")
+            {
+                m_speed = 6.0f;
+                m_sight = 18.0f;
+                m_hearing = 8.0f;
+            }
+            else if (kind == "Staff3008")
+            {
+                m_speed = 3.0f;
+                m_sight = 10.0f;
+                m_hearing = 6.0f;
+            }
+            else if (kind == "Scp939")
+            {
+                m_speed = 4.5f;
+                m_sight = 0.0f;   // blind
+                m_hearing = 22.0f;
             }
         }
         bool IsDead() const { return m_health <= 0.0f; }

@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Staff3008",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 9104396193396733568
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 6499219623277216129
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 5959425380021229245
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 619505675928828462
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 3624146307070233169
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 4086970590540960681
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 3927107003648349694
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 7530867088621145891
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 3704578425851954067
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 4914163710119027671,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 1073054481697531209,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{A6D8489A-5355-5EC0-BF9B-885251E55249}",
+                        "subId": 3435559223
+                    },
+                    "assetHint": "assets/models/monsters/staff3008/staff3008.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 3049211991869676910,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{C6F015A4-8958-58E4-8C15-D3C7E5273470}",
+                            "subId": 501765198
+                        },
+                        "assetHint": "assets/models/monsters/staff3008/staff3008_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 3262258646945702397,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{F8336D75-D540-5C16-99DF-0BE94BBC0C35}"
+                                    },
+                                    "assetHint": "assets/models/monsters/staff3008/staff3008.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 7614617382413772703,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        1.1
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 2.2,
+                        "Radius": 0.38
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 8146195125199794503
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 7267178980905798874,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Staff3008",
+                    "Kind": "Staff3008",
+                    "Motions": "assets/models/monsters/staff3008/staff3008"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

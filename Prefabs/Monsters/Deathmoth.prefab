@@ -1,0 +1,122 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Deathmoth",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 260858219439024084
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 1285296171544098250
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 134789219302375804
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 6848711396546051188
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 1347802045052455179
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 5122041735626204983
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 237610770887643489
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 5481780900657639931
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 767326819378680843
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 3233227841003058999,
+                "Parent Entity": ""
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 5305545156729459882,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{76CCD976-AD9D-56A2-A837-DA3D67CF5C95}"
+                                    },
+                                    "assetHint": "assets/models/monsters/deathmoth/deathmoth.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 1683061509936195890,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.5
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 1.0,
+                        "Radius": 0.5
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 4443495881423274293
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 6787408804934768694,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Deathmoth",
+                    "Kind": "Deathmoth",
+                    "Motions": ""
+                }
+            },
+            "AZ::Render::EditorMeshComponent": {
+                "$type": "AZ::Render::EditorMeshComponent",
+                "Id": 1321333078344198700,
+                "Controller": {
+                    "Configuration": {
+                        "ModelAsset": {
+                            "assetId": {
+                                "guid": "{51C22B28-4B0C-54D6-9B24-6FB474DBED71}",
+                                "subId": 272672904
+                            },
+                            "assetHint": "assets/models/monsters/deathmoth/deathmoth.fbx.azmodel"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

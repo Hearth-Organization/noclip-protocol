@@ -1,0 +1,137 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Hound",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 245004625984241979
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 1663689656442401833
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 7563371670581760847
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 2159522481127775322
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 8983455508501268056
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 3432095072384320798
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 4216389174648735218
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 1458209977866929723
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 2136002001262856796
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 4409658145772570944,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 935699422749398851,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{58AF3E40-8EF5-518C-B608-58ACB69FAEC7}",
+                        "subId": 1560231506
+                    },
+                    "assetHint": "assets/models/monsters/hound/hound.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 1342599766349723477,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{E8D580BA-12CD-547F-AF24-88B44FE56679}",
+                            "subId": 978651375
+                        },
+                        "assetHint": "assets/models/monsters/hound/hound_walk.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 7690851904694462213,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{71F6E090-E322-530F-A394-8C4BA0638C0F}"
+                                    },
+                                    "assetHint": "assets/models/monsters/hound/hound.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 4230547467864404067,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        0.45
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 0.9,
+                        "Radius": 0.45
+                    }
+                }
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 5962352818695383695
+            },
+            "HearthMonster": {
+                "$type": "GenericComponentWrapper",
+                "Id": 737622174669821034,
+                "m_template": {
+                    "$type": "HearthMonsterComponent",
+                    "Name": "Hound",
+                    "Kind": "Hound",
+                    "Motions": "assets/models/monsters/hound/hound"
+                }
+            }
+        }
+    },
+    "Entities": {}
+}
