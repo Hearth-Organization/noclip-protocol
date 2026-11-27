@@ -107,6 +107,7 @@ namespace NoclipProtocol
         float m_lightIntensityScale = 1.0f;
         float m_lightRadiusScale = 1.0f;
         void SetUpCatalogLevel();
+        bool IsOutdoors() const { return m_settings.m_catalog >= 0 && m_settings.m_layout == 3; }
         void DressEntity(AZ::EntityId id, int dress);
         void UpdateHums(float deltaTime);
 
@@ -168,6 +169,12 @@ namespace NoclipProtocol
         int m_styleField = 0;             // 0 = Level 0, 1 = Level 1, 2 = Level 2, 3 = the intro facility
         AZStd::string m_noclipPrefab = "prefabs/levels/noclipspot.spawnable";
         bool m_mainMenu = false;          // this level is the main menu's backdrop (the player stays put, the HUD shows the menu)
+        bool m_outdoorLevel = false;      // this is the Outdoors level: a sun, a sky and fog (catalog levels laid out outdoors)
+        bool m_outdoorSet = false;        // its sun, sky and fog have been set for this level
+        float m_outdoorTries = 0.0f;
+        void SetUpOutdoors(float deltaTime);
+        AZ::Data::Asset<AzFramework::Spawnable> m_landmarkAssets[3]; // tree, house, street lamp (outdoors)
+        int m_landmarkShare[2] = { 70, 20 };                           // % trees, % houses (the rest street lamps)
         AZStd::string m_framePrefab;      // breach frame (empty = none)
         AZStd::string m_screenPrefab;     // terminal screen (empty = none)
         bool m_terminalPrompt = false;    // the intro's "Access terminal" prompt is showing

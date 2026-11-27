@@ -260,6 +260,32 @@ for number, (wall, floor, ceiling) in SURFACE_FIXES.items():
     L[number]["surfaces"] = dict(wall=wall, floor=floor, ceiling=ceiling, pillar=wall)
 SURFACES = sorted({v for r in L for v in r["surfaces"].values()})
 
+# Outdoor levels (owner, Nov 27: they must look and feel like you're really outside, not in the Backrooms): a sky, a
+# sun or a moon, and fog. Mood: 0 day, 1 dusk, 2 night (from the light, or the look's words). Fog: colour and how far
+# you see (meters).
+OUTDOOR_FOG = {  # by keyword in the name or look: (colour, distance)
+    "swamp": ((0.30, 0.34, 0.28), 45.0), "snow": ((0.85, 0.88, 0.92), 55.0), "beach": ((0.70, 0.72, 0.75), 160.0),
+    "overcast": ((0.66, 0.68, 0.72), 140.0), "fog": ((0.55, 0.57, 0.60), 60.0), "void": ((0.0, 0.0, 0.0), 70.0),
+    "wheat": ((0.78, 0.76, 0.66), 220.0), "cartoon": ((0.75, 0.85, 1.0), 250.0),
+}
+for row in L:
+    if row["layout"] != "outdoor":
+        row["outdoor"] = None
+        continue
+    text = (row["name"] + " " + row["look"]).lower()
+    import re
+    night = re.search(r"\b(night|dark|graveyard|void)\b", text) or row["light"] in ("dark", "pitch")
+    dusk = re.search(r"\b(dusk|evening|sunset)\b", text) or row["light"] == "dim"
+    mood = 2 if night else (1 if dusk else 0)
+    colour, distance = {0: ((0.62, 0.68, 0.76), 180.0), 1: ((0.42, 0.30, 0.24), 110.0), 2: ((0.02, 0.025, 0.045), 55.0)}[mood]
+    for word, (c, d) in OUTDOOR_FOG.items():
+        if re.search(r"\b" + word, text):
+            colour, distance = c, d
+            if mood == 2:
+                colour = tuple(round(v * 0.08, 3) for v in colour)
+            break
+    row["outdoor"] = dict(mood=mood, fog_color=list(colour), fog_distance=distance)
+
 LAYOUT_IDS = {name: i for i, name in enumerate(LAYOUTS)}
 LIGHT_IDS = {"bright": 0, "normal": 1, "dim": 2, "dark": 3, "pitch": 4}
 
@@ -286,13 +312,18 @@ def write_header(path):
              "        uint32_t m_monsters; // bit i = Kinds[i] lives here",
              "        float m_lightColor[3];",
              "        const char* m_note;",
+             "        int m_outdoorMood;     // outdoor levels: 0 day, 1 dusk, 2 night (-1: not outdoors)",
+             "        float m_fogColor[3];   // outdoor levels' fog",
+             "        float m_fogDistance;   // meters you see outdoors",
              "    };",
              "    inline constexpr Level Levels[LevelCount] = {"]
     for r in L:
         mask = sum(1 << KINDS.index(m) for m in r["monsters"])
         col = ", ".join(f"{v:.2f}f" for v in r["light_color"])
         lines.append(f"        {{ {r['number']}, {c(r['name'])}, {'true' if r['kind'] == 'fan' else 'false'}, "
-                     f"{LAYOUT_IDS[r['layout']]}, {LIGHT_IDS[r['light']]}, {r['danger']}, 0x{mask:x}u, {{ {col} }}, {c(r['note'])} }},")
+                     f"{LAYOUT_IDS[r['layout']]}, {LIGHT_IDS[r['light']]}, {r['danger']}, 0x{mask:x}u, {{ {col} }}, {c(r['note'])}, "
+                     + (f"{o['mood']}, {{ {', '.join(f'{v:.3f}f' for v in o['fog_color'])} }}, {o['fog_distance']:.1f}f" if (o := r["outdoor"]) else "-1, { 0.0f, 0.0f, 0.0f }, 0.0f")
+                     + " },")
     lines += ["    };", "} // namespace NoclipProtocol::Catalog", ""]
     with open(path, "w") as f:
         f.write("\n".join(lines))

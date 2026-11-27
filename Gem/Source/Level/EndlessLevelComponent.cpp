@@ -9,6 +9,11 @@
 #include "LevelCatalogMaterials.h"
 #include <AtomLyIntegration/CommonFeatures/CoreLights/AreaLightBus.h>
 #include <AtomLyIntegration/CommonFeatures/Material/MaterialComponentBus.h>
+#include <AtomLyIntegration/CommonFeatures/CoreLights/DirectionalLightBus.h>
+#include <AtomLyIntegration/CommonFeatures/ImageBasedLights/ImageBasedLightComponentBus.h>
+#include <AtomLyIntegration/CommonFeatures/PostProcess/ExposureControl/ExposureControlBus.h>
+#include <AtomLyIntegration/CommonFeatures/ScreenSpace/DeferredFogBus.h>
+#include <AtomLyIntegration/CommonFeatures/SkyBox/HDRiSkyboxBus.h>
 #include <AzCore/Component/ComponentApplicationBus.h>
 #include <AzCore/Component/Entity.h>
 #include <MiniAudio/MiniAudioPlaybackBus.h>
@@ -37,6 +42,16 @@
 
 namespace NoclipProtocol
 {
+    //! The O3DE level that plays catalog level N: Levels 0-2 their own, outdoor ones Outdoors, the rest Backrooms.
+    static AZStd::string LevelFileFor(int number)
+    {
+        if (number <= 2)
+        {
+            return AZStd::string::format("Level%d", AZStd::max(number, 0));
+        }
+        return Catalog::Levels[AZStd::min(number, Catalog::LevelCount - 1)].m_layout == 3 ? AZStd::string("Outdoors") : AZStd::string("Backrooms");
+    }
+
     void EndlessLevelComponent::Reflect(AZ::ReflectContext* context)
     {
         Level0::ReflectScripting(context);
@@ -64,6 +79,7 @@ namespace NoclipProtocol
                 ->Field("NoclipPrefab", &EndlessLevelComponent::m_noclipPrefab)
                 ->Field("FramePrefab", &EndlessLevelComponent::m_framePrefab)
                 ->Field("MainMenu", &EndlessLevelComponent::m_mainMenu)
+                ->Field("Outdoor", &EndlessLevelComponent::m_outdoorLevel)
                 ->Field("ScreenPrefab", &EndlessLevelComponent::m_screenPrefab)
                 ->Field("NoclipTarget", &EndlessLevelComponent::m_noclipTarget)
                 ->Field("EnablePillars", &EndlessLevelComponent::m_enablePillars)
@@ -318,7 +334,7 @@ namespace NoclipProtocol
             {
                 if (auto* console = AZ::Interface<AZ::IConsole>::Get())
                 {
-                    console->PerformCommand(AZStd::string::format("LoadLevel %s", number <= 2 ? AZStd::string::format("Level%d", number).c_str() : "Backrooms").c_str());
+                    console->PerformCommand(AZStd::string::format("LoadLevel %s", LevelFileFor(number).c_str()).c_str());
                 }
             });
         }
@@ -349,9 +365,23 @@ namespace NoclipProtocol
         m_settings.m_style = m_styleField;
         m_settings.m_catalog = -1;
         Level0::ApplyStyle(m_settings);
+        m_outdoorSet = false;
+        m_outdoorTries = 0.0f;
         if (m_styleField == 4)
         {
             SetUpCatalogLevel();
+            if (IsOutdoors() != m_outdoorLevel)
+            {
+                // Arrived in the wrong one of the two (CONTINUE knows the number, not the level): load the right one.
+                const AZStd::string right = LevelFileFor(m_settings.m_catalog);
+                AZ::TickBus::QueueFunction([right]()
+                {
+                    if (auto* console = AZ::Interface<AZ::IConsole>::Get())
+                    {
+                        console->PerformCommand(AZStd::string::format("LoadLevel %s", right.c_str()).c_str());
+                    }
+                });
+            }
         }
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
@@ -566,6 +596,13 @@ namespace NoclipProtocol
 
     bool EndlessLevelComponent::PieceAssetsReady() const
     {
+        for (const auto& asset : m_landmarkAssets)
+        {
+            if (asset.GetId().IsValid() && !asset.IsReady() && !asset.IsError())
+            {
+                return false;
+            }
+        }
         for (const auto& asset : m_pieceAssets)
         {
             if (asset.GetId().IsValid() && !asset.IsReady())
@@ -593,6 +630,10 @@ namespace NoclipProtocol
     void EndlessLevelComponent::OnTick([[maybe_unused]] float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
         UpdateHums(deltaTime);
+        if (m_outdoorLevel && !m_outdoorSet)
+        {
+            SetUpOutdoors(deltaTime);
+        }
         CheckNoclipSpots();
         PublishPlayerState();
         // First frame (every entity is active by now): turn the player toward the most open view,
@@ -967,19 +1008,46 @@ namespace NoclipProtocol
         {
             SpawnBox(chunk.m_tickets[PieceWall], wall, true, 0.0f, false, 0);
         }
+        // Outdoors the pillars are landmarks: trees, houses and street lamps (Tripo3D models), not boxes.
+        bool landmarks = IsOutdoors();
+        for (auto& asset : m_landmarkAssets)
+        {
+            landmarks = landmarks && asset.IsReady();
+        }
+        const size_t landmarkTickets = chunk.m_tickets.size();
+        if (landmarks)
+        {
+            for (auto& asset : m_landmarkAssets)
+            {
+                chunk.m_tickets.emplace_back(asset);
+            }
+        }
         if (m_enablePillars)
         {
             for (const Level0::Box& pillar : layout.m_pillars)
             {
+                if (landmarks)
+                {
+                    const AZ::u64 h = m_settings.m_seed ^ (static_cast<AZ::u64>(static_cast<AZ::s64>(pillar.m_cx)) * 0x9E3779B97F4A7C15ull)
+                                    ^ (static_cast<AZ::u64>(static_cast<AZ::s64>(pillar.m_cy)) * 0xC2B2AE3D27D4EB4Full);
+                    const int roll = static_cast<int>((h ^ (h >> 31)) % 100ull);
+                    const int pick = roll < m_landmarkShare[0] ? 0 : (roll < m_landmarkShare[0] + m_landmarkShare[1] ? 1 : 2);
+                    const float yaw = static_cast<float>((h >> 13) % 628ull) / 100.0f;
+                    SpawnBox(chunk.m_tickets[landmarkTickets + pick], Level0::Box{ pillar.m_cx, pillar.m_cy, 0.0f, 1.0f, 1.0f, 1.0f }, false, yaw);
+                    continue;
+                }
                 SpawnBox(chunk.m_tickets[PiecePillar], pillar, true, 0.0f, false, 0);
             }
         }
         if (layout.m_hasSlabs)
         {
             SpawnBox(chunk.m_tickets[PieceFloor], layout.m_floor, true, 0.0f, false, 1);
-            SpawnBox(chunk.m_tickets[PieceCeiling], layout.m_ceiling, true, 0.0f, false, 2);
+            if (!IsOutdoors()) // outdoors: the sky
+            {
+                SpawnBox(chunk.m_tickets[PieceCeiling], layout.m_ceiling, true, 0.0f, false, 2);
+            }
         }
-        for (const Level0::Light& light : layout.m_lights)
+        for (const Level0::Light& light : IsOutdoors() ? AZStd::vector<Level0::Light>() : AZStd::vector<Level0::Light>(layout.m_lights.begin(), layout.m_lights.end()))
         {
             Level0::LightState state = light.m_state;
             if (state == Level0::LightState::Flickering && !m_enableFlicker)
@@ -1236,8 +1304,97 @@ namespace NoclipProtocol
         static const float brightness[5] = { 1.3f, 1.0f, 0.75f, 0.55f, 0.4f };
         m_lightIntensityScale = brightness[m_settings.m_light] * reach * reach * (m_settings.m_layout == 3 ? 2.0f : 1.0f); // outdoors: daylight
         m_lightRadiusScale = reach;
+        // Outdoors: the landmarks standing about, and how many of each (tree, house, street lamp) by the kind of place.
+        for (auto& asset : m_landmarkAssets)
+        {
+            asset = {};
+        }
+        if (IsOutdoors())
+        {
+            static const char* const landmarks[3] = { "prefabs/landmarks/tree.spawnable", "prefabs/landmarks/house.spawnable",
+                                                      "prefabs/landmarks/streetlamp.spawnable" };
+            for (int i = 0; i < 3; ++i)
+            {
+                AZ::Data::AssetId id;
+                AZ::Data::AssetCatalogRequestBus::BroadcastResult(id, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath, landmarks[i],
+                    azrtti_typeid<AzFramework::Spawnable>(), false);
+                if (id.IsValid())
+                {
+                    m_landmarkAssets[i] = AZ::Data::AssetManager::Instance().GetAsset<AzFramework::Spawnable>(id, AZ::Data::AssetLoadBehavior::PreLoad);
+                }
+            }
+            AZStd::string name = level.m_name;
+            for (char& ch : name) { ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch))); }
+            const bool town = name.find("suburb") != AZStd::string::npos || name.find("city") != AZStd::string::npos ||
+                              name.find("construction") != AZStd::string::npos || name.find("docks") != AZStd::string::npos ||
+                              name.find("rooftop") != AZStd::string::npos || name.find("motion") != AZStd::string::npos ||
+                              name.find("carnival") != AZStd::string::npos || name.find("window") != AZStd::string::npos;
+            const bool bare = name.find("plains") != AZStd::string::npos || name.find("beach") != AZStd::string::npos ||
+                              name.find("void") != AZStd::string::npos || name.find("snow") != AZStd::string::npos;
+            m_landmarkShare[0] = town ? 15 : (bare ? 70 : 80);
+            m_landmarkShare[1] = town ? 55 : (bare ? 10 : 12);
+        }
         AZ_Printf("NoclipProtocol", "Catalog level %d: %s (layout %d, light %d, danger %d)", static_cast<int>(number), level.m_name,
             level.m_layout, level.m_light, level.m_danger);
+    }
+
+    void EndlessLevelComponent::SetUpOutdoors(float deltaTime)
+    {
+        m_outdoorTries += deltaTime;
+        AZ::EntityId sun, sky, environment;
+        AZ::ComponentApplicationBus::Broadcast(&AZ::ComponentApplicationRequests::EnumerateEntities, [&](AZ::Entity* entity)
+        {
+            if (entity->GetState() != AZ::Entity::State::Active)
+            {
+                return;
+            }
+            const AZStd::string& name = entity->GetName();
+            if (name == "Sun") { sun = entity->GetId(); }
+            else if (name == "Global Sky") { sky = entity->GetId(); }
+            else if (name == "Atom Default Environment") { environment = entity->GetId(); }
+        });
+        if ((!sun.IsValid() || !sky.IsValid()) && m_outdoorTries < 5.0f)
+        {
+            return; // not active yet
+        }
+        m_outdoorSet = true;
+        const Catalog::Level& level = Catalog::Levels[AZStd::clamp(m_settings.m_catalog, 0, Catalog::LevelCount - 1)];
+        const int mood = AZStd::clamp(level.m_outdoorMood, 0, 2);
+        // Day: a white sun high up; dusk: low and orange; night: a faint blue moon. The sky dims to match.
+        static const float sunLux[3] = { 4.0f, 1.6f, 0.12f };
+        static const float sunPitch[3] = { -55.0f, -14.0f, -40.0f };
+        static const float skyExposure[3] = { 0.0f, -2.5f, -9.0f };
+        static const float iblExposure[3] = { 0.0f, -1.5f, -6.0f };
+        static const float compensation[3] = { 0.0f, 0.3f, 1.2f };
+        static const AZ::Color sunColor[3] = { AZ::Color(1.0f, 0.97f, 0.9f, 1.0f), AZ::Color(1.0f, 0.62f, 0.38f, 1.0f),
+                                               AZ::Color(0.55f, 0.65f, 1.0f, 1.0f) };
+        if (sun.IsValid())
+        {
+            AZ::Render::DirectionalLightRequestBus::Event(sun, &AZ::Render::DirectionalLightRequests::SetColor, sunColor[mood]);
+            AZ::Render::DirectionalLightRequestBus::Event(sun,
+                static_cast<void (AZ::Render::DirectionalLightRequests::*)(float)>(&AZ::Render::DirectionalLightRequests::SetIntensity), sunLux[mood]);
+            const float yaw = AZ::DegToRad(static_cast<float>((level.m_number * 47) % 360));
+            AZ::TransformBus::Event(sun, &AZ::TransformBus::Events::SetWorldRotationQuaternion,
+                AZ::Quaternion::CreateRotationZ(yaw) * AZ::Quaternion::CreateRotationX(AZ::DegToRad(sunPitch[mood])));
+        }
+        if (sky.IsValid())
+        {
+            AZ::Render::HDRiSkyboxRequestBus::Event(sky, &AZ::Render::HDRiSkyboxRequests::SetExposure, skyExposure[mood]);
+            AZ::Render::ImageBasedLightComponentRequestBus::Event(sky, &AZ::Render::ImageBasedLightComponentRequests::SetExposure, iblExposure[mood]);
+        }
+        if (environment.IsValid())
+        {
+            // Fog: the level's own colour and how far you can see (Levels/catalog.py).
+            const float far = AZStd::max(level.m_fogDistance, 20.0f);
+            AZ::Render::DeferredFogRequestsBus::Event(environment, &AZ::Render::DeferredFogRequests::SetFogColor,
+                AZ::Vector3(level.m_fogColor[0], level.m_fogColor[1], level.m_fogColor[2]));
+            AZ::Render::DeferredFogRequestsBus::Event(environment, &AZ::Render::DeferredFogRequests::SetFogStartDistance, far * 0.25f);
+            AZ::Render::DeferredFogRequestsBus::Event(environment, &AZ::Render::DeferredFogRequests::SetFogEndDistance, far);
+            AZ::Render::DeferredFogRequestsBus::Event(environment, &AZ::Render::DeferredFogRequests::SetFogMaxHeight, 60.0f);
+            AZ::Render::ExposureControlRequestBus::Event(environment, &AZ::Render::ExposureControlRequests::SetManualCompensation, compensation[mood]);
+        }
+        AZ_Printf("NoclipProtocol", "Outdoors: level %d, mood %d (sun %s, sky %s)", level.m_number, mood, sun.IsValid() ? "yes" : "no",
+            sky.IsValid() ? "yes" : "no");
     }
 
     void EndlessLevelComponent::DressEntity(AZ::EntityId id, int dress)
@@ -1322,6 +1479,11 @@ namespace NoclipProtocol
         double flareLight = 0.0;
         registry->Get(flareLight, "/NoclipProtocol/Player/FlareLight");
         light = AZStd::max(light, static_cast<float>(flareLight));
+        if (IsOutdoors())
+        {
+            static const float daylight[3] = { 1.0f, 0.6f, 0.15f }; // day, dusk, night (the moon)
+            light = AZStd::max(light, daylight[AZStd::clamp(Catalog::Levels[m_settings.m_catalog].m_outdoorMood, 0, 2)]);
+        }
         registry->Set("/NoclipProtocol/Player/Light", static_cast<double>(light));
         UpdatePickups(at);
         // The forward base is the arrival room around the spawn point.
@@ -1883,7 +2045,7 @@ namespace NoclipProtocol
                     {
                         registry->Set("/NoclipProtocol/Level/Number", static_cast<AZ::s64>(to));
                     }
-                    target = to <= 2 ? AZStd::string::format("Level%d", to) : AZStd::string("Backrooms");
+                    target = LevelFileFor(to);
                 }
                 AZ_Printf("NoclipProtocol", "Noclip spot at %.1f %.1f: falling through into %s", spot.GetX(), spot.GetY(), target.c_str());
                 if (registry)

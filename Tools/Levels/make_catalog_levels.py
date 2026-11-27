@@ -8,7 +8,8 @@ Builds what the catalog levels (Levels/catalog.json: Levels 3 to 99) need:
   Assets/Textures/Catalog/<surface>_basecolor.png (+ _normal.png)   the surfaces levels are made of (512 px, seamless)
   Assets/Materials/Catalog/<surface>_<hash>.material                each level's three surfaces, tinted, tiled to its layout
   Gem/Source/Level/LevelCatalogMaterials.h                           which of them each level uses (levels alike share one)
-  Levels/Backrooms/Backrooms.prefab                                 the one O3DE level every catalog level is played in
+  Levels/Backrooms/Backrooms.prefab                                 the O3DE level every indoor catalog level is played in
+  Levels/Outdoors/Outdoors.prefab                                   the same with a sun and a sky, for the outdoor ones
 
 The Backrooms level is Level 1's level file with its generator set to "catalog" (style 4) and Level 0's tile pieces.
 When it loads, the generator reads the level number (/NoclipProtocol/Level/Number), builds that level's layout and
@@ -248,6 +249,31 @@ def level_file():
     with open(path("Levels/Backrooms/Backrooms.prefab"), "w") as f:
         json.dump(data, f, indent=4)
     print("wrote Levels/Backrooms/Backrooms.prefab")
+
+    # Outdoors: the same, plus DefaultLevel's sun and sky (with its sky light). The generator sets day, dusk or night,
+    # the sun's angle and the fog per level when it loads, and builds no ceiling.
+    import copy
+    outdoors = copy.deepcopy(data)
+    with open(path("Levels/DefaultLevel/DefaultLevel.prefab")) as f:
+        default = json.load(f)
+    for key, entity in default["Entities"].items():
+        if entity.get("Name") in ("Sun", "Global Sky"):
+            outdoors["Entities"][key] = entity
+            env = outdoors["Entities"]["Entity_[1176639161715]"]
+            for comp in env["Components"].values():
+                if comp.get("$type") == "EditorEntitySortComponent" and key not in comp.setdefault("Child Entity Order", []):
+                    comp["Child Entity Order"].append(key)
+
+    def outdoor(node):
+        if node.get("$type") == "EndlessLevelComponent":
+            node["Outdoor"] = True
+    walk(outdoors, outdoor)
+    for entity in outdoors["Entities"].values():
+        if entity.get("Name") == "BackroomsGenerator":
+            entity["Name"] = "OutdoorsGenerator"
+    with open(path("Levels/Outdoors/Outdoors.prefab"), "w") as f:
+        json.dump(outdoors, f, indent=4)
+    print("wrote Levels/Outdoors/Outdoors.prefab")
 
 
 def main():
