@@ -9,6 +9,7 @@
 
 #include "Agents.h"
 #include "VoiceLines.h"
+#include "../Hud/GameSettings.h"
 #include "../Level/EndlessLevelComponent.h"
 #include "../Monsters/HearthMonsterComponent.h"
 
@@ -111,7 +112,8 @@ namespace NoclipProtocol
         // The agent's line from a group, in their voice.
         void SayAgent(const VoiceLines::Line* lines, int count)
         {
-            if (m_talkingUntil > m_now || count <= 0)
+            // Settings › Gameplay › Agent chatter: Off keeps the agent quiet except when hurt.
+            if (m_talkingUntil > m_now || count <= 0 || (GameSettings::Index("chatter") == 2 && lines != VoiceLines::Hurt))
             {
                 return;
             }
@@ -191,7 +193,8 @@ namespace NoclipProtocol
                         const AZ::EntityId speaker = m_speaker->GetId();
                         MiniAudio::MiniAudioPlaybackRequestBus::Event(speaker, &MiniAudio::MiniAudioPlaybackRequests::Stop);
                         MiniAudio::MiniAudioPlaybackRequestBus::Event(speaker, &MiniAudio::MiniAudioPlaybackRequests::SetSoundAsset, m_asset);
-                        MiniAudio::MiniAudioPlaybackRequestBus::Event(speaker, &MiniAudio::MiniAudioPlaybackRequests::SetVolumePercentage, 100.0f);
+                        MiniAudio::MiniAudioPlaybackRequestBus::Event(speaker, &MiniAudio::MiniAudioPlaybackRequests::SetVolumePercentage,
+                                                                      100.0f * GameSettings::Gain("vol_voices"));
                         MiniAudio::MiniAudioPlaybackRequestBus::Event(speaker, &MiniAudio::MiniAudioPlaybackRequests::Play);
                     }
                     Subtitle(m_playing, seconds); // the words show even if the sound isn't there yet
@@ -257,7 +260,7 @@ namespace NoclipProtocol
             m_idleClock -= deltaTime;
             if (m_idleClock <= 0.0f)
             {
-                m_idleClock = static_cast<float>(Roll(70, 160));
+                m_idleClock = static_cast<float>(Roll(70, 160)) * (GameSettings::Index("chatter") == 1 ? 2.5f : 1.0f);
                 if (Roll(0, 99) < 30)
                 {
                     SayAgent(VoiceLines::Jokes, AZ_ARRAY_SIZE(VoiceLines::Jokes));

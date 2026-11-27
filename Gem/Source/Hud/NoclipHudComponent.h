@@ -18,6 +18,7 @@
 #include <AzCore/Math/Color.h>
 #include <AzCore/Math/Vector2.h>
 #include <AzCore/std/containers/unordered_map.h>
+#include "GameSettings.h"
 #include <AzCore/std/containers/vector.h>
 #include <AzCore/std/string/string.h>
 #include <AzCore/std/utils.h>
@@ -91,6 +92,33 @@ namespace NoclipProtocol
         AzFramework::ViewportId m_viewportId = AzFramework::InvalidViewportId; // the viewport the HUD draws into (fonts measure against it)
         AzFramework::FontDrawInterface* m_fonts[6] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
+
+        // The settings menu (GameSettings1-7.dc.html): tab, selected line, scroll, the pending (not applied) values.
+        int m_setTab = 0;
+        int m_setRow = 1;
+        int m_setScroll = 0;
+        AZStd::unordered_map<AZStd::string, double> m_setPending;
+        AZStd::unordered_map<AZStd::string, AZStd::string> m_setKeys; // "key_jump/0" -> "SPACE"
+        int m_rebindRow = -1;     // waiting for a key for this line
+        int m_rebindSlot = 0;
+        AZStd::string m_clashId;  // the key just pressed is already this action's ...
+        int m_clashSlot = 0;
+        AZStd::string m_clashKey;
+        bool m_calibrating = false;
+        float m_fps = 0.0f;
+        AZ::Vector2 m_lastCursor = AZ::Vector2::CreateZero();
+        AZStd::string m_setNotice;
+        float m_setNoticeUntil = 0.0f;
+        double SetValue(const GameSettings::Line& line) const;
+        AZStd::string SetKey(const char* id, int slot) const;
+        bool SetChanged(const GameSettings::Line& line) const;
+        void SetChange(const GameSettings::Line& line, int direction);
+        void SetSelect(int direction);
+        void SetTab(int tab);
+        void SetApply();
+        void SetReset();
+        void SetActivate(const GameSettings::Line& line);
+        bool SetHandleKey(const AzFramework::InputChannelId& id);
 
         // Settings (saved to the project's user/Registry/noclip_settings.setreg)
         bool m_rayTracing = true;

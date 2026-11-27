@@ -56,6 +56,7 @@ namespace NoclipProtocol
 
         // Runtime state
         float m_yaw = 0.0f;
+        double m_appliedFov = -1.0;
         float m_pitch = 0.0f;
         float m_mouseDeltaX = 0.0f;
         float m_mouseDeltaY = 0.0f;

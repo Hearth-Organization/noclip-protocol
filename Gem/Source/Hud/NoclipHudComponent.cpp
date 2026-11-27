@@ -9,6 +9,11 @@
 #include "BuildIcons.h"
 #include "HudIcons.h"
 #include "../Player/Weapons.h"
+#include "GameSettingsApply.h"
+#include <Atom/RHI/RHISystemInterface.h>
+#include <Atom/RHI/Device.h>
+#include <Atom/RHI/PhysicalDevice.h>
+#include <cstring>
 #include <AzCore/Console/IConsole.h>
 #include <AzCore/IO/FileIO.h>
 #include <AzCore/Math/MathUtils.h>
@@ -389,41 +394,98 @@ namespace NoclipProtocol
             double volume = m_volumeDb;
             registry->Get(sensitivity, "/NoclipProtocol/Player/MouseSensitivity");
             registry->Get(volume, "/Hearth/Audio/Buses/Master");
-            m_mouseSensitivity = static_cast<float>(sensitivity);
-            m_volumeDb = static_cast<float>(volume);
             registry->Get(m_lastLevel, "/NoclipProtocol/Save/Level");
             registry->Get(m_lastWhen, "/NoclipProtocol/Save/When");
+            // From before the full settings menu: keep what was set then.
+            double probe = 0.0;
+            bool probeBool = false;
+            if (!registry->Get(probeBool, GameSettings::Path("raytracing")))
+            {
+                registry->Set(GameSettings::Path("raytracing"), m_rayTracing);
+            }
+            if (!registry->Get(probe, GameSettings::Path("mouse_sens")))
+            {
+                registry->Set(GameSettings::Path("mouse_sens"), AZStd::clamp(std::round(sensitivity * 45.0) / 10.0, 0.1, 10.0));
+            }
+            if (!registry->Get(probe, GameSettings::Path("vol_master")) && volume < -0.5)
+            {
+                registry->Set(GameSettings::Path("vol_master"), AZStd::clamp(std::round(100.0 * std::pow(10.0, volume / 20.0)), 0.0, 100.0));
+            }
+            m_rayTracing = GameSettings::On("raytracing");
+            m_mouseSensitivity = static_cast<float>(GameSettings::Number("mouse_sens") / 4.5);
+            m_volumeDb = static_cast<float>(GameSettings::Decibels(GameSettings::Number("vol_master")));
+            // The graphics card, for the settings' estimate.
+            if (auto* rhi = AZ::RHI::RHISystemInterface::Get())
+            {
+                if (const AZ::RHI::Device* device = rhi->GetDevice())
+                {
+                    const auto& d = device->GetPhysicalDevice().GetDescriptor();
+                    AZStd::string name = d.m_description;
+                    for (const char* drop : { "NVIDIA ", "GeForce ", "AMD ", "Radeon(TM) ", " (TM)" })
+                    {
+                        const size_t at = name.find(drop);
+                        if (at != AZStd::string::npos) { name.erase(at, strlen(drop)); }
+                    }
+                    registry->Set("/NoclipProtocol/Graphics/GpuName", name);
+                    const double gb = static_cast<double>(d.m_heapSizePerLevel[static_cast<size_t>(AZ::RHI::HeapMemoryLevel::Device)]) / (1024.0 * 1024.0 * 1024.0);
+                    if (gb > 0.5)
+                    {
+                        registry->Set("/NoclipProtocol/Graphics/GpuMemoryGb", std::round(gb));
+                    }
+                }
+            }
         }
     }
 
     void NoclipHudComponent::ApplySettings()
     {
-        if (auto* registry = AZ::SettingsRegistry::Get())
-        {
-            registry->Set("/NoclipProtocol/Graphics/RayTracing", m_rayTracing);
-            registry->Set("/NoclipProtocol/Player/MouseSensitivity", static_cast<double>(m_mouseSensitivity));
-            registry->Set("/Hearth/Audio/Buses/Master", static_cast<double>(m_volumeDb));
-        }
-        if (auto* console = AZ::Interface<AZ::IConsole>::Get())
-        {
-            console->PerformCommand("hearth_audioRefresh");
-        }
+        // On the next frame, not while the level's entities are still starting.
+        AZ::TickBus::QueueFunction([]() { GameSettings::ApplyAll(true); });
     }
 
     void NoclipHudComponent::SaveSettings()
     {
-        // The project's user/Registry is merged at every start, so these stick between runs.
+        // The project's user/Registry is merged at every start, so these stick between runs (and never change by themselves).
         AZ::IO::FileIOBase* io = AZ::IO::FileIOBase::GetInstance();
-        if (!io)
+        auto* r = AZ::SettingsRegistry::Get();
+        if (!io || !r)
         {
             return;
+        }
+        AZStd::string settings;
+        for (int t = 0; t < 7; ++t)
+        {
+            for (const GameSettings::Line& line : GameSettings::TabLines(t))
+            {
+                if (line.m_kind == GameSettings::Kind::Head || line.m_kind == GameSettings::Kind::Button)
+                {
+                    continue;
+                }
+                settings += settings.empty() ? "" : ",\n";
+                if (line.m_kind == GameSettings::Kind::Key)
+                {
+                    auto esc = [](AZStd::string v) { AZStd::string o; for (char c : v) { if (c == '"' || c == '\\') { o += '\\'; } o += c; } return o; };
+                    const AZStd::string k0 = GameSettings::KeyName(line.m_id, 0), k1 = GameSettings::KeyName(line.m_id, 1);
+                    settings += AZStd::string::format("            \"%s\": { \"0\": \"%s\", \"1\": \"%s\" }", line.m_id, k0.empty() ? "-" : esc(k0).c_str(),
+                                                      k1.empty() ? "-" : esc(k1).c_str());
+                }
+                else if (line.m_kind == GameSettings::Kind::Toggle)
+                {
+                    settings += AZStd::string::format("            \"%s\": %s", line.m_id, GameSettings::On(line.m_id) ? "true" : "false");
+                }
+                else
+                {
+                    settings += AZStd::string::format("            \"%s\": %.4g", line.m_id, GameSettings::Number(line.m_id));
+                }
+            }
         }
         const AZStd::string text = AZStd::string::format(
             "{\n    \"NoclipProtocol\": {\n        \"Graphics\": { \"RayTracing\": %s },\n"
             "        \"Player\": { \"MouseSensitivity\": %.2f },\n"
-            "        \"Save\": { \"Level\": \"%s\", \"When\": \"%s\" }\n    },\n"
+            "        \"Save\": { \"Level\": \"%s\", \"When\": \"%s\" },\n"
+            "        \"Settings\": {\n%s\n        }\n    },\n"
             "    \"Hearth\": { \"Audio\": { \"Buses\": { \"Master\": %.1f } } }\n}\n",
-            m_rayTracing ? "true" : "false", m_mouseSensitivity, m_lastLevel.c_str(), m_lastWhen.c_str(), m_volumeDb);
+            m_rayTracing ? "true" : "false", m_mouseSensitivity, m_lastLevel.c_str(), m_lastWhen.c_str(), settings.c_str(), m_volumeDb);
         AZ::IO::HandleType handle = AZ::IO::InvalidHandle;
         if (io->Open("@projectroot@/user/Registry/noclip_settings.setreg", AZ::IO::OpenMode::ModeWrite | AZ::IO::OpenMode::ModeText, handle))
         {
@@ -457,6 +519,7 @@ namespace NoclipProtocol
             break;
         case ActSettings:
             m_page = Page::Settings;
+            SetTab(m_setTab);
             break;
         case ActBack:
             m_page = m_inMenu ? Page::MainMenu : Page::Pause;
@@ -739,9 +802,8 @@ namespace NoclipProtocol
                 return true; // nothing to go back to
             }
         }
-        if (m_inMenu && m_page == Page::Settings && (id == InputDeviceKeyboard::Key::Escape || id == InputDeviceKeyboard::Key::AlphanumericP))
+        if (m_page == Page::Settings && (id != InputDeviceMouse::Button::Left || m_rebindRow >= 0) && SetHandleKey(id))
         {
-            DoAction(ActBack);
             return true;
         }
         // Esc in the game; P too, because Esc leaves Play in the editor.
@@ -762,11 +824,397 @@ namespace NoclipProtocol
         return false;
     }
 
+    // ------------------------------------------------------------------ the settings menu (GameSettings1-7.dc.html)
+
+    namespace
+    {
+        using GameSettings::Kind;
+
+        //! "keyboard_key_alphanumeric_W" -> "W", "keyboard_key_modifier_shift_l" -> "L SHIFT", "mouse_button_left" -> "MOUSE 1".
+        AZStd::string KeyLabel(const AzFramework::InputChannelId& id)
+        {
+            AZStd::string name = id.GetName();
+            static const char* const map[][2] = {
+                { "keyboard_key_edit_space", "SPACE" }, { "keyboard_key_edit_tab", "TAB" }, { "keyboard_key_edit_enter", "ENTER" },
+                { "keyboard_key_edit_backspace", "BACKSPACE" }, { "keyboard_key_escape", "ESC" },
+                { "keyboard_key_modifier_shift_l", "L SHIFT" }, { "keyboard_key_modifier_shift_r", "R SHIFT" },
+                { "keyboard_key_modifier_ctrl_l", "L CTRL" }, { "keyboard_key_modifier_ctrl_r", "R CTRL" },
+                { "keyboard_key_modifier_alt_l", "L ALT" }, { "keyboard_key_modifier_alt_r", "R ALT" },
+                { "keyboard_key_navigation_arrow_up", "UP" }, { "keyboard_key_navigation_arrow_down", "DOWN" },
+                { "keyboard_key_navigation_arrow_left", "LEFT" }, { "keyboard_key_navigation_arrow_right", "RIGHT" },
+                { "mouse_button_left", "MOUSE 1" }, { "mouse_button_right", "MOUSE 2" }, { "mouse_button_middle", "MOUSE 3" },
+                { "mouse_button_other1", "MOUSE 4" }, { "mouse_button_other2", "MOUSE 5" } };
+            for (const auto& m : map)
+            {
+                if (name == m[0])
+                {
+                    return m[1];
+                }
+            }
+            for (const char* prefix : { "keyboard_key_alphanumeric_", "keyboard_key_function_", "keyboard_key_punctuation_", "keyboard_key_numpad_",
+                                        "keyboard_key_navigation_", "keyboard_key_edit_", "keyboard_key_" })
+            {
+                const size_t n = strlen(prefix);
+                if (name.compare(0, n, prefix) == 0)
+                {
+                    name = name.substr(n);
+                    break;
+                }
+            }
+            for (char& c : name)
+            {
+                c = c == '_' ? ' ' : static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            }
+            return name;
+        }
+
+        //! The graphics lines a preset sets: LOW, MEDIUM, HIGH, ULTRA.
+        struct PresetValue { const char* m_id; double m_values[4]; };
+        const PresetValue Presets[] = {
+            { "raytracing", { 0, 0, 1, 1 } }, { "rtgi", { 0, 1, 2, 3 } }, { "reflections", { 0, 0, 1, 1 } }, { "shadows", { 0, 1, 2, 3 } },
+            { "ao", { 0, 1, 1, 2 } }, { "fog", { 0, 1, 2, 2 } }, { "textures", { 0, 1, 2, 3 } }, { "filtering", { 1, 2, 3, 4 } },
+            { "models", { 0, 1, 2, 3 } }, { "distance", { 0, 1, 2, 2 } }, { "clutter", { 0, 1, 2, 3 } }, { "aa", { 1, 2, 2, 2 } },
+            { "upscaling", { 3, 2, 1, 1 } }, { "renderscale", { 100, 100, 100, 100 } } };
+    }
+
+    double NoclipHudComponent::SetValue(const GameSettings::Line& line) const
+    {
+        auto it = m_setPending.find(line.m_id);
+        return it != m_setPending.end() ? it->second : GameSettings::Number(line.m_id);
+    }
+
+    AZStd::string NoclipHudComponent::SetKey(const char* id, int slot) const
+    {
+        auto it = m_setKeys.find(AZStd::string::format("%s/%d", id, slot));
+        return it != m_setKeys.end() ? it->second : GameSettings::KeyName(id, slot);
+    }
+
+    bool NoclipHudComponent::SetChanged(const GameSettings::Line& line) const
+    {
+        if (line.m_kind == Kind::Key)
+        {
+            for (int slot = 0; slot < 2; ++slot)
+            {
+                auto it = m_setKeys.find(AZStd::string::format("%s/%d", line.m_id, slot));
+                if (it != m_setKeys.end() && it->second != GameSettings::KeyName(line.m_id, slot))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        auto it = m_setPending.find(line.m_id);
+        return it != m_setPending.end() && std::fabs(it->second - GameSettings::Number(line.m_id)) > 1e-6;
+    }
+
+    void NoclipHudComponent::SetChange(const GameSettings::Line& line, int direction)
+    {
+        double value = SetValue(line);
+        switch (line.m_kind)
+        {
+        case Kind::Choice:
+        {
+            const int n = static_cast<int>(GameSettings::Split(line.m_options).size());
+            value = static_cast<double>((static_cast<int>(std::lround(value)) + direction + n * 4) % n);
+            break;
+        }
+        case Kind::Slider:
+            value = AZStd::clamp(std::round((value + direction * line.m_step) / line.m_step) * line.m_step, line.m_min, line.m_max);
+            break;
+        case Kind::Toggle:
+            value = direction > 0 ? 1.0 : (direction < 0 ? 0.0 : (value != 0.0 ? 0.0 : 1.0));
+            break;
+        default:
+            return;
+        }
+        m_setPending[line.m_id] = value;
+        const AZStd::string id = line.m_id;
+        if (id == "preset")
+        {
+            // A preset sets its lines; Custom leaves them.
+            const int p = static_cast<int>(value);
+            if (p < 4)
+            {
+                for (const auto& preset : Presets)
+                {
+                    m_setPending[preset.m_id] = preset.m_values[p];
+                }
+            }
+        }
+        else if (m_setTab == 0)
+        {
+            for (const auto& preset : Presets)
+            {
+                if (id == preset.m_id)
+                {
+                    m_setPending["preset"] = 4.0; // Custom
+                }
+            }
+        }
+        if (id == "colorblind" && value > 0.0 && SetValue(GameSettings::TabLines(6)[8]) == 0.0)
+        {
+            m_setPending["cbstrength"] = 100.0;
+        }
+    }
+
+    void NoclipHudComponent::SetSelect(int direction)
+    {
+        const auto& lines = GameSettings::TabLines(m_setTab);
+        int row = m_setRow;
+        for (int i = 0; i < static_cast<int>(lines.size()); ++i)
+        {
+            row = (row + direction + static_cast<int>(lines.size())) % static_cast<int>(lines.size());
+            if (lines[row].m_kind != Kind::Head)
+            {
+                break;
+            }
+        }
+        m_setRow = row;
+    }
+
+    void NoclipHudComponent::SetTab(int tab)
+    {
+        m_setTab = (tab + 7) % 7;
+        m_setRow = 0;
+        m_setScroll = 0;
+        m_rebindRow = -1;
+        m_clashId.clear();
+        SetSelect(1);
+    }
+
+    void NoclipHudComponent::SetApply()
+    {
+        auto* r = AZ::SettingsRegistry::Get();
+        if (!r)
+        {
+            return;
+        }
+        for (int t = 0; t < 7; ++t)
+        {
+            for (const GameSettings::Line& line : GameSettings::TabLines(t))
+            {
+                if (line.m_kind == Kind::Key)
+                {
+                    for (int slot = 0; slot < 2; ++slot)
+                    {
+                        auto it = m_setKeys.find(AZStd::string::format("%s/%d", line.m_id, slot));
+                        if (it != m_setKeys.end())
+                        {
+                            r->Set(GameSettings::Path(line.m_id) + (slot == 0 ? "/0" : "/1"), it->second.empty() ? AZStd::string("-") : it->second);
+                        }
+                    }
+                    continue;
+                }
+                auto it = m_setPending.find(line.m_id);
+                if (it == m_setPending.end())
+                {
+                    continue;
+                }
+                if (line.m_kind == Kind::Toggle)
+                {
+                    r->Set(GameSettings::Path(line.m_id), it->second != 0.0);
+                }
+                else
+                {
+                    r->Set(GameSettings::Path(line.m_id), it->second);
+                }
+            }
+        }
+        const int changed = static_cast<int>(m_setPending.size() + m_setKeys.size());
+        m_setPending.clear();
+        m_setKeys.clear();
+        GameSettings::ApplyAll();
+        m_rayTracing = GameSettings::On("raytracing");
+        m_mouseSensitivity = static_cast<float>(GameSettings::Number("mouse_sens") / 4.5);
+        m_volumeDb = static_cast<float>(GameSettings::Decibels(GameSettings::Number("vol_master")));
+        SaveSettings();
+        m_setNotice = changed > 0 ? "APPLIED · SAVED TO YOUR PROFILE" : "NOTHING CHANGED";
+        m_setNoticeUntil = m_time + 2.5f;
+    }
+
+    void NoclipHudComponent::SetReset()
+    {
+        for (const GameSettings::Line& line : GameSettings::TabLines(m_setTab))
+        {
+            if (line.m_kind == Kind::Key)
+            {
+                const auto keys = GameSettings::Split(line.m_options);
+                for (int slot = 0; slot < 2; ++slot)
+                {
+                    m_setKeys[AZStd::string::format("%s/%d", line.m_id, slot)] = slot < static_cast<int>(keys.size()) ? keys[slot] : AZStd::string();
+                }
+            }
+            else if (line.m_kind != Kind::Head && line.m_kind != Kind::Button)
+            {
+                m_setPending[line.m_id] = line.m_default;
+            }
+        }
+        m_setNotice = "TAB RESET TO DEFAULTS · ENTER TO APPLY";
+        m_setNoticeUntil = m_time + 2.5f;
+    }
+
+    void NoclipHudComponent::SetActivate(const GameSettings::Line& line)
+    {
+        const AZStd::string id = line.m_id;
+        if (line.m_kind == Kind::Key)
+        {
+            m_rebindRow = m_setRow;
+            m_rebindSlot = 0;
+            m_clashId.clear();
+            return;
+        }
+        if (id == "detect")
+        {
+            bool rt = true;
+            if (auto* r = AZ::SettingsRegistry::Get())
+            {
+                r->Get(rt, "/NoclipProtocol/Graphics/RayTracingSupported");
+            }
+            const int p = rt ? 3 : 2; // ULTRA with ray tracing, HIGH without
+            m_setPending["preset"] = p;
+            for (const auto& preset : Presets)
+            {
+                m_setPending[preset.m_id] = preset.m_values[p];
+            }
+            m_setNotice = rt ? "DETECTED: RAY TRACING CARD · ULTRA" : "DETECTED: NO RAY TRACING · HIGH";
+            m_setNoticeUntil = m_time + 3.0f;
+            return;
+        }
+        if (id == "calibrate")
+        {
+            m_calibrating = !m_calibrating;
+            return;
+        }
+        if (id == "testmic" || id == "pad_customise")
+        {
+            m_setNotice = id == "testmic" ? "NO MICROPHONE IN USE YET · CO-OP VOICE CHAT COMES WITH CO-OP" : "CUSTOM BUTTONS: PICK AN ACTION, PRESS ITS BUTTON";
+            m_setNoticeUntil = m_time + 3.0f;
+            return;
+        }
+        SetApply();
+    }
+
+    bool NoclipHudComponent::SetHandleKey(const AzFramework::InputChannelId& id)
+    {
+        using namespace AzFramework;
+        const auto& lines = GameSettings::TabLines(m_setTab);
+        // Waiting for a key: the next key or mouse button becomes the binding.
+        if (m_rebindRow >= 0)
+        {
+            const GameSettings::Line& line = lines[m_rebindRow];
+            const AZStd::string name = id.GetName();
+            if (name.find("mouse_delta") != AZStd::string::npos || name.find("system_cursor") != AZStd::string::npos ||
+                name.find("mouse_button_wheel") != AZStd::string::npos)
+            {
+                return true;
+            }
+            if (!m_clashId.empty())
+            {
+                if (id == InputDeviceKeyboard::Key::EditEnter || id == InputDeviceKeyboard::Key::AlphanumericS)
+                {
+                    // Swap: the other action gets this one's old key.
+                    m_setKeys[AZStd::string::format("%s/%d", m_clashId.c_str(), m_clashSlot)] = SetKey(line.m_id, m_rebindSlot);
+                    m_setKeys[AZStd::string::format("%s/%d", line.m_id, m_rebindSlot)] = m_clashKey;
+                }
+                m_clashId.clear();
+                m_rebindRow = -1;
+                return true;
+            }
+            if (id == InputDeviceKeyboard::Key::Escape)
+            {
+                m_rebindRow = -1;
+                return true;
+            }
+            if (id == InputDeviceKeyboard::Key::NavigationDelete)
+            {
+                m_setKeys[AZStd::string::format("%s/%d", line.m_id, m_rebindSlot)] = AZStd::string();
+                m_rebindRow = -1;
+                return true;
+            }
+            const AZStd::string key = KeyLabel(id);
+            for (const GameSettings::Line& other : lines)
+            {
+                if (other.m_kind != Kind::Key || AZStd::string_view(other.m_id) == line.m_id)
+                {
+                    continue;
+                }
+                for (int slot = 0; slot < 2; ++slot)
+                {
+                    if (SetKey(other.m_id, slot) == key)
+                    {
+                        m_clashId = other.m_id;
+                        m_clashSlot = slot;
+                        m_clashKey = key;
+                        return true;
+                    }
+                }
+            }
+            m_setKeys[AZStd::string::format("%s/%d", line.m_id, m_rebindSlot)] = key;
+            m_rebindRow = -1;
+            return true;
+        }
+        if (m_calibrating)
+        {
+            if (id == InputDeviceKeyboard::Key::NavigationArrowLeft || id == InputDeviceKeyboard::Key::AlphanumericA)
+            {
+                SetChange(GameSettings::TabLines(1)[16], -1);
+            }
+            else if (id == InputDeviceKeyboard::Key::NavigationArrowRight || id == InputDeviceKeyboard::Key::AlphanumericD)
+            {
+                SetChange(GameSettings::TabLines(1)[16], 1);
+            }
+            else if (id == InputDeviceKeyboard::Key::Escape || id == InputDeviceKeyboard::Key::EditEnter)
+            {
+                m_calibrating = false;
+            }
+            return true;
+        }
+        if (id == InputDeviceKeyboard::Key::AlphanumericQ) { SetTab(m_setTab - 1); return true; }
+        if (id == InputDeviceKeyboard::Key::AlphanumericE) { SetTab(m_setTab + 1); return true; }
+        if (id == InputDeviceKeyboard::Key::NavigationArrowUp || id == InputDeviceKeyboard::Key::AlphanumericW) { SetSelect(-1); return true; }
+        if (id == InputDeviceKeyboard::Key::NavigationArrowDown || id == InputDeviceKeyboard::Key::AlphanumericS) { SetSelect(1); return true; }
+        const GameSettings::Line& line = lines[AZStd::clamp(m_setRow, 0, static_cast<int>(lines.size()) - 1)];
+        if (id == InputDeviceKeyboard::Key::NavigationArrowLeft || id == InputDeviceKeyboard::Key::AlphanumericA)
+        {
+            if (line.m_kind == Kind::Key) { m_rebindSlot = 0; } else { SetChange(line, -1); }
+            return true;
+        }
+        if (id == InputDeviceKeyboard::Key::NavigationArrowRight || id == InputDeviceKeyboard::Key::AlphanumericD)
+        {
+            if (line.m_kind == Kind::Key) { m_rebindSlot = 1; } else { SetChange(line, 1); }
+            return true;
+        }
+        if (id == InputDeviceKeyboard::Key::EditEnter || id == InputDeviceKeyboard::Key::NumPadEnter)
+        {
+            SetActivate(line);
+            return true;
+        }
+        if (id == InputDeviceKeyboard::Key::AlphanumericR) { SetReset(); return true; }
+        if (id == InputDeviceKeyboard::Key::Escape || id == InputDeviceKeyboard::Key::AlphanumericP)
+        {
+            // Back: changes not applied are dropped.
+            m_setPending.clear();
+            m_setKeys.clear();
+            DoAction(ActBack);
+            return true;
+        }
+        return false;
+    }
+
     // ------------------------------------------------------------------ drawing
 
     void NoclipHudComponent::OnTick(float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
         m_time += deltaTime;
+        if (deltaTime > 0.0f)
+        {
+            // This PC's frame rate, smoothed (the settings' estimate starts from it).
+            m_fps = m_fps <= 0.0f ? 1.0f / deltaTime : m_fps + (1.0f / deltaTime - m_fps) * AZStd::min(1.0f, deltaTime * 2.0f);
+            if (auto* r = AZ::SettingsRegistry::Get())
+            {
+                r->Set("/NoclipProtocol/Hud/fps", static_cast<double>(m_fps));
+            }
+        }
         if (!s_pendingKey.empty())
         {
             using namespace AzFramework;
@@ -1199,7 +1647,7 @@ namespace NoclipProtocol
                  W * 0.5f, 300.0f * s, 12.0f, AZ::Color(127 / 255.0f, 224 / 255.0f, 160 / 255.0f, 0.85f), 1, 2.0f);
         }
         // Voice lines (Voices.h): the speaker small, the words on a dark band, low in the middle of the screen.
-        if (!mock && deathPhase == 0 && RegNumber("/NoclipProtocol/Hud/voice.until", 0.0) > RegNumber("/NoclipProtocol/Hud/time", 0.0) &&
+        if (!mock && deathPhase == 0 && GameSettings::On("subtitles") && RegNumber("/NoclipProtocol/Hud/voice.until", 0.0) > RegNumber("/NoclipProtocol/Hud/time", 0.0) &&
             m_page != Page::Terminal && !m_inMenu)
         {
             bool command = false;
@@ -1207,20 +1655,28 @@ namespace NoclipProtocol
             {
                 registry->Get(command, "/NoclipProtocol/Hud/voice.command");
             }
-            const AZStd::string who = RegString("/NoclipProtocol/Hud/voice.who", "");
+            // Settings › Accessibility: subtitles on/off, size, background, speaker names.
+            const bool names = GameSettings::On("subnames");
+            static const float sizes[4] = { 12.0f, 14.0f, 17.0f, 21.0f };
+            const float size = sizes[AZStd::clamp(GameSettings::Index("subsize"), 0, 3)];
+            const AZStd::string who = names ? RegString("/NoclipProtocol/Hud/voice.who", "") : AZStd::string();
             const AZStd::string words = RegString("/NoclipProtocol/Hud/voice.text", "");
-            const float wordsW = measure(Face::Mono, words, 14.0f, 0.0f);
-            const float whoW = measure(Face::Mono, who, 11.0f, 3.0f);
-            const float total = whoW + 12.0f * s + wordsW;
+            const float wordsW = measure(Face::Mono, words, size, 0.0f);
+            const float whoW = who.empty() ? 0.0f : measure(Face::Mono, who, 11.0f, 3.0f) + 12.0f * s;
+            const float total = whoW + wordsW;
             const float left = W * 0.5f - total * 0.5f;
             const float top = H - 150.0f * s;
-            rect(left - 18.0f * s, top - 9.0f * s, total + 36.0f * s, 34.0f * s, Panel);
-            text(Face::Mono, who, left, top + 1.0f * s, 11.0f, command ? Gold : Hex(0x7fe0a0), 0, 3.0f);
-            text(Face::Mono, words, left + whoW + 12.0f * s, top, 14.0f, Cream);
+            rect(left - 18.0f * s, top - 9.0f * s, total + 36.0f * s, (size + 20.0f) * s,
+                 AZ::Color(0.0f, 0.0f, 0.0f, static_cast<float>(GameSettings::Number("subbg") / 100.0)));
+            if (!who.empty())
+            {
+                text(Face::Mono, who, left, top + (size - 11.0f) * 0.5f * s + 1.0f * s, 11.0f, command ? Gold : Hex(0x7fe0a0), 0, 3.0f);
+            }
+            text(Face::Mono, words, left + whoW, top, size, Cream);
         }
 
         // The HUD itself; the terminal covers the whole screen (and text always draws over shapes), so not under it.
-        if (deathPhase == 0 && m_page != Page::Terminal && !m_inMenu && m_page != Page::Build && m_page != Page::Orders)
+        if (deathPhase == 0 && m_page != Page::Terminal && !m_inMenu && m_page != Page::Build && m_page != Page::Orders && m_page != Page::Settings)
         {
             // ---- vignette: radial-gradient(ellipse at center, transparent 55%, rgba(8,7,4,0.55) 100%) ----
             {
@@ -1407,7 +1863,9 @@ namespace NoclipProtocol
                 }
             }
 
+            const int hudMode = mock ? 0 : GameSettings::Index("hud");
             // ---- top centre: the heading tape (120 degrees across 500 px), the base and squad marks, 354° under it ----
+            if (mock || (hudMode == 0 && GameSettings::On("hud_compass")))
             {
                 const float left = 390.0f, width = 500.0f, top = 26.0f;
                 const float px = width / 120.0f;
@@ -1467,6 +1925,7 @@ namespace NoclipProtocol
             }
 
             // ---- top right: the order card, the radio, the squad ----
+            if (mock || (hudMode < 2 && GameSettings::On("hud_objective")))
             {
                 float y = 32.0f;
                 const float x0 = 920.0f, w = 320.0f;
@@ -1630,15 +2089,33 @@ namespace NoclipProtocol
                     dot.push_back(P(cx + std::cos(a0) * 1.6f * u, cy + std::sin(a0) * 1.6f * u));
                     dot.push_back(P(cx + std::cos(a1) * 1.6f * u, cy + std::sin(a1) * 1.6f * u));
                 }
-                triangles(dot, { Bright });
+                // Settings › Gameplay › Crosshair: OFF, DOT, CROSS (the dot and four arms), CIRCLE; Immersive: none.
+                // Motion sickness keeps a dot in the middle whatever is picked.
+                const int cross = mock ? 2 : (hudMode == 2 ? 0 : GameSettings::Index("crosshair"));
+                const bool steady = !mock && GameSettings::Index("motionsick") == 1;
                 const float t = AZStd::max(1.0f, 1.4f * u);
-                line(cx, cy - 11.0f * u, cx, cy - 6.0f * u, t, armC); line(cx, cy + 6.0f * u, cx, cy + 11.0f * u, t, armC);
-                line(cx - 11.0f * u, cy, cx - 6.0f * u, cy, t, armC); line(cx + 6.0f * u, cy, cx + 11.0f * u, cy, t, armC);
+                if (cross >= 1 || steady)
+                {
+                    triangles(dot, { Bright });
+                }
+                if (cross == 2)
+                {
+                    line(cx, cy - 11.0f * u, cx, cy - 6.0f * u, t, armC); line(cx, cy + 6.0f * u, cx, cy + 11.0f * u, t, armC);
+                    line(cx - 11.0f * u, cy, cx - 6.0f * u, cy, t, armC); line(cx + 6.0f * u, cy, cx + 11.0f * u, cy, t, armC);
+                }
+                else if (cross == 3)
+                {
+                    for (int q = 0; q < 24; ++q)
+                    {
+                        const float a0 = AZ::Constants::TwoPi * q / 24, a1 = AZ::Constants::TwoPi * (q + 1) / 24;
+                        line(cx + std::cos(a0) * 9.0f * u, cy + std::sin(a0) * 9.0f * u, cx + std::cos(a1) * 9.0f * u, cy + std::sin(a1) * 9.0f * u, t, armC);
+                    }
+                }
 
                 const AZStd::string verb = mock ? "Pick up" : RegString("/NoclipProtocol/Hud/interact.verb", "");
                 AZStd::string item = mock ? "Almond Water \xc2\xb7 backpack 14 / 20" : RegString("/NoclipProtocol/Hud/interact.item", "");
                 const AZStd::string key = mock ? "E" : RegString("/NoclipProtocol/Hud/interact.key", "E");
-                if (!verb.empty())
+                if (!verb.empty() && (mock || GameSettings::On("hud_prompts")))
                 {
                     if (RegString("/NoclipProtocol/Hud/interact.target", "") == "pickup" && kit.Carried() > 0)
                     {
@@ -1671,6 +2148,7 @@ namespace NoclipProtocol
             }
 
             // ---- bottom left: the wrist unit (FIELD UNIT · AGT. 4417, the pulse, HEALTH, STAMINA, SANITY, backpack / light / rad) ----
+            if (mock || (hudMode < 2 && GameSettings::On("hud_wrist")))
             {
                 const float x0 = 40.0f, w = 330.0f, h = 207.0f;
                 const float y0 = 720.0f - 36.0f - h;
@@ -1765,6 +2243,7 @@ namespace NoclipProtocol
             }
 
             // ---- bottom right: the weapon block (above) and the quick slots Q / B / G / H ----
+            if (mock || (hudMode < 2 && GameSettings::On("hud_ammo")))
             {
                 const AZStd::string weapon = mock ? "SERVICE PISTOL" : RegString("/NoclipProtocol/Hud/weapon.name", "");
                 if (!weapon.empty())
@@ -3625,28 +4104,6 @@ namespace NoclipProtocol
                     DoAction(action);
                 }
             };
-            auto setting = [&](const AZStd::string& label, const AZStd::string& value, float y, int down, int up)
-            {
-                text(Face::Mono, label, C(490), Y(y + 4.0f), 12.0f, Muted, 0, 2.0f);
-                const float bw = 32.0f * s;
-                const float bx0 = C(830) - bw * 2.0f - 90.0f * s;
-                for (int k = 0; k < (up ? 2 : 1); ++k)
-                {
-                    const float bx = k == 0 ? (up ? bx0 : C(830) - 90.0f * s) : C(830) - bw;
-                    const bool hover = cursor.GetX() >= bx && cursor.GetX() <= bx + bw && cursor.GetY() >= Y(y) && cursor.GetY() <= Y(y) + 24.0f * s;
-                    loutline(bx, Y(y), up ? bw : 90.0f * s, 24.0f * s, AZStd::max(1.0f, 1.5f * s), hover ? Gold : Line);
-                    text(Face::MonoSemiBold, up ? (k == 0 ? "-" : "+") : value, bx + (up ? bw : 90.0f * s) * 0.5f, Y(y + 5.0f), 12.0f, Bright, 1);
-                    if (hover && m_click)
-                    {
-                        m_click = false;
-                        DoAction(k == 0 ? down : up);
-                    }
-                }
-                if (up)
-                {
-                    text(Face::Mono, value, bx0 + bw + 45.0f * s, Y(y + 5.0f), 12.0f, Bright, 1);
-                }
-            };
             if (m_page == Page::Pause)
             {
                 text(Face::Oswald, "PAUSED", C(640), Y(200), 44.0f, Bright, 1, 3.0f);
@@ -3659,16 +4116,469 @@ namespace NoclipProtocol
             }
             else
             {
-                text(Face::Oswald, "SETTINGS", C(640), Y(170), 44.0f, Bright, 1, 3.0f);
-                bool supported = true;
-                if (auto* reg = AZ::SettingsRegistry::Get())
+                // ---- the settings (GameSettings1-7.dc.html): tabs, the list, the side panel, the footer ----
+                using GameSettings::Kind;
+                using GameSettings::Panel;
+                const auto& lines = GameSettings::TabLines(m_setTab);
+                auto inside = [&](float x, float y, float w, float h)
+                { return cursor.GetX() >= C(x) && cursor.GetX() <= C(x + w) && cursor.GetY() >= Y(y) && cursor.GetY() <= Y(y + h); };
+                auto clicked = [&](float x, float y, float w, float h)
                 {
-                    reg->Get(supported, "/NoclipProtocol/Graphics/RayTracingSupported");
+                    if (m_click && inside(x, y, w, h))
+                    {
+                        m_click = false;
+                        return true;
+                    }
+                    return false;
+                };
+                const AZ::Color dim(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.15f);
+                const AZ::Color faint(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.3f);
+                const AZ::Color goldWash(Gold.GetR(), Gold.GetG(), Gold.GetB(), 0.16f);
+                const AZ::Color goldLine(Gold.GetR(), Gold.GetG(), Gold.GetB(), 0.25f);
+                const AZ::Color dark(10 / 255.0f, 9 / 255.0f, 6 / 255.0f, 0.7f);
+                const AZ::Color ink(11 / 255.0f, 10 / 255.0f, 7 / 255.0f, 1.0f);
+                // The Foundation mark and the title.
+                {
+                    const float u = 24.0f * s / 24.0f;
+                    const HudIcons::Icon& ic = HudIcons::Icons[HudIcons::Icon_foundation];
+                    const float ix = C(56), iy = Y(39);
+                    for (int k = 0; k < ic.m_strokes; ++k)
+                    {
+                        const HudIcons::Stroke& st = HudIcons::Strokes[ic.m_firstStroke + k];
+                        for (int q = 0; q + 1 < st.m_count; ++q)
+                        {
+                            const float* a = HudIcons::Points[st.m_first + q];
+                            const float* b = HudIcons::Points[st.m_first + q + 1];
+                            line(ix + a[0] * u, iy + a[1] * u, ix + b[0] * u, iy + b[1] * u, AZStd::max(1.0f, st.m_width * u), Gold);
+                        }
+                    }
                 }
-                setting("RAY-TRACED LIGHT", supported ? (m_rayTracing ? "ON" : "OFF") : "NOT ON THIS PC", 250, ActRayTracing, 0);
-                setting("MOUSE SENSITIVITY", AZStd::string::format("%.1fx", m_mouseSensitivity), 300, ActSensDown, ActSensUp);
-                setting("VOLUME", AZStd::string::format("%+.0f dB", m_volumeDb), 350, ActVolDown, ActVolUp);
-                button("BACK", 420, ActBack, true);
+                text(Face::Oswald, "SETTINGS", C(92), Y(31), 30.0f, Bright, 0, 6.0f);
+                // Tabs (click, or Q / E).
+                {
+                    float x = 56.0f;
+                    auto keycap = [&](const char* k, float kx)
+                    {
+                        loutline(C(kx), Y(93), 20.0f * s, 16.0f * s, AZStd::max(1.0f, s), AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.4f));
+                        text(Face::Mono, k, C(kx + 10.0f), Y(94), 11.0f, Cream, 1);
+                    };
+                    keycap("Q", x);
+                    if (clicked(x, 90, 20, 20)) { SetTab(m_setTab - 1); }
+                    x += 51.0f;
+                    for (int t = 0; t < 7; ++t)
+                    {
+                        const AZStd::string name = GameSettings::Tabs[t];
+                        const float w = measure(Face::Mono, name, 12.0f, 3.0f) / s;
+                        const bool on = t == m_setTab;
+                        text(Face::Mono, name, C(x), Y(92), 12.0f, on ? Bright : Muted, 0, 3.0f);
+                        if (on)
+                        {
+                            rect(C(x), Y(114), w * s, 2.0f * s, Gold);
+                        }
+                        if (clicked(x - 4, 86, w + 8, 30)) { SetTab(t); }
+                        x += w + 30.0f;
+                    }
+                    keycap("E", x);
+                    if (clicked(x, 90, 20, 20)) { SetTab(m_setTab + 1); }
+                    lrect(C(56), Y(117), 1168.0f * s, AZStd::max(1.0f, s), dim);
+                }
+                // The list: 31 px a line in a 516 px window, scrolled to keep the selected line in view.
+                const float top = 132.0f, listH = 516.0f, rowH = 31.0f;
+                const bool keysHeader = m_setTab == 3;
+                const float head0 = keysHeader ? 18.0f : 0.0f;
+                const int visible = static_cast<int>((listH - head0) / rowH);
+                if (m_setRow < m_setScroll + 1) { m_setScroll = AZStd::max(0, m_setRow - 1); }
+                if (m_setRow > m_setScroll + visible - 2) { m_setScroll = AZStd::min(AZStd::max(0, static_cast<int>(lines.size()) - visible), m_setRow - visible + 2); }
+                m_setScroll = AZStd::clamp(m_setScroll, 0, AZStd::max(0, static_cast<int>(lines.size()) - visible));
+                if (keysHeader)
+                {
+                    text(Face::Mono, "PRIMARY", C(776 - 16 - 106 - 48), Y(top), 10.0f, Muted, 1, 2.0f);
+                    text(Face::Mono, "SECONDARY", C(776 - 16 - 48), Y(top), 10.0f, Muted, 1, 2.0f);
+                }
+                for (int i = m_setScroll; i < static_cast<int>(lines.size()) && i < m_setScroll + visible; ++i)
+                {
+                    const GameSettings::Line& L = lines[i];
+                    const float y = top + head0 + (i - m_setScroll) * rowH;
+                    if (L.m_kind == Kind::Head)
+                    {
+                        text(Face::Mono, L.m_label, C(70), Y(y + 10.0f), 10.0f, Gold, 0, 3.0f);
+                        lrect(C(70), Y(y + 26.0f), 692.0f * s, AZStd::max(1.0f, s), goldLine);
+                        continue;
+                    }
+                    const bool hover = inside(56, y, 720, rowH - 3);
+                    if (hover && (cursor - m_lastCursor).GetLengthSq() > 0.5f && m_rebindRow < 0)
+                    {
+                        m_setRow = i;
+                    }
+                    const bool selected = i == m_setRow;
+                    if (selected)
+                    {
+                        lrect(C(56), Y(y), 720.0f * s, (rowH - 3.0f) * s, goldWash);
+                        rect(C(56), Y(y), 3.0f * s, (rowH - 3.0f) * s, Gold);
+                    }
+                    const float labelW = text(Face::Mono, L.m_label, C(74), Y(y + 7.0f), 13.0f, selected ? Bright : Cream);
+                    if (SetChanged(L))
+                    {
+                        rect(C(74) + labelW + 8.0f * s, Y(y + 11.0f), 6.0f * s, 6.0f * s, Gold);
+                    }
+                    const float right = 776.0f - 16.0f;
+                    const double v = SetValue(L);
+                    if (L.m_kind == Kind::Choice)
+                    {
+                        const auto options = GameSettings::Split(L.m_options);
+                        const AZStd::string value = options[AZStd::clamp(static_cast<int>(std::lround(v)), 0, static_cast<int>(options.size()) - 1)];
+                        const AZ::Color arrow = selected ? Gold : Muted;
+                        text(Face::Mono, "\xe2\x80\xb9", C(right - 186), Y(y + 6.0f), 13.0f, arrow, 1);
+                        text(Face::Mono, value, C(right - 96), Y(y + 6.0f), 13.0f, Bright, 1);
+                        text(Face::Mono, "\xe2\x80\xba", C(right - 6), Y(y + 6.0f), 13.0f, arrow, 1);
+                        if (L.m_note)
+                        {
+                            text(Face::Mono, L.m_note, C(right - 200), Y(y + 7.0f), 11.0f, Muted, 2);
+                        }
+                        if (clicked(right - 200, y, 40, rowH)) { m_setRow = i; SetChange(L, -1); }
+                        if (clicked(right - 30, y, 40, rowH)) { m_setRow = i; SetChange(L, 1); }
+                        if (clicked(right - 160, y, 130, rowH)) { m_setRow = i; SetChange(L, 1); }
+                    }
+                    else if (L.m_kind == Kind::Slider)
+                    {
+                        const float bw = 190.0f, bx = right - 64.0f - bw;
+                        const float pct = static_cast<float>((v - L.m_min) / AZStd::max(1e-6, L.m_max - L.m_min));
+                        lrect(C(bx), Y(y + 12.0f), bw * s, 4.0f * s, dim);
+                        rect(C(bx), Y(y + 12.0f), bw * pct * s, 4.0f * s, selected ? Gold : Cream);
+                        rect(C(bx + bw * pct - 5.0f), Y(y + 7.0f), 10.0f * s, 14.0f * s, Bright);
+                        const AZStd::string shown = (L.m_id == AZStd::string_view("cbstrength") && SetValue(lines[i - 1]) == 0.0)
+                            ? AZStd::string("\xe2\x80\x94") : AZStd::string::format(L.m_options, v);
+                        text(Face::Mono, shown, C(right), Y(y + 7.0f), 13.0f, Bright, 2);
+                        if (m_click && inside(bx - 6, y, bw + 12, rowH))
+                        {
+                            m_click = false;
+                            m_setRow = i;
+                            const double t = AZStd::clamp((cursor.GetX() - C(bx)) / (bw * s), 0.0f, 1.0f);
+                            m_setPending[L.m_id] = AZStd::clamp(std::round((L.m_min + t * (L.m_max - L.m_min)) / L.m_step) * L.m_step, L.m_min, L.m_max);
+                        }
+                    }
+                    else if (L.m_kind == Kind::Toggle)
+                    {
+                        const bool on = v != 0.0;
+                        const float bx = right - 94.0f;
+                        for (int k = 0; k < 2; ++k)
+                        {
+                            const float x = bx + k * 47.0f;
+                            const bool lit = (k == 1) == on;
+                            if (lit) { rect(C(x), Y(y + 4.0f), 47.0f * s, 20.0f * s, Gold); }
+                            loutline(C(x), Y(y + 4.0f), 47.0f * s, 20.0f * s, AZStd::max(1.0f, s), faint);
+                            text(Face::Mono, k == 0 ? "OFF" : "ON", C(x + 23.5f), Y(y + 8.0f), 11.0f, lit ? ink : Muted, 1, 2.0f);
+                            if (clicked(x, y + 4, 47, 20)) { m_setRow = i; SetChange(L, k == 0 ? -1 : 1); }
+                        }
+                    }
+                    else if (L.m_kind == Kind::Key)
+                    {
+                        for (int slot = 0; slot < 2; ++slot)
+                        {
+                            const float x = right - 202.0f + slot * 106.0f;
+                            const AZStd::string key = SetKey(L.m_id, slot);
+                            const bool waiting = m_rebindRow == i && m_rebindSlot == slot;
+                            if (!key.empty() || waiting)
+                            {
+                                lrect(C(x), Y(y + 4.0f), 96.0f * s, 20.0f * s, waiting ? goldWash : AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.06f));
+                                loutline(C(x), Y(y + 4.0f), 96.0f * s, 20.0f * s, AZStd::max(1.0f, s), waiting ? Gold : AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.35f));
+                            }
+                            text(Face::Mono, waiting ? AZStd::string("\xe2\x80\xa6") : (key.empty() ? AZStd::string("\xe2\x80\x94") : key), C(x + 48.0f), Y(y + 7.0f), 12.0f,
+                                 key.empty() && !waiting ? Muted : Bright, 1);
+                            if (clicked(x, y + 4, 96, 20)) { m_setRow = i; m_rebindRow = i; m_rebindSlot = slot; m_clashId.clear(); }
+                        }
+                    }
+                    else if (L.m_kind == Kind::Button)
+                    {
+                        const float w = measure(Face::Mono, L.m_options, 11.0f, 2.0f) / s + 32.0f;
+                        loutline(C(right - w), Y(y + 4.0f), w * s, 20.0f * s, AZStd::max(1.0f, s), Gold);
+                        text(Face::Mono, L.m_options, C(right - w * 0.5f), Y(y + 8.0f), 11.0f, Gold, 1, 2.0f);
+                        if (clicked(right - w, y + 4, w, 20)) { m_setRow = i; SetActivate(L); }
+                    }
+                }
+                // The scroll bar.
+                lrect(C(782), Y(top), 3.0f * s, listH * s, AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.1f));
+                {
+                    const float total = static_cast<float>(AZStd::max(1, static_cast<int>(lines.size())));
+                    const float h = AZStd::min(1.0f, visible / total) * listH;
+                    const float y = top + (m_setScroll / total) * listH;
+                    rect(C(782), Y(y), 3.0f * s, h * s, AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.45f));
+                }
+                // The side panel: what the selected line does.
+                const float sx = 812.0f, sw = 412.0f, px = sx + 22.0f, pw = sw - 44.0f;
+                lrect(C(sx), Y(top), sw * s, listH * s, dark);
+                rect(C(sx), Y(top), sw * s, 2.0f * s, Gold);
+                const GameSettings::Line& sel = lines[AZStd::clamp(m_setRow, 0, static_cast<int>(lines.size()) - 1)];
+                {
+                    AZStd::string title = sel.m_label;
+                    for (char& c : title) { c = static_cast<char>(std::toupper(static_cast<unsigned char>(c))); }
+                    if (sel.m_panel == Panel::Captions && AZStd::string_view(sel.m_id) == "captions") { title = "SOUND CAPTIONS"; }
+                    if (sel.m_kind == Kind::Key) { title = "REBIND A KEY"; }
+                    float y = top + 20.0f;
+                    for (const AZStd::string& l : wrap(Face::Oswald, title, 20.0f, pw * s))
+                    {
+                        text(Face::Oswald, l, C(px), Y(y), 20.0f, Bright, 0, 3.0f);
+                        y += 26.0f;
+                    }
+                    y += 6.0f;
+                    for (const AZStd::string& l : wrap(Face::Mono, sel.m_about ? sel.m_about : "", 12.0f, pw * s))
+                    {
+                        text(Face::Mono, l, C(px), Y(y), 12.0f, Cream);
+                        y += 20.0f;
+                    }
+                    y += 10.0f;
+                    auto meter = [&](const AZStd::string& label, const AZStd::string& value, float pct, const AZ::Color& c)
+                    {
+                        text(Face::Mono, label, C(px), Y(y), 11.0f, Muted, 0, 2.0f);
+                        text(Face::Mono, value, C(px + pw), Y(y), 11.0f, Bright, 2, 2.0f);
+                        lrect(C(px), Y(y + 20.0f), pw * s, 6.0f * s, AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.12f));
+                        rect(C(px), Y(y + 20.0f), pw * AZStd::clamp(pct, 0.0f, 1.0f) * s, 6.0f * s, c);
+                        y += 40.0f;
+                    };
+                    auto box = [&](float h) { loutline(C(px), Y(y), pw * s, h * s, AZStd::max(1.0f, s), AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.2f)); };
+                    auto pending = [&](const char* id)
+                    {
+                        for (int t = 0; t < 7; ++t) { for (const auto& l : GameSettings::TabLines(t)) { if (l.m_kind != Kind::Head && AZStd::string_view(l.m_id) == id) { return SetValue(l); } } }
+                        return 0.0;
+                    };
+                    switch (sel.m_panel)
+                    {
+                    case Panel::RayTracing:
+                    {
+                        // The estimate: this PC's measured frame rate, scaled by what the pending lines cost against what's applied.
+                        auto cost = [&](bool usePending)
+                        {
+                            auto val = [&](const char* id) { return usePending ? pending(id) : GameSettings::Number(id); };
+                            const double scale = val("renderscale") / 100.0 * (val("upscaling") == 0 ? 1.0 : (val("upscaling") == 1 ? 0.67 : (val("upscaling") == 2 ? 0.58 : 0.5)));
+                            return 0.35 + 0.65 * scale * scale + (val("raytracing") != 0.0 ? 0.25 + 0.06 * val("rtgi") : 0.0) + 0.04 * val("shadows") +
+                                   0.03 * val("ao") + 0.03 * val("fog") + 0.02 * val("models") + 0.02 * val("distance") + 0.01 * val("clutter");
+                        };
+                        const double fps = AZStd::max(1.0, RegNumber("/NoclipProtocol/Hud/fps", 60.0)) * cost(false) / cost(true);
+                        const double vram = 2.2 + 1.0 * pending("textures") + 0.4 * pending("models") + (pending("raytracing") != 0.0 ? 1.2 : 0.0) +
+                                            pending("renderscale") / 100.0 * 0.8;
+                        const AZStd::string gpu = RegString("/NoclipProtocol/Graphics/GpuName", "Graphics card");
+                        const double total = RegNumber("/NoclipProtocol/Graphics/GpuMemoryGb", 12.0);
+                        meter("ESTIMATE ON THIS PC", AZStd::string::format("\xe2\x89\x88 %.0f FPS", fps), static_cast<float>(fps / 120.0), Gold);
+                        meter("GRAPHICS MEMORY", AZStd::string::format("%.1f / %.0f GB", vram, total), static_cast<float>(vram / total), Hex(0x7fe0a0));
+                        // Before / after.
+                        box(150.0f);
+                        lquad(C(px), Y(y), C(px + pw * 0.5f), Y(y + 150.0f), Hex(0x5a5228), Hex(0x2a2614));
+                        lquad(C(px + pw * 0.5f), Y(y), C(px + pw), Y(y + 150.0f), Hex(0xa89a4a), Hex(0x1a1810));
+                        rect(C(px + pw * 0.5f - 1.0f), Y(y), 2.0f * s, 150.0f * s, Gold);
+                        text(Face::Mono, "OFF", C(px + 10.0f), Y(y + 132.0f), 10.0f, Cream, 0, 2.0f);
+                        text(Face::Mono, "ON", C(px + pw - 10.0f), Y(y + 132.0f), 10.0f, Cream, 2, 2.0f);
+                        y += 166.0f;
+                        for (const AZStd::string& l : wrap(Face::Mono, gpu + " \xc2\xb7 " + AZStd::string::format("%.0f GB", total) + " \xc2\xb7 the estimate updates as you change things", 11.0f, pw * s))
+                        {
+                            text(Face::Mono, l, C(px), Y(y), 11.0f, Muted);
+                            y += 16.0f;
+                        }
+                        break;
+                    }
+                    case Panel::Fov:
+                    {
+                        if (AZStd::string_view(sel.m_id) == "fov" || AZStd::string_view(sel.m_id) == "weaponfov")
+                        {
+                            box(130.0f);
+                            const float deg = static_cast<float>(SetValue(sel));
+                            const float cx = px + pw * 0.5f, cy = y + 122.0f, len = 120.0f;
+                            const float half = AZ::DegToRad(deg * 0.5f);
+                            line(C(cx), Y(cy), C(cx - std::sin(half) * len), Y(cy - std::cos(half) * len), 2.0f * s, Gold);
+                            line(C(cx), Y(cy), C(cx + std::sin(half) * len), Y(cy - std::cos(half) * len), 2.0f * s, Gold);
+                            text(Face::Mono, AZStd::string::format("%.0f\xc2\xb0", deg), C(cx), Y(y + 26.0f), 14.0f, Bright, 1);
+                            y += 146.0f;
+                        }
+                        text(Face::Mono, "BRIGHTNESS CALIBRATION", C(px), Y(y), 11.0f, Muted, 0, 2.0f);
+                        y += 20.0f;
+                        box(110.0f);
+                        lrect(C(px + 1.0f), Y(y + 1.0f), (pw - 2.0f) * s, 108.0f * s, AZ::Color(0.0f, 0.0f, 0.0f, 1.0f));
+                        {
+                            const float b = static_cast<float>(pending("brightness")) / 100.0f;
+                            static const float shades[3] = { 0.02f, 0.05f, 0.1f };
+                            static const char* const words[3] = { "BARELY", "VISIBLE", "CLEAR" };
+                            for (int k = 0; k < 3; ++k)
+                            {
+                                const float g = AZStd::min(1.0f, shades[k] * (0.5f + b));
+                                const float x = px + pw * 0.5f - 135.0f + k * 100.0f;
+                                rect(C(x), Y(y + 10.0f), 70.0f * s, 90.0f * s, AZ::Color(g, g, g, 1.0f));
+                                text(Face::Mono, words[k], C(x + 35.0f), Y(y + 86.0f), 9.0f, AZ::Color(0.2f + 0.3f * k, 0.2f + 0.3f * k, 0.2f + 0.3f * k, 1.0f), 1);
+                            }
+                        }
+                        y += 120.0f;
+                        text(Face::Mono, "Raise the brightness until the left symbol is barely visible.", C(px), Y(y), 11.0f, Muted);
+                        break;
+                    }
+                    case Panel::Voices:
+                    {
+                        box(110.0f);
+                        text(Face::Mono, "PLAYING A SAMPLE", C(px + 16.0f), Y(y + 12.0f), 10.0f, Muted, 0, 2.0f);
+                        static const float bars[14] = { 8, 14, 22, 30, 18, 36, 44, 28, 16, 10, 24, 34, 20, 12 };
+                        for (int k = 0; k < 14; ++k)
+                        {
+                            const float h = bars[k] * (0.6f + 0.4f * std::fabs(std::sin(m_time * 6.0f + k)));
+                            rect(C(px + 16.0f + k * 10.0f), Y(y + 94.0f - h), 6.0f * s, h * s, h < 40.0f ? Hex(0x7fe0a0) : Gold);
+                        }
+                        y += 124.0f;
+                        loutline(C(px), Y(y), 120.0f * s, 22.0f * s, AZStd::max(1.0f, s), Gold);
+                        text(Face::Mono, "PLAY SAMPLE", C(px + 60.0f), Y(y + 5.0f), 11.0f, Gold, 1, 2.0f);
+                        if (clicked(px, y, 120, 22))
+                        {
+                            GameSettings::Command(AZStd::string::format("voice_sample %s", sel.m_id));
+                        }
+                        y += 36.0f;
+                        for (const AZStd::string& l : wrap(Face::Mono, "Each slider plays a sample of its sounds as you move it. Headphones and 3D audio let you hear which way something is coming from.", 11.0f, pw * s))
+                        {
+                            text(Face::Mono, l, C(px), Y(y), 11.0f, Muted);
+                            y += 18.0f;
+                        }
+                        break;
+                    }
+                    case Panel::Rebind:
+                    {
+                        box(150.0f);
+                        AZStd::string action = sel.m_label;
+                        for (char& c : action) { c = static_cast<char>(std::toupper(static_cast<unsigned char>(c))); }
+                        text(Face::Mono, action, C(px + pw * 0.5f), Y(y + 42.0f), 11.0f, Muted, 1, 3.0f);
+                        text(Face::Oswald, m_rebindRow >= 0 ? "PRESS A KEY\xe2\x80\xa6" : (SetKey(sel.m_id, 0).empty() ? "NOT SET" : SetKey(sel.m_id, 0)),
+                             C(px + pw * 0.5f), Y(y + 62.0f), 26.0f, Bright, 1, 4.0f);
+                        text(Face::Mono, m_rebindRow >= 0 ? "ESC cancels \xc2\xb7 DELETE clears" : "ENTER or click a key to change it", C(px + pw * 0.5f), Y(y + 104.0f), 11.0f, Muted, 1);
+                        y += 164.0f;
+                        if (!m_clashId.empty())
+                        {
+                            AZStd::string other;
+                            for (const auto& l : lines) { if (l.m_kind == Kind::Key && AZStd::string_view(l.m_id) == m_clashId) { other = l.m_label; } }
+                            loutline(C(px), Y(y), pw * s, 40.0f * s, AZStd::max(1.0f, s), AZ::Color(1.0f, 138 / 255.0f, 120 / 255.0f, 0.5f));
+                            const float w0 = text(Face::Mono, m_clashKey + " is already " + other + ". ", C(px + 12.0f), Y(y + 12.0f), 11.0f, Alarm);
+                            text(Face::Mono, "ENTER SWAP \xc2\xb7 ESC CANCEL", C(px + 12.0f) + w0, Y(y + 12.0f), 11.0f, Bright);
+                        }
+                        break;
+                    }
+                    case Panel::Gyro:
+                    {
+                        box(170.0f);
+                        const float cx = px + pw * 0.5f, cy = y + 90.0f;
+                        // A controller outline: body, sticks, the four face buttons.
+                        for (int k = 0; k < 40; ++k)
+                        {
+                            const float a0 = AZ::Constants::TwoPi * k / 40, a1 = AZ::Constants::TwoPi * (k + 1) / 40;
+                            line(C(cx + std::cos(a0) * 130.0f), Y(cy + std::sin(a0) * 50.0f), C(cx + std::cos(a1) * 130.0f), Y(cy + std::sin(a1) * 50.0f), 2.0f * s, Muted);
+                            line(C(cx - 60.0f + std::cos(a0) * 16.0f), Y(cy - 8.0f + std::sin(a0) * 16.0f), C(cx - 60.0f + std::cos(a1) * 16.0f), Y(cy - 8.0f + std::sin(a1) * 16.0f), 2.0f * s, Gold);
+                            line(C(cx + 30.0f + std::cos(a0) * 16.0f), Y(cy + 18.0f + std::sin(a0) * 16.0f), C(cx + 30.0f + std::cos(a1) * 16.0f), Y(cy + 18.0f + std::sin(a1) * 16.0f), 2.0f * s, Cream);
+                        }
+                        const AZ::Color face[4] = { Hex(0x7fe0a0), Hex(0xff8a78), Hex(0x7aa8ff), Gold };
+                        const float fx[4] = { 0, 16, -16, 0 }, fy[4] = { -16, 0, 0, 16 };
+                        for (int k = 0; k < 4; ++k) { rect(C(cx + 80.0f + fx[k] - 6.0f), Y(cy - 8.0f + fy[k] - 6.0f), 12.0f * s, 12.0f * s, face[k]); }
+                        text(Face::Mono, "MOVE \xc2\xb7 SPRINT", C(cx - 60.0f), Y(y + 10.0f), 10.0f, Gold, 1);
+                        text(Face::Mono, "LOOK \xc2\xb7 MELEE", C(cx + 30.0f), Y(y + 150.0f), 10.0f, Cream, 1);
+                        text(Face::Mono, "A JUMP \xc2\xb7 B CROUCH", C(px + pw - 8.0f), Y(y + 10.0f), 10.0f, Cream, 2);
+                        y += 184.0f;
+                        for (const AZStd::string& l : wrap(Face::Mono, "The picture follows the layout you pick and the controller you hold; every button can be remapped below (Customise).", 11.0f, pw * s))
+                        {
+                            text(Face::Mono, l, C(px), Y(y), 11.0f, Muted);
+                            y += 18.0f;
+                        }
+                        break;
+                    }
+                    case Panel::Difficulty:
+                    {
+                        static const char* const names[4] = { "RECRUIT", "AGENT", "VETERAN", "KETER" };
+                        static const char* const about[4] = { "Monsters slower and rarer, more supplies, sanity forgiving.", "The game as meant: dangerous, scarce, fair.",
+                                                               "Monsters hunt in pairs, less ammo, the dark eats sanity faster.", "Everything at its worst. One life is on." };
+                        const int d = static_cast<int>(pending("difficulty"));
+                        for (int k = 0; k < 4; ++k)
+                        {
+                            const bool on = k == d;
+                            const auto words = wrap(Face::Mono, about[k], 11.0f, (pw - 20.0f) * s);
+                            const float h = 30.0f + words.size() * 16.0f;
+                            if (on) { lrect(C(px), Y(y), pw * s, h * s, AZ::Color(Gold.GetR(), Gold.GetG(), Gold.GetB(), 0.08f)); }
+                            loutline(C(px), Y(y), pw * s, h * s, AZStd::max(1.0f, s), on ? Gold : dim);
+                            text(Face::Mono, names[k], C(px + 10.0f), Y(y + 8.0f), 12.0f, on ? Bright : Cream, 0, 2.0f);
+                            float ly = y + 26.0f;
+                            for (const auto& w : words) { text(Face::Mono, w, C(px + 10.0f), Y(ly), 11.0f, Muted); ly += 16.0f; }
+                            y += h + 8.0f;
+                        }
+                        break;
+                    }
+                    case Panel::Captions:
+                    {
+                        box(150.0f);
+                        lquad(C(px + 1.0f), Y(y + 1.0f), C(px + pw - 1.0f), Y(y + 149.0f), Hex(0x4a4220), Hex(0x1a160c));
+                        const float big = pending("subsize") >= 2.0 ? 15.0f : 13.0f;
+                        const float bg = static_cast<float>(pending("subbg") / 100.0);
+                        const AZStd::string words = "Signal's gone, Epsilon-6.";
+                        const float ww = measure(Face::Mono, words, big, 0.0f) + (pending("subnames") != 0.0 ? measure(Face::Mono, "FOUNDATION  ", 12.0f, 2.0f) : 0.0f);
+                        if (pending("subtitles") != 0.0)
+                        {
+                            lrect(C(px + pw * 0.5f) - ww * 0.5f - 12.0f * s, Y(y + 76.0f), ww + 24.0f * s, 28.0f * s, AZ::Color(0.0f, 0.0f, 0.0f, bg));
+                            float x = C(px + pw * 0.5f) - ww * 0.5f;
+                            if (pending("subnames") != 0.0) { x += text(Face::Mono, "FOUNDATION ", x, Y(y + 83.0f), 12.0f, Gold, 0, 2.0f) + 6.0f * s; }
+                            text(Face::Mono, words, x, Y(y + 81.0f), big, Bright);
+                        }
+                        if (pending("captions") != 0.0)
+                        {
+                            const AZStd::string cap = "[ wet footsteps \xc2\xb7 behind you ]";
+                            const float cw = measure(Face::Mono, cap, 12.0f, 0.0f);
+                            lrect(C(px + pw * 0.5f) - cw * 0.5f - 10.0f * s, Y(y + 112.0f), cw + 20.0f * s, 24.0f * s, AZ::Color(0.0f, 0.0f, 0.0f, 0.7f));
+                            text(Face::Mono, cap, C(px + pw * 0.5f), Y(y + 117.0f), 12.0f, Cream, 1);
+                        }
+                        y += 166.0f;
+                        for (const AZStd::string& l : wrap(Face::Mono, "Arachnophobia mode turns the Crawler into a shape with no legs. Reduce flashing lights calms the flicker in Level 0 and the Electrical Station.", 11.0f, pw * s))
+                        {
+                            text(Face::Mono, l, C(px), Y(y), 11.0f, Muted);
+                            y += 18.0f;
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                    }
+                }
+                // Brightness calibration: the whole screen, three squares.
+                if (m_calibrating)
+                {
+                    lrect(0, 0, W, H, AZ::Color(0.0f, 0.0f, 0.0f, 1.0f));
+                    const float b = static_cast<float>(SetValue(GameSettings::TabLines(1)[16])) / 100.0f;
+                    static const float shades[3] = { 0.02f, 0.05f, 0.1f };
+                    for (int k = 0; k < 3; ++k)
+                    {
+                        const float g = AZStd::min(1.0f, shades[k] * (0.5f + b));
+                        rect(C(440.0f + k * 150.0f), Y(250), 100.0f * s, 130.0f * s, AZ::Color(g, g, g, 1.0f));
+                    }
+                    text(Face::Oswald, "BRIGHTNESS", C(640), Y(160), 30.0f, Bright, 1, 6.0f);
+                    text(Face::Mono, AZStd::string::format("%.0f", b * 100.0f), C(640), Y(420), 16.0f, Bright, 1);
+                    text(Face::Mono, "\xe2\x80\xb9 / \xe2\x80\xba to change \xc2\xb7 the left square should be barely visible \xc2\xb7 ENTER when done", C(640), Y(460), 12.0f, Muted, 1);
+                }
+                // The footer.
+                {
+                    float x = 56.0f;
+                    auto key = [&](const char* k, const char* label, int what)
+                    {
+                        const float kw = measure(Face::Mono, k, 11.0f, 0.0f) / s + 14.0f;
+                        loutline(C(x), Y(664), kw * s, 18.0f * s, AZStd::max(1.0f, s), AZ::Color(243 / 255.0f, 234 / 255.0f, 208 / 255.0f, 0.45f));
+                        text(Face::Mono, k, C(x + kw * 0.5f), Y(666), 11.0f, Cream, 1);
+                        const float lw = text(Face::Mono, label, C(x + kw + 8.0f), Y(666), 11.0f, Cream, 0, 2.0f) / s;
+                        if (clicked(x, 660, kw + 8.0f + lw, 24))
+                        {
+                            if (what == 0) { m_setPending.clear(); m_setKeys.clear(); DoAction(ActBack); }
+                            else if (what == 1) { SetReset(); }
+                            else { SetApply(); }
+                        }
+                        x += kw + 8.0f + lw + 26.0f;
+                    };
+                    key("ESC", "BACK", 0);
+                    key("R", "RESET TAB", 1);
+                    key("ENTER", "APPLY", 2);
+                    if (m_setNoticeUntil > m_time)
+                    {
+                        text(Face::Mono, m_setNotice, C(1224), Y(666), 11.0f, Gold, 2, 2.0f);
+                    }
+                    else
+                    {
+                        const float w = text(Face::Mono, "changed, not applied yet \xc2\xb7 Settings are saved to your profile and never change by themselves", C(1224), Y(666), 11.0f, Muted, 2);
+                        rect(C(1224) - w - 12.0f * s, Y(669), 6.0f * s, 6.0f * s, Gold);
+                    }
+                }
+                m_lastCursor = cursor;
             }
             lflush(3);
             m_click = false;

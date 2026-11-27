@@ -41,6 +41,8 @@
 #include <AzFramework/Spawnable/Spawnable.h>
 #include <AzFramework/Spawnable/SpawnableEntitiesInterface.h>
 #include <MiniAudio/MiniAudioPlaybackBus.h>
+#include "../Hud/GameSettings.h"
+#include <AzCore/std/containers/unordered_map.h>
 #include <cmath>
 
 namespace NoclipProtocol
@@ -734,6 +736,16 @@ namespace NoclipProtocol
             {
                 if (soundName == want)
                 {
+                    // Settings › Audio › Weapons (and Master), on top of the sound's own volume.
+                    auto base = m_baseVolume.find(soundName);
+                    if (base == m_baseVolume.end())
+                    {
+                        float volume = 100.0f;
+                        MiniAudio::MiniAudioPlaybackRequestBus::EventResult(volume, entity, &MiniAudio::MiniAudioPlaybackRequests::GetVolumePercentage);
+                        base = m_baseVolume.emplace(soundName, volume).first;
+                    }
+                    MiniAudio::MiniAudioPlaybackRequestBus::Event(entity, &MiniAudio::MiniAudioPlaybackRequests::SetVolumePercentage,
+                                                                  base->second * GameSettings::Gain("vol_weapons"));
                     MiniAudio::MiniAudioPlaybackRequestBus::Event(entity, &MiniAudio::MiniAudioPlaybackRequests::Stop);
                     MiniAudio::MiniAudioPlaybackRequestBus::Event(entity, &MiniAudio::MiniAudioPlaybackRequests::Play);
                     return;
@@ -1048,12 +1060,17 @@ namespace NoclipProtocol
             m_lastEye = eye;
             m_bobSpeed = AZ::Lerp(m_bobSpeed, AZStd::min(speed, 6.0f), AZStd::min(1.0f, dt * 8.0f));
             m_bobPhase += dt * (4.0f + m_bobSpeed * 1.6f);
-            const float bob = AZStd::min(m_bobSpeed / 4.0f, 1.0f);
+            // Settings › Gameplay › Head bob (Motion sickness: none).
+            const float bob = AZStd::min(m_bobSpeed / 4.0f, 1.0f) * static_cast<float>(GameSettings::Number("headbob") / 60.0) *
+                              (GameSettings::Index("motionsick") == 1 ? 0.0f : 1.0f);
             // Dying and the next agent's walk-out are filmed from outside the eyes: no gun on the camera then.
             bool cutscene = false;
             if (auto* registry = AZ::SettingsRegistry::Get())
             {
                 registry->Get(cutscene, "/NoclipProtocol/Player/Dead");
+                bool paused = false;
+                registry->Get(paused, "/NoclipProtocol/Paused");
+                cutscene = cutscene || paused; // and none over the pause menu or settings
             }
             for (int i = 0; i < Weapons::Count; ++i)
             {
@@ -1276,6 +1293,7 @@ namespace NoclipProtocol
         AZ::Vector3 m_lastEye = AZ::Vector3::CreateZero();
         AZ::Vector3 m_muzzle = AZ::Vector3::CreateZero();
         float m_bobSpeed = 0.0f;
+        AZStd::unordered_map<AZStd::string, float> m_baseVolume;
         float m_recoilBack = 0.0f;
         float m_bobPhase = 0.0f;
         AZ::SimpleLcgRandom m_random;

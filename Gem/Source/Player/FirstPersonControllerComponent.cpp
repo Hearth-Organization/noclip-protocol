@@ -8,6 +8,9 @@
 #include "DeathSequence.h"
 
 #include <AzCore/Settings/SettingsRegistry.h>
+#include <AzCore/std/parallel/thread.h>
+#include <AzFramework/Components/CameraBus.h>
+#include <cmath>
 #include <AzCore/Console/IConsole.h>
 #include <AzCore/std/string/conversions.h>
 #include <cctype>
@@ -556,10 +559,34 @@ namespace NoclipProtocol
             m_mouseDeltaY = 0.0f;
         }
         m_pitch += static_cast<float>(recoil);
+        // Settings › Controls: invert look; Display: field of view; the frame-rate limit.
+        bool invert = false;
+        double fov = 95.0, limit = 0.0;
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Get(invert, "/NoclipProtocol/Player/InvertLook");
+            registry->Get(fov, "/NoclipProtocol/Display/Fov");
+            registry->Get(limit, "/NoclipProtocol/Display/FrameLimit");
+        }
+        if (m_cameraEntity.IsValid() && std::fabs(fov - m_appliedFov) > 0.01)
+        {
+            // Horizontal field of view (as players set it) to the camera's vertical one, for the window's shape.
+            float fw = 16.0f, fh = 9.0f;
+            Camera::CameraRequestBus::EventResult(fw, m_cameraEntity, &Camera::CameraComponentRequests::GetFrustumWidth);
+            Camera::CameraRequestBus::EventResult(fh, m_cameraEntity, &Camera::CameraComponentRequests::GetFrustumHeight);
+            const float aspect = fh > 0.0f ? fw / fh : 16.0f / 9.0f;
+            const float vertical = 2.0f * std::atan(std::tan(AZ::DegToRad(static_cast<float>(fov)) * 0.5f) / AZStd::max(0.5f, aspect));
+            Camera::CameraRequestBus::Event(m_cameraEntity, &Camera::CameraComponentRequests::SetFovRadians, vertical);
+            m_appliedFov = fov;
+        }
+        if (limit > 0.0 && deltaTime < 1.0 / limit)
+        {
+            AZStd::this_thread::sleep_for(AZStd::chrono::microseconds(static_cast<int64_t>((1.0 / limit - deltaTime) * 1e6 * 0.9)));
+        }
         if (m_cursorCaptured)
         {
             m_yaw -= m_mouseDeltaX * m_mouseSensitivity;
-            m_pitch -= m_mouseDeltaY * m_mouseSensitivity;
+            m_pitch -= m_mouseDeltaY * m_mouseSensitivity * (invert ? -1.0f : 1.0f);
             const float maxPitch = AZ::DegToRad(m_maxPitchDegrees);
             m_pitch = AZ::GetClamp(m_pitch, -maxPitch, maxPitch);
         }
