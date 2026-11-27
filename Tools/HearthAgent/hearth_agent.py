@@ -53,7 +53,7 @@ LOG_DIR = PROJECT / "user" / "log"
 LAUNCHER = PROJECT / "build" / "linux" / "bin" / "profile" / "NoclipProtocol.GameLauncher"
 BUILD_TARGETS = ["NoclipProtocol.GameLauncher", "NoclipProtocol.HeadlessServerLauncher",
                  "NoclipProtocol.ServerLauncher", "NoclipProtocol.UnifiedLauncher", "Editor"]
-VERSION = "1.8"
+VERSION = "1.9"
 ENGINE_DIR = Path.home() / "O3DE" / "Engines" / "hearth-engine"
 ENGINE_REPO = "https://github.com/Dragongamer9/hearth-engine"
 ENGINE_BRANCH = "hearth/main"
@@ -1029,7 +1029,10 @@ def engine_gems():
             roots.append(root)
     found = {}
     for root in roots[:1] + [str(PROJECT)]:
-        for gem_json in glob.glob(str(Path(root) / "Gems" / "**" / "gem.json"), recursive=True) + \
+        # Gems sit one or two folders down (Gems/PhysX/PhysX5/gem.json): a full recursive search of the engine
+        # took many seconds, and Project settings showed no parts meanwhile.
+        for gem_json in glob.glob(str(Path(root) / "Gems" / "*" / "gem.json")) + \
+                        glob.glob(str(Path(root) / "Gems" / "*" / "*" / "gem.json")) + \
                         glob.glob(str(Path(root) / "Gem" / "gem.json")):
             try:
                 data = json.loads(Path(gem_json).read_text())
@@ -1532,6 +1535,138 @@ OPS = {"package_checks": op_package_checks, "package": op_package, "package_stat
        "crash_report": op_crash_report, "logs": op_logs,
        "levelgen_get": op_levelgen_get, "levelgen_area": op_levelgen_area, "levelgen_tests": op_levelgen_tests,
        "levelgen_apply": op_levelgen_apply, "levelgen_play": op_levelgen_play}
+
+# ---------- Hearth Forge (the owner, Nov 26 2026: "You need to have full control over hearth forge") ----------
+# Hearth Forge (a Hearth OS app, from the Hearth Store) makes 3D models on this PC's graphics card through its own
+# service on 127.0.0.1:8191 (hosts/hearth-ui/apps/forge/helper/hearth-forge.py in hearth-os). These operations drive it:
+# its service on / off / status, the models (get, remove), making (make, stop), what was made, and bringing a made
+# model into this project's assets. Forge itself waits while a game is being played; that is Forge's own rule.
+
+FORGE_HELPER = Path.home() / ".local" / "share" / "hearth" / "forge" / "hearth-forge.py"
+FORGE_URL = "http://127.0.0.1:8191"
+FORGE_DIR = Path(os.environ.get("HEARTH_FORGE_DIR") or (Path.home() / "Hearth" / "Forge"))
+
+
+def _forge_http(method, path, body=None, timeout=30):
+    import urllib.request
+    import urllib.error
+    data = json.dumps(body).encode() if body is not None else None
+    request = urllib.request.Request(FORGE_URL + path, data=data, method=method,
+                                     headers={"Content-Type": "application/json"} if data else {})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw = response.read()
+            kind = response.headers.get("Content-Type", "")
+            return response.status, (json.loads(raw) if "json" in kind else raw)
+    except urllib.error.HTTPError as error:
+        try:
+            return error.code, json.loads(error.read())
+        except ValueError:
+            return error.code, {"error": str(error)}
+    except (urllib.error.URLError, OSError) as error:
+        return 0, {"error": f"Hearth Forge isn't answering on 127.0.0.1:8191 ({error})"}
+
+
+def _forge_cli(*command, timeout=120):
+    if not FORGE_HELPER.is_file():
+        return {"ok": False, "error": "Hearth Forge isn't set up on this PC: install it from the Hearth Store and open it once"}
+    done = subprocess.run([sys.executable, str(FORGE_HELPER), *command], capture_output=True, text=True, timeout=timeout)
+    return {"ok": done.returncode == 0, "code": done.returncode, "out": done.stdout[-4000:], "err": done.stderr[-2000:]}
+
+
+def op_forge_status(args):
+    """Is Forge installed and set up, is its service on, and what it says about itself (models, the queue, the card)."""
+    app = shutil.which("hearth-forge") or next((p for p in ("/usr/share/applications/hearth-forge.desktop",
+                                                             str(Path.home() / ".local/share/applications/hearth-forge.desktop")) if Path(p).exists()), None)
+    code, status = _forge_http("GET", "/status", timeout=10)
+    return {"ok": True, "installed": bool(app) or FORGE_HELPER.is_file(), "app": app, "helper": FORGE_HELPER.is_file(),
+            "service": _forge_cli("status", timeout=30) if FORGE_HELPER.is_file() else None,
+            "answering": code == 200, "status": status if code == 200 else None, "error": None if code == 200 else status.get("error")}
+
+
+def op_forge_service(args):
+    """forge_service {"state": "on" | "off"}: Forge's own service (its timer and the service, as the app does it)."""
+    state = args.get("state")
+    if state not in ("on", "off"):
+        return {"ok": False, "error": "state is on or off"}
+    return _forge_cli(state, timeout=60)
+
+
+def op_forge_models(args):
+    """The model list with what's got (from /status), or forge_models {"get": id} / {"remove": id}."""
+    for action in ("get", "remove"):
+        if args.get(action):
+            mid = str(args[action])
+            if not all(c.isalnum() or c in "-._" for c in mid):
+                return {"ok": False, "error": "bad model id"}
+            code, answer = _forge_http("POST", f"/models/{mid}/{action}", {})
+            return {"ok": code == 200, "answer": answer}
+    code, status = _forge_http("GET", "/status", timeout=10)
+    return {"ok": code == 200, "status": status}
+
+
+def op_forge_make(args):
+    """forge_make {"model": id, "prompt": "...", ...Forge's own settings..., "photos": [paths on this PC]}: queues a model."""
+    import base64
+    job = {k: v for k, v in args.items() if k != "photos"}
+    photos = []
+    for p in args.get("photos") or []:
+        path = Path(p).expanduser()
+        if not path.is_file() or path.stat().st_size > 32 << 20:
+            return {"ok": False, "error": f"photo not found or too big: {p}"}
+        photos.append(base64.b64encode(path.read_bytes()).decode())
+    if photos:
+        job["photos"] = photos
+    code, answer = _forge_http("POST", "/make", job, timeout=60)
+    return {"ok": code == 200, "answer": answer}
+
+
+def op_forge_made(args):
+    """Everything made (newest first), or forge_made {"stop": name} to stop or unqueue one."""
+    if args.get("stop"):
+        code, answer = _forge_http("POST", f"/made/{args['stop']}/stop", {})
+        return {"ok": code == 200, "answer": answer}
+    code, answer = _forge_http("GET", "/made", timeout=15)
+    return {"ok": code == 200, "made": answer if code == 200 else None, "error": None if code == 200 else answer.get("error")}
+
+
+def op_forge_import(args):
+    """forge_import {"name": made name, "as": "Weapons/m4_carbine", "format": "glb"|"fbx", "faces": N, "texture": PX,
+    "height": metres}: exports the made model (Forge's own export, through Blender) into this project's
+    Assets/Models/Forge/<as>/ with its photo and settings, where the Asset Processor picks it up."""
+    name = str(args.get("name") or "")
+    dest = str(args.get("as") or name)
+    if not name or not all(c.isalnum() or c == "-" for c in name):
+        return {"ok": False, "error": "name is a made model's name"}
+    if not dest or ".." in dest.split("/") or dest.startswith("/") or not all(c.isalnum() or c in "-_/" for c in dest):
+        return {"ok": False, "error": "as is a folder under Assets/Models/Forge (letters, digits, - _ /)"}
+    made = FORGE_DIR / name
+    if not (made / "model.glb").is_file():
+        return {"ok": False, "error": f"{name} has no model.glb yet (still being made, or no such model)"}
+    fmt = args.get("format", "fbx")
+    if fmt not in ("glb", "fbx", "obj"):
+        return {"ok": False, "error": "format is glb, fbx or obj"}
+    out_dir = PROJECT / "Assets" / "Models" / "Forge" / dest
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"{Path(dest).name}.{fmt}"
+    extra = []
+    for key, flag in (("faces", "--faces"), ("texture", "--texture"), ("height", "--height")):
+        if args.get(key):
+            extra += [flag, str(args[key])]
+    if fmt == "glb" and not extra:
+        shutil.copy2(made / "model.glb", out)
+        result = {"ok": True}
+    else:
+        result = _forge_cli("export", str(made), fmt, str(out), *extra, timeout=600)
+    for extra_file in ("photo.png", "preview.png", "ask.json", "stats.json"):
+        if (made / extra_file).is_file():
+            shutil.copy2(made / extra_file, out_dir / extra_file)
+    result.update({"file": str(out.relative_to(PROJECT)) if out.exists() else None})
+    return result
+
+
+OPS.update({"forge_status": op_forge_status, "forge_service": op_forge_service, "forge_models": op_forge_models,
+            "forge_make": op_forge_make, "forge_made": op_forge_made, "forge_import": op_forge_import})
 
 
 # ---------- request loop ----------
