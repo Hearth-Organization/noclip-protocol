@@ -329,7 +329,11 @@ namespace NoclipProtocol
             // The body: half a second in the breach's glow, then out and in to where agents arrive.
             const float bx = Level0::Level0Breach::X, from = Level0::Level0Breach::Y + 0.4f, to = Level0::Level0Breach::ArriveY;
             const float walk = Ease(AZStd::clamp((m_clock - 0.6f) / 3.0f, 0.0f, 1.0f));
-            const AZ::Vector3 body(bx, from + (to - from) * walk, m_floorZ);
+            // Walks like a person: a little bob and side-to-side shift with each step, strongest mid-stride.
+            const float stepping = std::sin(walk * AZ::Constants::Pi);
+            const float strides = walk * (to - from) / 0.75f;
+            const AZ::Vector3 body(bx + 0.035f * std::sin(strides * AZ::Constants::Pi) * stepping,
+                                   from + (to - from) * walk, m_floorZ);
             AZ::Entity* entity = nullptr;
             AZ::ComponentApplicationBus::BroadcastResult(entity, &AZ::ComponentApplicationRequests::FindEntity, m_player);
             if (auto* player = entity ? entity->FindComponent<FirstPersonControllerComponent>() : nullptr)
@@ -339,7 +343,8 @@ namespace NoclipProtocol
             if (m_bodyId.IsValid())
             {
                 AZ::TransformBus::Event(m_bodyId, &AZ::TransformBus::Events::SetWorldTM,
-                                        AZ::Transform::CreateFromQuaternionAndTranslation(AZ::Quaternion::CreateIdentity(), body));
+                    AZ::Transform::CreateFromQuaternionAndTranslation(
+                        AZ::Quaternion::CreateRotationZ(0.04f * std::sin(strides * AZ::Constants::Pi) * stepping), body));
             }
             // The camera: in front of them, facing the breach, backing off as they come; then round into their eyes.
             const AZ::Vector3 eye = body + m_cameraLocal.GetTranslation();

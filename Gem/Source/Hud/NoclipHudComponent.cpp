@@ -411,6 +411,14 @@ namespace NoclipProtocol
             {
                 registry->Set(GameSettings::Path("vol_master"), AZStd::clamp(std::round(100.0 * std::pow(10.0, volume / 20.0)), 0.0, 100.0));
             }
+            // Settings v2 (Nov 27): upscaling's default is OFF (QUALITY's lower render scale broke the HUD's vignette).
+            AZ::s64 version = 0;
+            registry->Get(version, "/NoclipProtocol/Settings/version");
+            if (version < 2)
+            {
+                registry->Set(GameSettings::Path("upscaling"), 0.0);
+                registry->Set("/NoclipProtocol/Settings/version", static_cast<AZ::s64>(2));
+            }
             m_rayTracing = GameSettings::On("raytracing");
             m_mouseSensitivity = static_cast<float>(GameSettings::Number("mouse_sens") / 4.5);
             m_volumeDb = static_cast<float>(GameSettings::Decibels(GameSettings::Number("vol_master")));
@@ -452,7 +460,7 @@ namespace NoclipProtocol
         {
             return;
         }
-        AZStd::string settings;
+        AZStd::string settings = "            \"version\": 2"; // see LoadSettings
         for (int t = 0; t < 7; ++t)
         {
             for (const GameSettings::Line& line : GameSettings::TabLines(t))

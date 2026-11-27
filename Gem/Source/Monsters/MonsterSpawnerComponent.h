@@ -284,6 +284,20 @@ namespace NoclipProtocol
             if (!pending.empty())
             {
                 Pending().clear();
+                // monster_spawn all<N>: kinds 6N to 6N+5 in a row 7 m ahead, each turned to face the player as built
+                // (no "turn"), to check which models' fronts aren't +Y. Freeze them first (Monsters/Enabled false).
+                if (pending.substr(0, 3) == "All")
+                {
+                    const int group = pending.size() > 3 ? AZStd::clamp(pending[3] - '0', 0, 9) : 0;
+                    const AZ::Vector3 forward = playerTm.GetBasisY().GetNormalized(), right = playerTm.GetBasisX().GetNormalized();
+                    for (int j = 0; j < 6 && group * 6 + j < count; ++j)
+                    {
+                        const AZ::Vector3 at = playerAt + forward * 7.0f + right * ((static_cast<float>(j) - 2.5f) * 2.3f);
+                        // All turned the same way, straight back along the view: a right model shows its face.
+                        Spawn(group * 6 + j, at, std::atan2(forward.GetX(), -forward.GetY()), true);
+                    }
+                    return;
+                }
                 for (int i = 0; i < count; ++i)
                 {
                     if (pending == kinds[i].m_name || pending == AZStd::string(kinds[i].m_name).substr(0, pending.size()))

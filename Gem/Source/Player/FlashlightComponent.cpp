@@ -7,10 +7,26 @@
 #include <AzCore/Serialization/SerializeContext.h>
 #include <AzCore/Component/ComponentApplicationBus.h>
 #include <AzCore/Component/Entity.h>
+#include <AzCore/Component/TransformBus.h>
+#include <AtomLyIntegration/CommonFeatures/CoreLights/AreaLightBus.h>
 #include <AzFramework/Input/Devices/Keyboard/InputDeviceKeyboard.h>
+#include <AzCore/Console/IConsole.h>
 
 namespace NoclipProtocol
 {
+    namespace
+    {
+        // flashlight_toggle: like pressing F (testing through the game bridge).
+        void FlashlightToggle([[maybe_unused]] const AZ::ConsoleCommandContainer& arguments)
+        {
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Set("/NoclipProtocol/Player/FlashlightToggle", true);
+            }
+        }
+        AZ_CONSOLEFREEFUNC("flashlight_toggle", FlashlightToggle, AZ::ConsoleFunctorFlags::Null, "Flashlight on/off (testing)");
+    }
+
     namespace
     {
         // One shared random source for flicker timing.
@@ -104,6 +120,16 @@ namespace NoclipProtocol
         if (visible && lightEntity->GetState() == AZ::Entity::State::Init)
         {
             lightEntity->Activate();
+            // The owner, Nov 27: the flashlight lit up the gun. The beam starts out at the muzzle now, like a rail light,
+            // so the gun is behind it; a wider, softer cone at a natural brightness.
+            AZ::TransformBus::Event(m_lightEntity, &AZ::TransformBus::Events::SetLocalTranslation, AZ::Vector3(0.16f, 0.95f, -0.10f));
+            AZ::Render::AreaLightRequestBus::Event(m_lightEntity, [](AZ::Render::AreaLightRequests* light)
+            {
+                light->SetIntensity(380.0f);
+                light->SetAttenuationRadius(30.0f);
+                light->SetInnerShutterAngle(16.0f);
+                light->SetOuterShutterAngle(36.0f);
+            });
         }
         else if (!visible && lightEntity->GetState() == AZ::Entity::State::Active)
         {
@@ -124,6 +150,16 @@ namespace NoclipProtocol
 
     void FlashlightComponent::OnTick(float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
+        // Testing (the game bridge's registry op): /NoclipProtocol/Player/FlashlightToggle true flips it, like F.
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            bool toggle = false;
+            if (registry->Get(toggle, "/NoclipProtocol/Player/FlashlightToggle") && toggle)
+            {
+                registry->Set("/NoclipProtocol/Player/FlashlightToggle", false);
+                m_switchedOn = !m_switchedOn;
+            }
+        }
         // The HUD's flashlight bar (Hearth HUD, bind "player.flashlight").
         if (auto* registry = AZ::SettingsRegistry::Get())
         {

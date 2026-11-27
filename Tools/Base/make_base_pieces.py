@@ -52,6 +52,7 @@ BASE_MATERIALS = {
     "piece_sandbag_dark": ([0.16, 0.12, 0.06], 0.0, 0.95, None),
     "piece_olive":       ([0.06, 0.07, 0.03], 0.4, 0.55, None),
     "piece_seam":        ([0.55, 0.50, 1.00], 0.0, 0.2, ([0.6, 0.55, 1.0], 10.0)),
+    "piece_anchor":      ([0.50, 0.55, 1.00], 0.0, 0.2, ([0.55, 0.6, 1.0], 6.0)),
 }
 
 
@@ -100,6 +101,20 @@ def flare_stand():
 
 def beacon():
     return [F(0, 0, 0, 0.8, 0.8, 0.08, "metal_dark"), F(0, 0, 0.08, 0.4, 0.4, 1.32, "brass"), C(0, 0, 1.4, 0.3, 0.3, "yellow")]
+
+
+def reality_anchor():
+    """The Foundation's reality anchor in the spawn room: its field keeps the Backrooms' entities out of the base."""
+    p = [F(0, 0, 0, 1.1, 1.1, 0.08, "piece_foundation"), F(0, 0, 0.08, 0.9, 0.9, 0.06, "piece_hazard"),
+         C(0, 0, 0.14, 0.2, 1.5, "piece_steel")]
+    for z in (0.45, 0.85, 1.25):
+        p.append(C(0, 0, z, 0.3, 0.06, "piece_anchor"))
+    for x, y in ((0.24, 0), (-0.24, 0), (0, 0.24), (0, -0.24)):
+        p.append(F(x, y, 0.14, 0.05, 0.05, 1.5, "piece_copper"))
+    p += [C(0, 0, 1.64, 0.32, 0.08, "piece_foundation"), C(0, 0, 1.72, 0.12, 0.26, "piece_anchor"),
+          F(0, -0.5, 0.14, 0.36, 0.14, 0.5, "piece_foundation"), F(0.1, -0.575, 0.52, 0.06, 0.01, 0.04, "piece_green_led"),
+          F(-0.08, -0.575, 0.52, 0.12, 0.01, 0.05, "piece_hazard")]
+    return p
 
 
 def uv_lamp():
@@ -752,6 +767,9 @@ def main():
         built += 1
     # Breach 4-A sealed: its glowing seam (the level stretches it, wider while it opens for a delivery).
     mc.build_prefab("Piece_BreachSeam", {"parts": [B(0, 0, 0, 1.0, 1.0, 1.0, "piece_seam")], "size": (1, 1, 1), "collide": False},
+                    template, folder="Prefabs/Base", mat_guid=mat_guid)
+    # The spawn room's reality anchor (owner, Nov 27: monsters can't enter the spawn, "like a device").
+    mc.build_prefab("Piece_RealityAnchor", {"parts": reality_anchor(), "size": mc.bounds(reality_anchor()), "collide": True},
                     template, folder="Prefabs/Base", mat_guid=mat_guid)
     write_catalog()
     write_icons()

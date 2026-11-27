@@ -513,6 +513,10 @@ namespace NoclipProtocol
                 asset.Release();
             }
             m_seamAsset.Release();
+            m_anchorAsset.Release();
+            m_anchorLightAsset.Release();
+            m_anchorTicket = AzFramework::EntitySpawnTicket();
+            m_anchorLightTicket = AzFramework::EntitySpawnTicket();
             m_buildEnabled = false;
         }
         for (auto& asset : m_pickupAssets)
@@ -703,6 +707,25 @@ namespace NoclipProtocol
         if (!m_mainMenu && m_settings.m_style <= 2)
         {
             UpdateBase(deltaTime, position);
+        }
+        // The reality anchor: against the spawn room's west wall, facing into the room, with its glow.
+        if (m_anchorAsset.IsReady() && !m_anchorTicket.IsValid())
+        {
+            const float cell = m_settings.m_cellSize;
+            const float x = -static_cast<float>(m_settings.m_spawnRoomRadius) * cell + 1.3f, y = cell * 0.5f;
+            m_anchorTicket = AzFramework::EntitySpawnTicket(m_anchorAsset);
+            SpawnBox(m_anchorTicket, Level0::Box{ x, y, 0.0f, 1.0f, 1.0f, 1.0f }, false, AZ::DegToRad(-90.0f));
+            if (m_anchorLightAsset.IsReady())
+            {
+                m_anchorLightTicket = AzFramework::EntitySpawnTicket(m_anchorLightAsset);
+                SpawnBox(m_anchorLightTicket, Level0::Box{ x, y, 1.85f, 1.0f, 1.0f, 1.0f }, false, 0.0f);
+            }
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Set("/NoclipProtocol/Base/AnchorX", static_cast<double>(x));
+                registry->Set("/NoclipProtocol/Base/AnchorY", static_cast<double>(y));
+            }
+            AZ_Printf("NoclipProtocol", "Reality anchor up at %.1f %.1f: the spawn room is shielded", x, y);
         }
 
         // For the debug overlay: the seed and the chunk the player is in (0, 0 is the forward base).
@@ -1567,6 +1590,14 @@ namespace NoclipProtocol
             AZ_Warning("NoclipProtocol", false, "Base building: '%s' not found", path);
             return false;
         };
+        // The reality anchor in every spawn room (not the menu or the intro).
+        m_anchorTicket = AzFramework::EntitySpawnTicket();
+        m_anchorLightTicket = AzFramework::EntitySpawnTicket();
+        if (!m_mainMenu && m_settings.m_style != 3 && m_settings.m_spawnRoomRadius > 0)
+        {
+            load("prefabs/base/piece_realityanchor.spawnable", m_anchorAsset);
+            load("prefabs/base/build_uvlamp.spawnable", m_anchorLightAsset);
+        }
         // Supplies' pieces (every level with supplies, not the menu or the intro).
         if (!m_mainMenu && m_settings.m_style <= 2)
         {

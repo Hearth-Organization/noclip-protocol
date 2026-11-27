@@ -62,7 +62,7 @@ namespace NoclipProtocol::GameSettings
                 NP_CHOICE("distance", "Draw distance", "NEAR|MEDIUM|FAR", 2, nullptr, "How far rooms, lights and props are drawn before the dark takes them.", Panel::RayTracing),
                 NP_CHOICE("clutter", "Clutter and decals", "LOW|MEDIUM|HIGH|ULTRA", 3, nullptr, "Stains, junk, papers and small things lying around.", Panel::RayTracing),
                 NP_CHOICE("aa", "Anti-aliasing", "OFF|SMAA|TAA|MSAA 4×", 2, nullptr, "Smooths jagged edges. TAA is the smoothest; SMAA is sharper.", Panel::RayTracing),
-                NP_CHOICE("upscaling", "Upscaling", "OFF|QUALITY|BALANCED|PERFORMANCE", 1, nullptr, "Draws fewer pixels and sharpens them back up, for more frames.", Panel::RayTracing),
+                NP_CHOICE("upscaling", "Upscaling", "OFF|QUALITY|BALANCED|PERFORMANCE", 0, nullptr, "Draws fewer pixels and sharpens them back up, for more frames. Takes effect at the next start.", Panel::RayTracing),
                 NP_SLIDER("renderscale", "Render scale", "%.0f%%", 100, 50, 200, 5, "Pixels drawn compared with your screen. Over 100% is sharper and slower.", Panel::RayTracing),
                 NP_TOGGLE("motionblur", "Motion blur", 0, "Blurs fast movement and quick turns.", Panel::RayTracing),
                 NP_SLIDER("filmgrain", "Film grain", "%.0f%%", 40, 0, 100, 5, "The grain over the picture (it grows as sanity drops).", Panel::RayTracing),

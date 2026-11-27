@@ -58,7 +58,17 @@ namespace NoclipProtocol::GameSettings
         r->Set("/NoclipProtocol/Graphics/RayTracing", On("raytracing"));
         static const double upscale[4] = { 1.0, 0.67, 0.58, 0.5 };
         const double scale = Number("renderscale") / 100.0 * upscale[AZStd::clamp(Index("upscaling"), 0, 3)];
-        Command(AZStd::string::format("r_renderScale %.3f", scale));
+        // Changing the render scale while the game runs crashed the renderer (Vulkan, Nov 27), so it's set once, at
+        // start, and only when it isn't the full 100% the renderer starts at; a change takes effect at the next start.
+        static bool scaleSet = false;
+        if (startup && !scaleSet)
+        {
+            scaleSet = true;
+            if (std::abs(scale - 1.0) > 0.001)
+            {
+                Command(AZStd::string::format("r_renderScale %.3f", scale));
+            }
+        }
         static const char* const aa[4] = { "", "SMAA", "TAA", "MSAA" };
         const int aaIndex = AZStd::clamp(Index("aa"), 0, 3);
         static int appliedAa = 2; // the pipeline starts with TAA

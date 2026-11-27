@@ -130,6 +130,11 @@ namespace NoclipProtocol
         void UpdateBase(float deltaTime, const AZ::Vector3& at); // the base ticking over, the breach seam, delivered crates
         // Breach 4-A sealed: a glowing seam that opens a crack for a delivery.
         AZ::Data::Asset<AzFramework::Spawnable> m_seamAsset;
+        // The spawn room's reality anchor: the reason monsters stay out of the base (HearthMonsterComponent::InSafe).
+        AZ::Data::Asset<AzFramework::Spawnable> m_anchorAsset;
+        AZ::Data::Asset<AzFramework::Spawnable> m_anchorLightAsset;
+        AzFramework::EntitySpawnTicket m_anchorTicket;
+        AzFramework::EntitySpawnTicket m_anchorLightTicket;
         AzFramework::EntitySpawnTicket m_seamTicket;
         AZStd::vector<AZ::EntityId> m_seamEntities;
         float m_seamShown = -1.0f;

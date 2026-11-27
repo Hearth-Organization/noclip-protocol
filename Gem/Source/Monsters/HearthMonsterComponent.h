@@ -191,5 +191,35 @@ namespace NoclipProtocol
         float m_sinceHeard = 100.0f;
         CellPos m_wander;
         bool m_hasWander = false;
+
+        // Moving like a person (owner, Nov 27: "AI need to move like a human and not like a robot", "a lot of the AIs
+        // walk sideways"): easing into and out of a pace that wanders a little, turning into the way it goes before
+        // getting up to speed, rounding corners, a small sway with each stride, stopping now and then to look round.
+        void Face(const AZ::Vector3& direction, float rate = 4.5f);
+        void FaceYaw(float yaw, float rate);
+        float m_turn = 0.0f;         // monsters.json "turn" (degrees): the model's own front, if it isn't +Y
+        float m_yaw = 0.0f;          // where it faces (the model's front)
+        bool m_hasYaw = false;
+        float m_sway = 0.0f;
+        float m_stride = 0.0f;
+        float m_curSpeed = 0.0f;
+        float m_gait = 1.0f;         // its own pace, 0.9-1.1
+        float m_seed = 0.0f;
+        float m_clock = 0.0f;
+        float m_pauseIn = 8.0f;
+        float m_pausing = 0.0f;
+        float m_glance = 0.0f;
+        float m_dt = 0.016f;
+
+        // The spawn room is the player's: monsters never go in, never hit anyone inside, and don't wait outside for
+        // them (owner, Nov 27: "AI should not camp or be able to enter the spawn area"). One who'd have to go in to
+        // reach the player turns away and goes off somewhere else for a while.
+        bool InSafe(const CellPos& cell);
+        CellPos LeaveGoal(const AZ::Vector3& at);
+        bool m_safeKnown = false;
+        CellPos m_safeCentre;
+        int m_safeHalf = 4;
+        float m_leaveFor = 0.0f;
+        CellPos m_leave;
     };
 } // namespace NoclipProtocol

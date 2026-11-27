@@ -105,6 +105,7 @@ namespace NoclipProtocol
                 m_hearing = m.HasMember("hearing") && m["hearing"].IsNumber() ? static_cast<float>(m["hearing"].GetDouble()) : m_hearing;
                 m_sight = m.HasMember("sight") && m["sight"].IsNumber() ? static_cast<float>(m["sight"].GetDouble()) : m_sight;
                 m_speed = m.HasMember("speed") && m["speed"].IsNumber() ? static_cast<float>(m["speed"].GetDouble()) : m_speed;
+                m_turn = m.HasMember("turn") && m["turn"].IsNumber() ? AZ::DegToRad(static_cast<float>(m["turn"].GetDouble())) : m_turn;
             }
         }
     }
@@ -295,6 +296,10 @@ namespace NoclipProtocol
                     continue;
                 }
                 const CellPos next{ current.x + d[0], current.y + d[1] };
+                if (InSafe(next) && !InSafe(current))
+                {
+                    continue; // never into the spawn room (one already inside can still walk out)
+                }
                 const AZ::u64 nextKey = MonsterCellKey(next.x, next.y);
                 const int newCost = cost[key] + 1;
                 auto known = cost.find(nextKey);
@@ -356,6 +361,7 @@ namespace NoclipProtocol
 
     void HearthMonsterComponent::OnTick(float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
+        m_dt = deltaTime;
         auto* registry = AZ::SettingsRegistry::Get();
         bool enabled = true;
         if (registry)
@@ -527,8 +533,7 @@ namespace NoclipProtocol
             if (distance > 0.01f)
             {
                 const AZ::Vector3 face = flat / distance;
-                AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion,
-                    AZ::Quaternion::CreateRotationZ(std::atan2(-face.GetX(), face.GetY())));
+                Face(face, 8.0f);
             }
         };
         // The player has it on screen (near the middle of the view, nothing in between).
@@ -701,6 +706,12 @@ namespace NoclipProtocol
                     const float angle = static_cast<float>(std::rand() % 6283) / 1000.0f;
                     const float radius = 18.0f + static_cast<float>(std::rand() % 800) / 100.0f;
                     const CellPos c = Cell(playerAt + AZ::Vector3(std::cos(angle), std::sin(angle), 0.0f) * radius);
+                    if (InSafe(c))
+                    {
+                        m_awayFor = 8.0f; // not in the spawn room: try again in a bit
+                        AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldTranslation, at);
+                        return;
+                    }
                     at = Centre(c, m_floorZ - 2.6f);
                     m_rise = 2.0f;
                     m_path.clear();
@@ -768,9 +779,11 @@ namespace NoclipProtocol
 
         if (m_kind == "Scp173")
         {
-            // Moves only while nobody is looking at it, very fast, and kills on reaching you. Looked at, it can't
-            // move at all. It can't be hurt.
-            const bool watched = distance > 0.01f && playerAhead.Dot(-flat / distance) >= 0.55f && LineOfSight(playerAt, at);
+            // Owner, Nov 27: slow, and it can't move at all while you're looking at it. "Looking" is anywhere on the
+            // screen, edges included (a wide cone, wider still up close), not just the middle; it kills on reaching you
+            // and can't be hurt.
+            const float facing = distance > 0.01f ? playerAhead.Dot(-flat / distance) : 1.0f;
+            const bool watched = (facing >= 0.25f || (distance < 3.0f && facing > -0.1f)) && LineOfSight(playerAt, at);
             if (watched)
             {
                 Walk(at, Cell(at), 0.0f, deltaTime, false, playerAt);
@@ -788,7 +801,7 @@ namespace NoclipProtocol
                 Report(at, "Reached " + playerName);
                 return;
             }
-            at = Walk(at, Cell(playerAt), 9.0f, deltaTime, true, playerAt);
+            at = Walk(at, Cell(playerAt), 1.9f, deltaTime, true, playerAt);
             Report(at, "Moving (unwatched)");
             return;
         }
@@ -797,7 +810,8 @@ namespace NoclipProtocol
         {
             // Statues of a kind: they move only while nobody looks at them (the Watcher never moves: looking at it
             // wears on you instead). Reaching you hurts and shakes you; they can't be hurt.
-            const bool watched = distance > 0.01f && playerAhead.Dot(-flat / distance) >= 0.55f && LineOfSight(playerAt, at);
+            const float facing = distance > 0.01f ? playerAhead.Dot(-flat / distance) : 1.0f;
+            const bool watched = (facing >= 0.25f || (distance < 3.0f && facing > -0.1f)) && LineOfSight(playerAt, at);
             if (m_kind == "Watcher")
             {
                 Walk(at, Cell(at), 0.0f, deltaTime, distance < 25.0f, playerAt);
@@ -1001,7 +1015,7 @@ namespace NoclipProtocol
         if (!m_struck && m_attack >= 0.45f)
         {
             m_struck = true;
-            if (distance < 2.3f && registry)
+            if (distance < 2.3f && registry && !InSafe(Cell(at + flat)))
             {
                 bool shield = false;
                 registry->Get(shield, "/NoclipProtocol/Player/Shield");
@@ -1018,8 +1032,7 @@ namespace NoclipProtocol
         if (distance > 0.01f)
         {
             const AZ::Vector3 face = flat / distance;
-            AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion,
-                AZ::Quaternion::CreateRotationZ(std::atan2(-face.GetX(), face.GetY())));
+            Face(face, 8.0f);
         }
         if (m_attack >= 1.1f)
         {
@@ -1031,19 +1044,172 @@ namespace NoclipProtocol
         return true;
     }
 
-    AZ::Vector3 HearthMonsterComponent::Walk(AZ::Vector3 at, const CellPos& goal, float speed, float deltaTime, bool closeIn,
+    bool HearthMonsterComponent::InSafe(const CellPos& cell)
+    {
+        if (!m_safeKnown)
+        {
+            const Level0::Settings* settings = Settings();
+            if (!settings)
+            {
+                return false;
+            }
+            m_safeKnown = true;
+            const Level0::Point spawn = Level0::SpawnPoint(*settings);
+            m_safeCentre = Cell(AZ::Vector3(spawn.m_x, spawn.m_y, 0.0f));
+            // The reality anchor's field: the room and one cell round it (none in a level without a spawn room).
+            m_safeHalf = settings->m_spawnRoomRadius > 0 && settings->m_style != 3 ? settings->m_spawnRoomRadius + 1 : -1;
+        }
+        return std::abs(cell.x - m_safeCentre.x) <= m_safeHalf && std::abs(cell.y - m_safeCentre.y) <= m_safeHalf;
+    }
+
+    HearthMonsterComponent::CellPos HearthMonsterComponent::LeaveGoal(const AZ::Vector3& at)
+    {
+        // Away from the spawn room, out past where it is now, a little to one side.
+        const AZ::Vector3 centre = Centre(m_safeCentre, at.GetZ());
+        AZ::Vector3 out(at.GetX() - centre.GetX(), at.GetY() - centre.GetY(), 0.0f);
+        out = out.GetLength() > 0.1f ? out.GetNormalized() : AZ::Vector3(1.0f, 0.0f, 0.0f);
+        const float side = (static_cast<float>(std::rand() % 1000) / 1000.0f - 0.5f) * 1.4f;
+        const AZ::Vector3 dir = AZ::Quaternion::CreateRotationZ(side).TransformVector(out);
+        const float far = (m_safeHalf + 7 + std::rand() % 5) * m_cell;
+        return Cell(centre + dir * far);
+    }
+
+    void HearthMonsterComponent::FaceYaw(float target, float rate)
+    {
+        if (!m_hasYaw)
+        {
+            m_hasYaw = true;
+            AZ::Quaternion q = AZ::Quaternion::CreateIdentity();
+            AZ::TransformBus::EventResult(q, GetEntityId(), &AZ::TransformBus::Events::GetWorldRotationQuaternion);
+            m_yaw = q.GetEulerRadians().GetZ() - m_turn;
+            m_seed = static_cast<float>(std::rand() % 6283) / 1000.0f;
+            m_gait = 0.9f + static_cast<float>(std::rand() % 200) / 1000.0f;
+            m_pauseIn = 4.0f + static_cast<float>(std::rand() % 900) / 100.0f;
+        }
+        float diff = std::remainder(target - m_yaw, AZ::Constants::TwoPi);
+        // Eases into the turn and out of it, no faster than a person turns.
+        const float step = AZStd::clamp(diff * AZStd::min(1.0f, m_dt * 7.0f), -rate * m_dt, rate * m_dt);
+        m_yaw = std::remainder(m_yaw + step, AZ::Constants::TwoPi);
+        AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion,
+            AZ::Quaternion::CreateRotationZ(m_yaw + m_turn + m_sway));
+    }
+
+    void HearthMonsterComponent::Face(const AZ::Vector3& direction, float rate)
+    {
+        if (direction.GetX() * direction.GetX() + direction.GetY() * direction.GetY() > 1.0e-6f)
+        {
+            FaceYaw(std::atan2(-direction.GetX(), direction.GetY()), rate);
+        }
+    }
+
+    AZ::Vector3 HearthMonsterComponent::Walk(AZ::Vector3 at, const CellPos& wanted, float speed, float deltaTime, bool closeIn,
                                              const AZ::Vector3& target)
     {
+        m_dt = deltaTime;
+        m_clock += deltaTime;
+        if (!m_hasYaw)
+        {
+            FaceYaw(m_yaw, 0.0f); // reads where it faces now and picks its own pace
+        }
+        // The spawn room: never in, and no waiting at its door.
+        CellPos goal = wanted;
+        m_leaveFor = AZStd::max(0.0f, m_leaveFor - deltaTime);
+        if (InSafe(goal) && m_leaveFor <= 0.0f)
+        {
+            m_leaveFor = 25.0f + static_cast<float>(std::rand() % 1500) / 100.0f;
+            m_leave = LeaveGoal(at);
+            m_repath = 0.0f;
+            AZ_Printf("Noclip", "monster: %s turns away from the reality anchor's field", m_name.c_str());
+        }
+        const bool leaving = m_leaveFor > 0.0f;
+        if (leaving)
+        {
+            goal = m_leave;
+            closeIn = false;
+            speed = AZStd::min(speed, m_speed * 0.5f); // walks off, it doesn't flee
+        }
         m_repath -= deltaTime;
         if (m_repath <= 0.0f)
         {
             m_repath = 0.4f;
             m_path = FindPath(Cell(at), goal);
         }
-        // Walk the path; face where it's going.
-        float left = speed * deltaTime;
+
+        // Its pace: its own, never quite even; on a wander it stops now and then and looks round.
+        float pace = speed * m_gait * (1.0f + 0.06f * std::sin(m_clock * 0.8f + m_seed) + 0.03f * std::sin(m_clock * 2.3f + m_seed * 1.7f));
+        const bool wandering = !closeIn && speed <= m_speed * 0.55f;
+        if (wandering)
+        {
+            if (m_pausing > 0.0f)
+            {
+                m_pausing -= deltaTime;
+                pace = 0.0f;
+            }
+            else if ((m_pauseIn -= deltaTime) <= 0.0f)
+            {
+                m_pausing = 1.2f + static_cast<float>(std::rand() % 250) / 100.0f;
+                m_pauseIn = 7.0f + static_cast<float>(std::rand() % 900) / 100.0f;
+                m_glance = (std::rand() % 2 ? 1.0f : -1.0f) * (0.5f + static_cast<float>(std::rand() % 60) / 100.0f);
+            }
+        }
+        else
+        {
+            m_pausing = 0.0f;
+        }
+
+        // Where it's heading: along the path, cutting the corners a little instead of touching every cell's middle.
         AZ::Vector3 heading = AZ::Vector3::CreateZero();
+        while (!m_path.empty())
+        {
+            const AZ::Vector3 next = Centre(m_path.front(), at.GetZ());
+            const AZ::Vector3 to = next - at;
+            const float length = to.GetLength();
+            if (length < 0.05f || (m_path.size() >= 2 && length < m_cell * 0.35f))
+            {
+                m_path.erase(m_path.begin());
+                continue;
+            }
+            heading = to / length;
+            break;
+        }
+        const AZ::Vector3 flat(target.GetX() - at.GetX(), target.GetY() - at.GetY(), 0.0f);
+        const float distance = flat.GetLength();
+        const bool straight = closeIn && m_path.empty() && distance > 1.0f;
+        if (straight)
+        {
+            heading = flat / distance;
+        }
+
+        // Turns into the way it's going first: it slows for a sharp turn rather than sliding sideways or backwards.
+        float turnSlow = 1.0f;
+        if (!heading.IsZero())
+        {
+            const float want = std::atan2(-heading.GetX(), heading.GetY());
+            const float off = std::abs(std::remainder(want - m_yaw, AZ::Constants::TwoPi));
+            turnSlow = AZStd::clamp(std::cos(off), 0.15f, 1.0f);
+        }
+        else
+        {
+            pace = 0.0f;
+        }
+        // Statues (SCP-173, dolls, mannequins...) stop dead the instant they're seen: no easing, no turning, no sway.
+        const bool statue = m_kind == "Scp173" || m_kind == "Doll" || m_kind == "Mannequin" || m_kind == "Plush" || m_kind == "Watcher";
+        if (statue)
+        {
+            m_pausing = 0.0f;
+            turnSlow = 1.0f;
+            if (pace <= 0.0f)
+            {
+                m_curSpeed = 0.0f;
+            }
+        }
+        // Speeds up and slows down like a body with weight; a hunter gets going quicker.
+        const float target_ = pace * turnSlow;
+        const float accel = target_ > m_curSpeed ? (closeIn ? 6.0f : 2.8f) : 5.0f;
+        m_curSpeed += AZStd::clamp(target_ - m_curSpeed, -accel * deltaTime, accel * deltaTime);
+
         const AZ::Vector3 startAt = at;
+        float left = m_curSpeed * deltaTime;
         while (left > 0.0f && !m_path.empty())
         {
             const AZ::Vector3 next = Centre(m_path.front(), at.GetZ());
@@ -1055,19 +1221,20 @@ namespace NoclipProtocol
                 continue;
             }
             const float move = AZStd::min(left, length);
-            heading = to / length;
-            at += heading * move;
+            at += to / length * move;
             left -= move;
         }
-        // In the same cell as what it's after: straight at it, stopping just short.
-        const AZ::Vector3 flat(target.GetX() - at.GetX(), target.GetY() - at.GetY(), 0.0f);
-        const float distance = flat.GetLength();
-        if (closeIn && m_path.empty() && distance > 1.0f && left > 0.0f)
+        if (straight && left > 0.0f)
         {
-            heading = flat / distance;
             at += heading * AZStd::min(left, distance - 1.0f);
         }
+        if (InSafe(Cell(at)) && !InSafe(Cell(startAt)))
+        {
+            at = startAt; // the doorway of the spawn room is as far as it gets
+            m_curSpeed = 0.0f;
+        }
         AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldTranslation, at);
+
         // Animation follows how fast it actually moved this frame.
         const float moved = deltaTime > 0.0f ? (at - startAt).GetLength() / deltaTime : 0.0f;
         if (moved < 0.15f)
@@ -1082,10 +1249,17 @@ namespace NoclipProtocol
         {
             Play("run", true, AZ::GetClamp(moved / 4.5f, 0.7f, 1.5f));
         }
-        if (!heading.IsZero())
+        // A small sway from side to side with each stride.
+        m_stride += moved * deltaTime / (moved < 2.6f ? 0.75f : 1.2f);
+        m_sway = statue ? 0.0f : 0.035f * std::sin(m_stride * AZ::Constants::Pi) * AZStd::min(1.0f, moved / 1.2f);
+        if (m_pausing > 0.0f)
         {
-            AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion,
-                AZ::Quaternion::CreateRotationZ(std::atan2(-heading.GetX(), heading.GetY())));
+            FaceYaw(m_yaw + m_glance * AZStd::min(1.0f, deltaTime * 2.0f), 1.6f); // looking round
+            m_glance *= 1.0f - AZStd::min(1.0f, deltaTime * 2.0f);
+        }
+        else if (!heading.IsZero() && !(statue && moved < 0.05f))
+        {
+            Face(heading, statue ? 30.0f : (moved < 2.6f ? 3.5f : 5.0f));
         }
         return at;
     }
