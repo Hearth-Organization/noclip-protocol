@@ -174,7 +174,7 @@ namespace NoclipProtocol
         float m_darkZoneShareField = 0.4f;
         float m_decalChanceField = 0.3f;
         float m_workingLightsField = 0.66f;           // share of lit-area lights that work
-        float m_workingLightsRayTracedField = 0.33f;  // same, when ray-traced bounce light is on
+        float m_workingLightsRayTracedField = 0.22f;  // same, when ray-traced bounce light is on (the owner: dial it back, Nov 26: 0.33 -> 0.22)
         int m_chunkCellsField = 6;
         float m_lightFractionField = 0.35f;
         float m_openFractionField = 0.2f;
