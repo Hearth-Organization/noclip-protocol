@@ -180,6 +180,57 @@ namespace NoclipProtocol::Level0
         }
     }
 
+    void ApplyCatalog(Settings& settings, int number, int layout, int light)
+    {
+        static const int nearest[7] = { 0, 1, 2, 0, 1, 0, 2 };
+        settings.m_catalog = number;
+        settings.m_layout = layout < 0 || layout > 6 ? 0 : layout;
+        settings.m_light = light < 0 || light > 4 ? 1 : light;
+        settings.m_style = nearest[settings.m_layout];
+        ApplyStyle(settings);
+        settings.m_spawnRoomRadius = 1;
+        settings.m_propChance = 0.0f; // the hand-made levels' crates and pipes need their own pieces
+        switch (settings.m_layout)
+        {
+        case 0: // rooms: Level 0's grid
+            settings.m_chunkCells = 6; settings.m_cellSize = 4.0f; settings.m_ceilingHeight = 3.0f;
+            break;
+        case 1: // halls: Level 1's bays
+            settings.m_chunkCells = 6; settings.m_cellSize = 8.0f; settings.m_ceilingHeight = 5.0f;
+            break;
+        case 2: // corridors: Level 2's tunnels
+            settings.m_chunkCells = 8; settings.m_cellSize = 3.0f; settings.m_ceilingHeight = 2.6f;
+            break;
+        case 3: // outdoor: open ground, a few big blocks (houses, trees, rocks), the sky far overhead
+            settings.m_chunkCells = 6; settings.m_cellSize = 10.0f; settings.m_ceilingHeight = 14.0f;
+            settings.m_openFraction = 1.0f; settings.m_borderExtraOpen = 1.0f; settings.m_roomChance = 0.0f;
+            settings.m_pillarChance = 0.3f; settings.m_pillarSize = 2.6f; settings.m_lightSpacing = 2;
+            settings.m_decalChance = 0.1f; settings.m_clutterChance = 0.25f; settings.m_scatterChance = 0.2f;
+            break;
+        case 4: // caves: wide winding tunnels, thick rock columns
+            settings.m_chunkCells = 6; settings.m_cellSize = 5.0f; settings.m_ceilingHeight = 4.5f;
+            settings.m_openFraction = 0.3f; settings.m_borderExtraOpen = 0.2f; settings.m_roomChance = 0.3f;
+            settings.m_pillarChance = 0.85f; settings.m_pillarSize = 1.6f; settings.m_lightSpacing = 2;
+            settings.m_clutterChance = 0.2f;
+            break;
+        case 5: // water: wide flooded rooms and pools
+            settings.m_chunkCells = 6; settings.m_cellSize = 6.0f; settings.m_ceilingHeight = 3.5f;
+            settings.m_openFraction = 0.6f; settings.m_borderExtraOpen = 0.4f; settings.m_roomChance = 0.6f;
+            settings.m_pillarChance = 0.5f; settings.m_pillarSize = 0.7f; settings.m_decalChance = 0.0f;
+            settings.m_clutterChance = 0.1f; settings.m_scatterChance = 0.05f;
+            break;
+        case 6: // stairs and shafts: narrow and very tall
+            settings.m_chunkCells = 8; settings.m_cellSize = 3.0f; settings.m_ceilingHeight = 7.0f;
+            settings.m_openFraction = 0.08f; settings.m_roomChance = 0.1f;
+            break;
+        }
+        // Light: how much of the level sits in dead zones, and how many lights work where it doesn't.
+        static const float dark[5] = { 0.05f, 0.3f, 0.5f, 0.7f, 1.0f };
+        static const float working[5] = { 0.95f, 0.75f, 0.55f, 0.4f, 0.0f };
+        settings.m_darkZoneShare = dark[settings.m_light];
+        settings.m_workingLights = (settings.m_workingLights / 0.66f < 1.0f ? settings.m_workingLights / 0.66f : 1.0f) * working[settings.m_light];
+    }
+
     Point SpawnPoint(const Settings& settings)
     {
         if (settings.m_style == 3)
@@ -512,7 +563,7 @@ namespace NoclipProtocol::Level0
         layout.m_ceiling = Box{ originX + chunkSize * 0.5f, originY + chunkSize * 0.5f, height + 0.05f, chunkSize, chunkSize, 0.1f };
 
         // 6b. Level 0's end of Breach 4-A: the hole the Foundation punched through the spawn room's south wall.
-        if (settings.m_style == 0 && settings.m_spawnRoomRadius > 0 && Level0Breach::X >= originX && Level0Breach::X < originX + chunkSize &&
+        if (settings.m_style == 0 && settings.m_catalog < 0 && settings.m_spawnRoomRadius > 0 && Level0Breach::X >= originX && Level0Breach::X < originX + chunkSize &&
             Level0Breach::Y >= originY && Level0Breach::Y < originY + chunkSize)
         {
             AddBreachFrame(layout, Level0Breach::X, Level0Breach::Y);

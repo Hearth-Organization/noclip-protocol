@@ -5,6 +5,10 @@
 #include "../Player/FirstPersonControllerComponent.h"
 #include "../Base/BaseBuilding.h"
 #include "ClutterCatalog.h"
+#include "LevelCatalog.h"
+#include "LevelCatalogMaterials.h"
+#include <AtomLyIntegration/CommonFeatures/CoreLights/AreaLightBus.h>
+#include <AtomLyIntegration/CommonFeatures/Material/MaterialComponentBus.h>
 #include <AzCore/Component/ComponentApplicationBus.h>
 #include <AzCore/Component/Entity.h>
 #include <MiniAudio/MiniAudioPlaybackBus.h>
@@ -139,9 +143,9 @@ namespace NoclipProtocol
                         ->Attribute(AZ::Edit::Attributes::Min, 0.05f)
                         ->Attribute(AZ::Edit::Attributes::Max, 0.9f)
                     ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_styleField, "Level",
-                        "Which level this generates: 0 = yellow rooms, 1 = concrete warehouse, 2 = pipe tunnels, 3 = the intro facility (Sublevel 4)")
+                        "Which level this generates: 0 = yellow rooms, 1 = concrete warehouse, 2 = pipe tunnels, 3 = the intro facility (Sublevel 4), 4 = a catalog level (Levels 3-99, picked by /NoclipProtocol/Level/Number)")
                         ->Attribute(AZ::Edit::Attributes::Min, 0)
-                        ->Attribute(AZ::Edit::Attributes::Max, 3)
+                        ->Attribute(AZ::Edit::Attributes::Max, 4)
                     ->DataElement(AZ::Edit::UIHandlers::Slider, &EndlessLevelComponent::m_humShareField, "Humming lights",
                         "Share of working lights that hum (flickering ones always buzz while lit)")
                         ->Attribute(AZ::Edit::Attributes::Min, 0.0f)
@@ -301,6 +305,25 @@ namespace NoclipProtocol
                 }
             });
         }
+        // level_go N: straight to catalog level N (0-99), as if you had noclipped into it (testing).
+        void LevelGo(const AZ::ConsoleCommandContainer& arguments)
+        {
+            const int number = arguments.empty() ? 3 : AZStd::clamp(std::atoi(AZStd::string(arguments[0]).c_str()), 0, Catalog::LevelCount - 1);
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Set("/NoclipProtocol/Level/Number", static_cast<AZ::s64>(number));
+                registry->Set("/NoclipProtocol/Level/Arrived", AZStd::string("noclip"));
+            }
+            AZ::TickBus::QueueFunction([number]()
+            {
+                if (auto* console = AZ::Interface<AZ::IConsole>::Get())
+                {
+                    console->PerformCommand(AZStd::string::format("LoadLevel %s", number <= 2 ? AZStd::string::format("Level%d", number).c_str() : "Backrooms").c_str());
+                }
+            });
+        }
+        AZ_CONSOLEFREEFUNC("level_go", LevelGo, AZ::ConsoleFunctorFlags::Null, "level_go N goes straight to catalog level N, 0-99 (testing)");
+
         AZ_CONSOLEFREEFUNC("noclip_cross", NoclipCross, AZ::ConsoleFunctorFlags::Null, "noclip_cross arrives in Level 0 as if through Breach 4-A (testing)");
     } // namespace
 
@@ -324,7 +347,12 @@ namespace NoclipProtocol
         m_settings.m_darkZoneScale = AZStd::max(1.0f, m_darkZoneScaleField);
         m_settings.m_seed = m_seed;
         m_settings.m_style = m_styleField;
+        m_settings.m_catalog = -1;
         Level0::ApplyStyle(m_settings);
+        if (m_styleField == 4)
+        {
+            SetUpCatalogLevel();
+        }
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
             registry->Get(m_shiftsSeen, "/NoclipProtocol/Level0/Shifts");
@@ -363,10 +391,12 @@ namespace NoclipProtocol
                 "Get through the tunnels",
                 "Report to the briefing terminal",
             };
-            registry->Set("/NoclipProtocol/Hud/game.objective", AZStd::string(objectives[AZStd::clamp(m_settings.m_style, 0, 3)]));
+            const bool catalog = m_settings.m_catalog >= 0;
+            registry->Set("/NoclipProtocol/Hud/game.objective",
+                catalog ? AZStd::string("Survive, scavenge, find the way deeper") : AZStd::string(objectives[AZStd::clamp(m_settings.m_style, 0, 3)]));
             registry->Set("/NoclipProtocol/Hud/game.progress",
                 AZStd::string(m_settings.m_style == 3 ? "Sublevel 4, briefing room"
-                    : (m_settings.m_style == 0 ? "Put up a Foundation beacon in the spawn room [TAB]" : "Look for a tear in the walls")));
+                    : (m_settings.m_style == 0 && !catalog ? "Put up a Foundation beacon in the spawn room [TAB]" : "Look for a tear in the walls")));
             if (m_settings.m_style == 3)
             {
                 registry->Set("/NoclipProtocol/Intro/Accepted", false); // every run of the intro starts with the briefing
@@ -379,12 +409,14 @@ namespace NoclipProtocol
                 AZStd::string previous, arrived;
                 registry->Get(previous, "/NoclipProtocol/Save/Level");
                 registry->Get(arrived, "/NoclipProtocol/Level/Arrived");
-                if (m_settings.m_style == 0 && (arrived == "breach" || previous == "Intro"))
+                if (m_settings.m_style == 0 && m_settings.m_catalog < 0 && (arrived == "breach" || previous == "Intro"))
                 {
                     registry->Set("/NoclipProtocol/Player/SanityStart", 0.75);
                 }
                 static const char* const levels[] = { "Level0", "Level1", "Level2", "Intro" };
-                registry->Set("/NoclipProtocol/Save/Level", AZStd::string(levels[AZStd::clamp(m_settings.m_style, 0, 3)]));
+                registry->Set("/NoclipProtocol/Save/Level", m_settings.m_catalog >= 0
+                    ? AZStd::string::format("Backrooms:%d", m_settings.m_catalog) // CONTINUE comes back to this number
+                    : AZStd::string(levels[AZStd::clamp(m_settings.m_style, 0, 3)]));
             }
         }
 
@@ -583,7 +615,7 @@ namespace NoclipProtocol
             {
                 player = entity->FindComponent<FirstPersonControllerComponent>();
             }
-            if (m_settings.m_style == 0 && arrived == "breach" && player)
+            if (m_settings.m_style == 0 && m_settings.m_catalog < 0 && arrived == "breach" && player)
             {
                 // Stepped out of Breach 4-A: in front of the hole in the spawn room's south wall, facing into the room.
                 player->Teleport(AZ::Vector3(Level0::Level0Breach::ArriveX, Level0::Level0Breach::ArriveY, start.GetZ()), 0.0f, 0.0f, true, true);
@@ -933,19 +965,19 @@ namespace NoclipProtocol
 
         for (const Level0::Box& wall : layout.m_walls)
         {
-            SpawnBox(chunk.m_tickets[PieceWall], wall, true);
+            SpawnBox(chunk.m_tickets[PieceWall], wall, true, 0.0f, false, 0);
         }
         if (m_enablePillars)
         {
             for (const Level0::Box& pillar : layout.m_pillars)
             {
-                SpawnBox(chunk.m_tickets[PiecePillar], pillar, true);
+                SpawnBox(chunk.m_tickets[PiecePillar], pillar, true, 0.0f, false, 0);
             }
         }
         if (layout.m_hasSlabs)
         {
-            SpawnBox(chunk.m_tickets[PieceFloor], layout.m_floor, true);
-            SpawnBox(chunk.m_tickets[PieceCeiling], layout.m_ceiling, true);
+            SpawnBox(chunk.m_tickets[PieceFloor], layout.m_floor, true, 0.0f, false, 1);
+            SpawnBox(chunk.m_tickets[PieceCeiling], layout.m_ceiling, true, 0.0f, false, 2);
         }
         for (const Level0::Light& light : layout.m_lights)
         {
@@ -982,7 +1014,7 @@ namespace NoclipProtocol
             }
             SpawnBox(chunk.m_tickets[piece],
                 Level0::Box{ light.m_position.m_x, light.m_position.m_y, light.m_position.m_z, 1.0f, 1.0f, 1.0f }, false, 0.0f,
-                piece == PieceLight || piece == PieceLightDying);
+                piece == PieceLight || piece == PieceLightDying, 3);
         }
         if (m_enableStains)
         {
@@ -1087,8 +1119,12 @@ namespace NoclipProtocol
     }
 
     void EndlessLevelComponent::SpawnBox(AzFramework::EntitySpawnTicket& ticket, const Level0::Box& box, bool stretch, float yawRadians,
-        bool hum)
+        bool hum, int dress)
     {
+        if (m_settings.m_catalog < 0)
+        {
+            dress = -1; // the hand-made levels' pieces already wear their own materials
+        }
         ++m_spawnedPieces;
         const AZ::Vector3 translation(box.m_cx, box.m_cy, box.m_cz);
         const AZ::Vector3 scale(box.m_sx, box.m_sy, box.m_sz);
@@ -1123,6 +1159,17 @@ namespace NoclipProtocol
                 }
             }
         };
+        if (dress >= 0 && !hum)
+        {
+            args.m_completionCallback =
+                [this, dress]([[maybe_unused]] AzFramework::EntitySpawnTicket::Id ticketId, AzFramework::SpawnableConstEntityContainerView view)
+            {
+                for (const AZ::Entity* entity : view)
+                {
+                    DressEntity(entity->GetId(), dress);
+                }
+            };
+        }
         if (hum)
         {
             // Decided per light from its position, so a light hums (or doesn't) the same way every time its chunk loads.
@@ -1136,10 +1183,14 @@ namespace NoclipProtocol
             const bool keep = unit(seed) < m_humShareField;
             const float delay = unit(seed + 1) * 4.0f;
             args.m_completionCallback =
-                [this, keep, delay]([[maybe_unused]] AzFramework::EntitySpawnTicket::Id ticketId, AzFramework::SpawnableConstEntityContainerView view)
+                [this, keep, delay, dress]([[maybe_unused]] AzFramework::EntitySpawnTicket::Id ticketId, AzFramework::SpawnableConstEntityContainerView view)
             {
                 for (const AZ::Entity* entity : view)
                 {
+                    if (dress >= 0)
+                    {
+                        DressEntity(entity->GetId(), dress);
+                    }
                     const AZStd::string& name = entity->GetName();
                     if (name.size() < 4 || name.substr(name.size() - 4) != "Bulb")
                     {
@@ -1155,6 +1206,64 @@ namespace NoclipProtocol
             };
         }
         AzFramework::SpawnableEntitiesInterface::Get()->SpawnAllEntities(ticket, AZStd::move(args));
+    }
+
+    void EndlessLevelComponent::SetUpCatalogLevel()
+    {
+        AZ::s64 number = 3;
+        if (auto* registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Get(number, "/NoclipProtocol/Level/Number");
+        }
+        number = AZStd::clamp<AZ::s64>(number, 3, Catalog::LevelCount - 1);
+        const Catalog::Level& level = Catalog::Levels[number];
+        Level0::ApplyCatalog(m_settings, static_cast<int>(number), level.m_layout, level.m_light);
+        m_enablePillars = true;
+        // The level's surfaces (Tools/Levels/make_catalog_levels.py writes them).
+        static const char* const roles[3] = { "wall", "floor", "ceiling" };
+        for (int i = 0; i < 3; ++i)
+        {
+            const AZStd::string assetPath = Catalog::Materials[number][i];
+            (void)roles;
+            m_dressMaterials[i] = AZ::Data::AssetId();
+            AZ::Data::AssetCatalogRequestBus::BroadcastResult(m_dressMaterials[i], &AZ::Data::AssetCatalogRequests::GetAssetIdByPath,
+                assetPath.c_str(), AZ::Data::s_invalidAssetType, false);
+            AZ_Warning("NoclipProtocol", m_dressMaterials[i].IsValid(), "Catalog level %d: '%s' not found", static_cast<int>(number), assetPath.c_str());
+        }
+        // Its lights: the colour, and brighter and farther-reaching under a higher ceiling (made for Level 0's 3 m).
+        m_lightTint = AZ::Color(level.m_lightColor[0], level.m_lightColor[1], level.m_lightColor[2], 1.0f);
+        const float reach = m_settings.m_ceilingHeight / 3.0f;
+        static const float brightness[5] = { 1.3f, 1.0f, 0.75f, 0.55f, 0.4f };
+        m_lightIntensityScale = brightness[m_settings.m_light] * reach * reach;
+        m_lightRadiusScale = reach;
+        AZ_Printf("NoclipProtocol", "Catalog level %d: %s (layout %d, light %d, danger %d)", static_cast<int>(number), level.m_name,
+            level.m_layout, level.m_light, level.m_danger);
+    }
+
+    void EndlessLevelComponent::DressEntity(AZ::EntityId id, int dress)
+    {
+        if (dress >= 0 && dress < 3)
+        {
+            if (m_dressMaterials[dress].IsValid())
+            {
+                AZ::Render::MaterialComponentRequestBus::Event(id, &AZ::Render::MaterialComponentRequests::SetMaterialAssetIdOnDefaultSlot,
+                    m_dressMaterials[dress]);
+            }
+        }
+        else if (dress == 3)
+        {
+            AZ::Render::AreaLightRequestBus::Event(id, &AZ::Render::AreaLightRequests::SetColor, m_lightTint);
+            float intensity = 0.0f;
+            AZ::Render::AreaLightRequestBus::EventResult(intensity, id, &AZ::Render::AreaLightRequests::GetIntensity);
+            AZ::Render::AreaLightRequestBus::Event(id, static_cast<void (AZ::Render::AreaLightRequests::*)(float)>(&AZ::Render::AreaLightRequests::SetIntensity),
+                intensity * m_lightIntensityScale);
+            if (m_lightRadiusScale > 1.01f)
+            {
+                float radius = 0.0f;
+                AZ::Render::AreaLightRequestBus::EventResult(radius, id, &AZ::Render::AreaLightRequests::GetAttenuationRadius);
+                AZ::Render::AreaLightRequestBus::Event(id, &AZ::Render::AreaLightRequests::SetAttenuationRadius, radius * m_lightRadiusScale);
+            }
+        }
     }
 
     void EndlessLevelComponent::PublishPlayerState()
@@ -1185,7 +1294,7 @@ namespace NoclipProtocol
             }
         }
         // The spawn room's own working ceiling lights (the forward base's room): they light you like any other.
-        if (m_settings.m_style == 0 && !m_mainMenu)
+        if (m_settings.m_style == 0 && m_settings.m_catalog < 0 && !m_mainMenu)
         {
             for (const auto& lamp : Base::Get().m_roomLights)
             {
@@ -1225,9 +1334,24 @@ namespace NoclipProtocol
         static const char* const titles[] = { "LEVEL 0", "LEVEL 1", "LEVEL 2", "SITE-[REDACTED]" };
         static const char* const subtitles[] = { "THE LOBBY · UNSTABLE", "HABITABLE ZONE · DAMP", "PIPE DREAMS · HOT",
                                                  "SUBLEVEL 4 · BREACH 4-A" };
-        const int style = AZStd::clamp(m_settings.m_style, 0, 3);
-        registry->Set("/NoclipProtocol/Hud/level.title", AZStd::string(titles[style]));
-        registry->Set("/NoclipProtocol/Hud/level.subtitle", AZStd::string(subtitles[style]));
+        if (m_settings.m_catalog >= 0)
+        {
+            const Catalog::Level& level = Catalog::Levels[m_settings.m_catalog];
+            static const char* const moods[5] = { "BRIGHT", "QUIET", "DIM", "DARK", "NO LIGHT" };
+            static const char* const danger[6] = { "", "CALM", "UNEASY", "HOSTILE", "DANGEROUS", "DEADLY" };
+            AZStd::string name = level.m_name;
+            for (char& ch : name) { ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch))); }
+            registry->Set("/NoclipProtocol/Hud/level.title", AZStd::string::format("LEVEL %d", level.m_number));
+            registry->Set("/NoclipProtocol/Hud/level.subtitle",
+                AZStd::string::format("%s \xc2\xb7 %s", name.c_str(), level.m_danger >= 4 ? danger[level.m_danger] : moods[m_settings.m_light]));
+            registry->Set("/NoclipProtocol/Hud/level.depth", static_cast<double>(level.m_number + 1));
+        }
+        else
+        {
+            const int style = AZStd::clamp(m_settings.m_style, 0, 3);
+            registry->Set("/NoclipProtocol/Hud/level.title", AZStd::string(titles[style]));
+            registry->Set("/NoclipProtocol/Hud/level.subtitle", AZStd::string(subtitles[style]));
+        }
 
         if (m_settings.m_style == 3)
         {
@@ -1256,7 +1380,7 @@ namespace NoclipProtocol
     void EndlessLevelComponent::StartBuilding()
     {
         // The forward base: Level 0's spawn room (not the main menu's backdrop).
-        m_buildEnabled = m_settings.m_style == 0 && !m_mainMenu && m_settings.m_spawnRoomRadius > 0;
+        m_buildEnabled = m_settings.m_style == 0 && m_settings.m_catalog < 0 && !m_mainMenu && m_settings.m_spawnRoomRadius > 0;
         Base::State& base = Base::Get();
         base.LoadOnce(); // the expedition's stockpile and base (CONTINUE), once per run
         base.m_requests.clear();
@@ -1736,8 +1860,31 @@ namespace NoclipProtocol
                     return;
                 }
                 m_noclipping = true;
-                static const char* const next[] = { "Level1", "Level2", "Level0", "Level0" };
-                const AZStd::string target = !m_noclipTarget.empty() ? m_noclipTarget : AZStd::string(next[AZStd::clamp(m_settings.m_style, 0, 3)]);
+                static const char* const next[] = { "Level1", "Level2", "Backrooms", "Level0" };
+                AZStd::string target = !m_noclipTarget.empty() ? m_noclipTarget : AZStd::string(next[AZStd::clamp(m_settings.m_style, 0, 3)]);
+                if (m_settings.m_catalog >= 0 || (m_noclipTarget.empty() && m_settings.m_style == 2))
+                {
+                    // Deeper: one to four levels on, picked by the tear's place (the same tear always leads to the same
+                    // level). The hubs (The Matrix, The Hub) lead anywhere; The Exit? leads back to the Lobby.
+                    const int from = m_settings.m_catalog >= 0 ? m_settings.m_catalog : 2;
+                    const AZ::u64 h = m_settings.m_seed ^ (static_cast<AZ::u64>(static_cast<AZ::s64>(spot.GetX() * 7.0f)) * 0x9E3779B97F4A7C15ull)
+                                    ^ (static_cast<AZ::u64>(static_cast<AZ::s64>(spot.GetY() * 7.0f)) * 0xC2B2AE3D27D4EB4Full);
+                    const int mixed = static_cast<int>((h ^ (h >> 29)) % 1000003ull);
+                    int to = from + 1 + mixed % 4;
+                    if (from == 12 || from == 52)
+                    {
+                        to = 3 + mixed % (Catalog::LevelCount - 3);
+                    }
+                    if (from == Catalog::LevelCount - 1 || to >= Catalog::LevelCount)
+                    {
+                        to = from == Catalog::LevelCount - 1 ? 0 : Catalog::LevelCount - 1;
+                    }
+                    if (registry)
+                    {
+                        registry->Set("/NoclipProtocol/Level/Number", static_cast<AZ::s64>(to));
+                    }
+                    target = to <= 2 ? AZStd::string::format("Level%d", to) : AZStd::string("Backrooms");
+                }
                 AZ_Printf("NoclipProtocol", "Noclip spot at %.1f %.1f: falling through into %s", spot.GetX(), spot.GetY(), target.c_str());
                 if (registry)
                 {

@@ -156,8 +156,17 @@ namespace NoclipProtocol
         }
 
         // Loads a level on the next frame (loading tears down the HUD's own entity).
-        void LoadLevelLater(const AZStd::string& level)
+        void LoadLevelLater(AZStd::string level)
         {
+            // "Backrooms:37": a catalog level, played in the Backrooms level with its number set first.
+            if (level.starts_with("Backrooms:"))
+            {
+                if (auto* registry = AZ::SettingsRegistry::Get())
+                {
+                    registry->Set("/NoclipProtocol/Level/Number", static_cast<AZ::s64>(std::atoi(level.substr(10).c_str())));
+                }
+                level = "Backrooms";
+            }
             AZ::TickBus::QueueFunction([level]()
             {
                 if (auto* console = AZ::Interface<AZ::IConsole>::Get())
@@ -173,6 +182,10 @@ namespace NoclipProtocol
             if (level.size() == 6 && level.substr(0, 5) == "Level")
             {
                 return AZStd::string("Level ") + level.substr(5);
+            }
+            if (level.starts_with("Backrooms:"))
+            {
+                return AZStd::string("Level ") + level.substr(10);
             }
             return level == "Intro" ? AZStd::string("Sublevel 4") : level;
         }

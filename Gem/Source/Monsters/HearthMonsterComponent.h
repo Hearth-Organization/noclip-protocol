@@ -47,6 +47,29 @@ namespace NoclipProtocol
             m_health = kind == "Faceling" ? 90.0f : (kind == "Scp096" || kind == "Scp106" || kind == "Scp173") ? 1.0e9f
                      : kind == "Hound" ? 70.0f : kind == "Wretch" ? 60.0f : kind == "Skinstealer" ? 200.0f : kind == "Staff3008" ? 120.0f
                      : kind == "Scp939" ? 300.0f : kind == "Clump" ? 400.0f : kind == "Deathmoth" ? 25.0f : 160.0f;
+            // The catalog levels' own monsters (Nov 27): speed, sight, hearing, health. Not listed: the defaults above.
+            struct Stats { const char* kind; float speed, sight, hearing, health; };
+            static const Stats more[] = {
+                { "Partygoer", 3.8f, 16.0f, 10.0f, 150.0f }, { "Dancer", 2.5f, 12.0f, 8.0f, 140.0f },
+                { "Scp049", 2.0f, 14.0f, 10.0f, 1.0e9f },    { "Scarecrow", 4.6f, 8.0f, 6.0f, 180.0f },
+                { "Diver", 1.6f, 10.0f, 12.0f, 260.0f },     { "Burnt", 3.0f, 12.0f, 9.0f, 110.0f },
+                { "Patient", 3.6f, 11.0f, 12.0f, 90.0f },    { "Nurse", 2.4f, 12.0f, 8.0f, 120.0f },
+                { "Clown", 4.0f, 15.0f, 10.0f, 160.0f },     { "Miner", 2.2f, 9.0f, 14.0f, 170.0f },
+                { "Frostwraith", 3.2f, 14.0f, 8.0f, 200.0f }, { "Farmthing", 3.5f, 10.0f, 12.0f, 220.0f },
+                { "Crawler", 6.0f, 12.0f, 16.0f, 130.0f },
+                { "Doll", 5.0f, 30.0f, 0.0f, 1.0e9f },       { "Mannequin", 6.0f, 30.0f, 0.0f, 1.0e9f },
+                { "Plush", 3.0f, 30.0f, 0.0f, 1.0e9f },      { "Watcher", 0.0f, 25.0f, 0.0f, 1.0e9f },
+            };
+            for (const Stats& stats : more)
+            {
+                if (kind == stats.kind)
+                {
+                    m_speed = stats.speed;
+                    m_sight = stats.sight;
+                    m_hearing = stats.hearing;
+                    m_health = stats.health;
+                }
+            }
             if (kind == "Smiler")
             {
                 m_speed = 4.2f;   // hunting: a run; it wanders at 40 % (a walk)

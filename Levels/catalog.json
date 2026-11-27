@@ -8,6 +8,58 @@
     "water": "Flooded rooms and pools: wade, swim, never see the bottom",
     "stairs": "Shafts, stairwells and drops: levels stacked on levels"
   },
+  "kinds": [
+    "Smiler",
+    "Faceling",
+    "Scp096",
+    "Scp106",
+    "Scp173",
+    "Hound",
+    "Wretch",
+    "Skinstealer",
+    "Staff3008",
+    "Scp939",
+    "Clump",
+    "Deathmoth",
+    "Partygoer",
+    "Dancer",
+    "Scp049",
+    "Scarecrow",
+    "Diver",
+    "Burnt",
+    "Patient",
+    "Nurse",
+    "Clown",
+    "Miner",
+    "Frostwraith",
+    "Farmthing",
+    "Crawler",
+    "Doll",
+    "Mannequin",
+    "Watcher",
+    "Plush"
+  ],
+  "surfaces": [
+    "brick",
+    "carpet",
+    "ceilingtile",
+    "concrete",
+    "dirt",
+    "flesh",
+    "glass",
+    "grass",
+    "hedge",
+    "metal",
+    "plaster",
+    "rock",
+    "sand",
+    "sky",
+    "snow",
+    "tile",
+    "wallpaper",
+    "water",
+    "wood"
+  ],
   "levels": [
     {
       "number": 0,
@@ -24,7 +76,23 @@
         "Scp096",
         "Scp173"
       ],
-      "note": "Where every expedition starts; the base is built here"
+      "note": "Where every expedition starts; the base is built here",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        0.95,
+        0.7
+      ],
+      "light_color": [
+        0.92,
+        0.97,
+        1.0
+      ]
     },
     {
       "number": 1,
@@ -42,7 +110,23 @@
         "Scp939",
         "Smiler"
       ],
-      "note": "Supply crates turn up most often here"
+      "note": "Supply crates turn up most often here",
+      "surfaces": {
+        "wall": "concrete",
+        "floor": "concrete",
+        "ceiling": "concrete",
+        "pillar": "concrete"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 2,
@@ -58,7 +142,23 @@
         "Scp106",
         "Smiler"
       ],
-      "note": "Burning pipes hurt; valves can be shut"
+      "note": "Burning pipes hurt; valves can be shut",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 3,
@@ -73,7 +173,23 @@
         "Skinstealer",
         "Smiler"
       ],
-      "note": "Live wires; the hum hides footsteps (monsters hear less, so do you)"
+      "note": "Live wires; the hum hides footsteps (monsters hear less, so do you)",
+      "surfaces": {
+        "wall": "brick",
+        "floor": "concrete",
+        "ceiling": "concrete",
+        "pillar": "brick"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 4,
@@ -86,7 +202,23 @@
       "monsters": [
         "Faceling"
       ],
-      "note": "Quiet: water coolers of Almond Water, good for a first outpost"
+      "note": "Quiet: water coolers of Almond Water, good for a first outpost",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.92,
+        0.97,
+        1.0
+      ]
     },
     {
       "number": 5,
@@ -101,7 +233,23 @@
         "Wretch",
         "Smiler"
       ],
-      "note": "Some room doors open onto other rooms of the same hotel"
+      "note": "Some room doors open onto other rooms of the same hotel",
+      "surfaces": {
+        "wall": "wood",
+        "floor": "wood",
+        "ceiling": "plaster",
+        "pillar": "wood"
+      },
+      "tint": [
+        1.0,
+        0.45,
+        0.42
+      ],
+      "light_color": [
+        1.0,
+        0.25,
+        0.2
+      ]
     },
     {
       "number": 6,
@@ -115,7 +263,23 @@
         "Smiler",
         "Deathmoth"
       ],
-      "note": "Flashlight only; Smilers everywhere you aren't looking"
+      "note": "Flashlight only; Smilers everywhere you aren't looking",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        0.35,
+        0.33,
+        0.32
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 7,
@@ -126,9 +290,26 @@
       "light": "dark",
       "danger": 4,
       "monsters": [
-        "Deathmoth"
+        "Deathmoth",
+        "Diver"
       ],
-      "note": "Swim through; something big moves below (never seen)"
+      "note": "Swim through; something big moves below (never seen)",
+      "surfaces": {
+        "wall": "tile",
+        "floor": "water",
+        "ceiling": "plaster",
+        "pillar": "tile"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 8,
@@ -141,9 +322,27 @@
       "monsters": [
         "Hound",
         "Scp939",
-        "Clump"
+        "Clump",
+        "Miner",
+        "Crawler"
       ],
-      "note": "Echoes: shots carry twice as far"
+      "note": "Echoes: shots carry twice as far",
+      "surfaces": {
+        "wall": "rock",
+        "floor": "rock",
+        "ceiling": "rock",
+        "pillar": "rock"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 9,
@@ -158,7 +357,23 @@
         "Hound",
         "Faceling"
       ],
-      "note": "Houses are rooms to search; never stay out after the streetlights die"
+      "note": "Houses are rooms to search; never stay out after the streetlights die",
+      "surfaces": {
+        "wall": "concrete",
+        "floor": "grass",
+        "ceiling": "sky",
+        "pillar": "concrete"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.55,
+        0.7,
+        1.0
+      ]
     },
     {
       "number": 10,
@@ -169,7 +384,23 @@
       "light": "bright",
       "danger": 1,
       "monsters": [],
-      "note": "Safe and calm; crops and water: farmland for the base"
+      "note": "Safe and calm; crops and water: farmland for the base",
+      "surfaces": {
+        "wall": "wood",
+        "floor": "grass",
+        "ceiling": "sky",
+        "pillar": "wood"
+      },
+      "tint": [
+        0.8,
+        0.8,
+        0.82
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 11,
@@ -183,7 +414,23 @@
         "Wretch",
         "Faceling"
       ],
-      "note": "Shops to loot; climbing a tower shows the city never ends"
+      "note": "Shops to loot; climbing a tower shows the city never ends",
+      "surfaces": {
+        "wall": "concrete",
+        "floor": "concrete",
+        "ceiling": "sky",
+        "pillar": "concrete"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 12,
@@ -194,7 +441,23 @@
       "light": "normal",
       "danger": 1,
       "monsters": [],
-      "note": "A crossroads: each door opens onto another level"
+      "note": "A crossroads: each door opens onto another level",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "concrete",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 13,
@@ -208,7 +471,23 @@
         "Faceling",
         "Skinstealer"
       ],
-      "note": "Kitchens with food in the fridges"
+      "note": "Kitchens with food in the fridges",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 14,
@@ -221,7 +500,23 @@
       "monsters": [
         "Staff3008"
       ],
-      "note": "Day: the staff ignore you. Night (lights go out): they hunt. Beds and food everywhere"
+      "note": "Day: the staff ignore you. Night (lights go out): they hunt. Beds and food everywhere",
+      "surfaces": {
+        "wall": "concrete",
+        "floor": "concrete",
+        "ceiling": "concrete",
+        "pillar": "concrete"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 15,
@@ -234,9 +529,26 @@
       "monsters": [
         "Scp173",
         "Scp106",
-        "Scp939"
+        "Scp939",
+        "Scp049"
       ],
-      "note": "Foundation lockers and dead MTF with gear; SCP items to recover"
+      "note": "Foundation lockers and dead MTF with gear; SCP items to recover",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        0.45,
+        0.42
+      ],
+      "light_color": [
+        1.0,
+        0.25,
+        0.2
+      ]
     },
     {
       "number": 16,
@@ -249,7 +561,23 @@
       "monsters": [
         "Scp106"
       ],
-      "note": "Where 106 drags you: one way out, 60 seconds"
+      "note": "Where 106 drags you: one way out, 60 seconds",
+      "surfaces": {
+        "wall": "rock",
+        "floor": "rock",
+        "ceiling": "rock",
+        "pillar": "rock"
+      },
+      "tint": [
+        0.35,
+        0.33,
+        0.32
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 17,
@@ -263,7 +591,23 @@
         "Hound",
         "Wretch"
       ],
-      "note": "Cars to search; a horn sounds somewhere and draws monsters"
+      "note": "Cars to search; a horn sounds somewhere and draws monsters",
+      "surfaces": {
+        "wall": "concrete",
+        "floor": "concrete",
+        "ceiling": "concrete",
+        "pillar": "concrete"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 18,
@@ -274,9 +618,27 @@
       "light": "bright",
       "danger": 3,
       "monsters": [
-        "Faceling"
+        "Faceling",
+        "Doll",
+        "Plush"
       ],
-      "note": "Toys move when you aren't looking"
+      "note": "Toys move when you aren't looking",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 19,
@@ -289,7 +651,23 @@
       "monsters": [
         "Deathmoth"
       ],
-      "note": "Terminals that show the Foundation's lost camera feeds"
+      "note": "Terminals that show the Foundation's lost camera feeds",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        0.7,
+        0.8,
+        1.0
+      ],
+      "light_color": [
+        0.55,
+        0.7,
+        1.0
+      ]
     },
     {
       "number": 20,
@@ -301,9 +679,27 @@
       "danger": 3,
       "monsters": [
         "Faceling",
-        "Skinstealer"
+        "Skinstealer",
+        "Scp049",
+        "Nurse"
       ],
-      "note": "Medkits are common here"
+      "note": "Medkits are common here",
+      "surfaces": {
+        "wall": "tile",
+        "floor": "tile",
+        "ceiling": "plaster",
+        "pillar": "tile"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.92,
+        0.97,
+        1.0
+      ]
     },
     {
       "number": 21,
@@ -315,9 +711,26 @@
       "danger": 3,
       "monsters": [
         "Clump",
-        "Wretch"
+        "Wretch",
+        "Diver"
       ],
-      "note": "Slow going; sounds of splashing behind you"
+      "note": "Slow going; sounds of splashing behind you",
+      "surfaces": {
+        "wall": "concrete",
+        "floor": "water",
+        "ceiling": "concrete",
+        "pillar": "concrete"
+      },
+      "tint": [
+        0.35,
+        0.33,
+        0.32
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 22,
@@ -329,9 +742,26 @@
       "danger": 2,
       "monsters": [
         "Wretch",
-        "Faceling"
+        "Faceling",
+        "Mannequin"
       ],
-      "note": "Shops to loot; the music still plays"
+      "note": "Shops to loot; the music still plays",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 23,
@@ -344,7 +774,23 @@
       "monsters": [
         "Wretch"
       ],
-      "note": "Each door: a short room; the floor number counts on and on"
+      "note": "Each door: a short room; the floor number counts on and on",
+      "surfaces": {
+        "wall": "concrete",
+        "floor": "concrete",
+        "ceiling": "concrete",
+        "pillar": "concrete"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 24,
@@ -356,9 +802,26 @@
       "danger": 4,
       "monsters": [
         "Clump",
-        "Hound"
+        "Hound",
+        "Burnt"
       ],
-      "note": "Heat drains stamina"
+      "note": "Heat drains stamina",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "concrete",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        0.85,
+        0.6,
+        0.45
+      ],
+      "light_color": [
+        1.0,
+        0.7,
+        0.4
+      ]
     },
     {
       "number": 25,
@@ -369,7 +832,23 @@
       "light": "normal",
       "danger": 1,
       "monsters": [],
-      "note": "Food can be grown here"
+      "note": "Food can be grown here",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "grass",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.92,
+        0.97,
+        1.0
+      ]
     },
     {
       "number": 26,
@@ -381,9 +860,26 @@
       "danger": 3,
       "monsters": [
         "Faceling",
-        "Smiler"
+        "Smiler",
+        "Dancer"
       ],
-      "note": "Sitting in the front row starts the show"
+      "note": "Sitting in the front row starts the show",
+      "surfaces": {
+        "wall": "wood",
+        "floor": "wood",
+        "ceiling": "plaster",
+        "pillar": "wood"
+      },
+      "tint": [
+        1.0,
+        0.45,
+        0.42
+      ],
+      "light_color": [
+        1.0,
+        0.25,
+        0.2
+      ]
     },
     {
       "number": 27,
@@ -394,7 +890,23 @@
       "light": "normal",
       "danger": 1,
       "monsters": [],
-      "note": "Clothes to swap; quiet place to rest"
+      "note": "Clothes to swap; quiet place to rest",
+      "surfaces": {
+        "wall": "tile",
+        "floor": "tile",
+        "ceiling": "plaster",
+        "pillar": "tile"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 28,
@@ -408,7 +920,23 @@
         "Faceling",
         "Wretch"
       ],
-      "note": "Chalkboards hold notes from earlier agents"
+      "note": "Chalkboards hold notes from earlier agents",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 29,
@@ -421,7 +949,23 @@
       "monsters": [
         "Deathmoth"
       ],
-      "note": "Documents that unlock research"
+      "note": "Documents that unlock research",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 30,
@@ -434,7 +978,23 @@
       "monsters": [
         "Hound"
       ],
-      "note": "Nowhere to hide; you can see what's coming"
+      "note": "Nowhere to hide; you can see what's coming",
+      "surfaces": {
+        "wall": "concrete",
+        "floor": "concrete",
+        "ceiling": "sky",
+        "pillar": "concrete"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.92,
+        0.97,
+        1.0
+      ]
     },
     {
       "number": 31,
@@ -447,7 +1007,23 @@
       "monsters": [
         "Skinstealer"
       ],
-      "note": "Every room number is your own agent number"
+      "note": "Every room number is your own agent number",
+      "surfaces": {
+        "wall": "wood",
+        "floor": "wood",
+        "ceiling": "plaster",
+        "pillar": "wood"
+      },
+      "tint": [
+        0.9,
+        0.7,
+        1.0
+      ],
+      "light_color": [
+        0.55,
+        0.7,
+        1.0
+      ]
     },
     {
       "number": 32,
@@ -460,7 +1036,23 @@
       "monsters": [
         "Wretch"
       ],
-      "note": "Supplies; a working radio to call the Foundation"
+      "note": "Supplies; a working radio to call the Foundation",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 33,
@@ -471,9 +1063,26 @@
       "light": "dim",
       "danger": 2,
       "monsters": [
-        "Smiler"
+        "Smiler",
+        "Clown"
       ],
-      "note": "Machines still work; one high score has your name"
+      "note": "Machines still work; one high score has your name",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        0.9,
+        0.7,
+        1.0
+      ],
+      "light_color": [
+        0.85,
+        0.55,
+        1.0
+      ]
     },
     {
       "number": 34,
@@ -487,7 +1096,23 @@
         "Wretch",
         "Faceling"
       ],
-      "note": "Board the train: it goes to another level"
+      "note": "Board the train: it goes to another level",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 35,
@@ -500,7 +1125,23 @@
       "monsters": [
         "Clump"
       ],
-      "note": "Herbs for medicine"
+      "note": "Herbs for medicine",
+      "surfaces": {
+        "wall": "glass",
+        "floor": "tile",
+        "ceiling": "plaster",
+        "pillar": "glass"
+      },
+      "tint": [
+        0.8,
+        1.0,
+        0.8
+      ],
+      "light_color": [
+        0.6,
+        1.0,
+        0.6
+      ]
     },
     {
       "number": 36,
@@ -512,9 +1153,26 @@
       "danger": 3,
       "monsters": [
         "Smiler",
-        "Deathmoth"
+        "Deathmoth",
+        "Crawler"
       ],
-      "note": "Crouch to move"
+      "note": "Crouch to move",
+      "surfaces": {
+        "wall": "wood",
+        "floor": "wood",
+        "ceiling": "plaster",
+        "pillar": "wood"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 37,
@@ -525,7 +1183,23 @@
       "light": "bright",
       "danger": 1,
       "monsters": [],
-      "note": "Calm, almost no monsters, and still the most unsettling place you've been"
+      "note": "Calm, almost no monsters, and still the most unsettling place you've been",
+      "surfaces": {
+        "wall": "tile",
+        "floor": "water",
+        "ceiling": "plaster",
+        "pillar": "tile"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.92,
+        0.97,
+        1.0
+      ]
     },
     {
       "number": 38,
@@ -536,9 +1210,26 @@
       "light": "normal",
       "danger": 3,
       "monsters": [
-        "Faceling"
+        "Faceling",
+        "Dancer"
       ],
-      "note": "Dancers appear if you stand still too long"
+      "note": "Dancers appear if you stand still too long",
+      "surfaces": {
+        "wall": "wood",
+        "floor": "wood",
+        "ceiling": "plaster",
+        "pillar": "wood"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.7,
+        0.4
+      ]
     },
     {
       "number": 39,
@@ -549,9 +1240,26 @@
       "light": "dim",
       "danger": 3,
       "monsters": [
-        "Hound"
+        "Hound",
+        "Frostwraith"
       ],
-      "note": "Cold drains health away from fire"
+      "note": "Cold drains health away from fire",
+      "surfaces": {
+        "wall": "plaster",
+        "floor": "snow",
+        "ceiling": "sky",
+        "pillar": "plaster"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.92,
+        0.97,
+        1.0
+      ]
     },
     {
       "number": 40,
@@ -565,7 +1273,23 @@
         "Smiler",
         "Skinstealer"
       ],
-      "note": "Sanity drains slowly here"
+      "note": "Sanity drains slowly here",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        0.45,
+        0.42
+      ],
+      "light_color": [
+        1.0,
+        0.25,
+        0.2
+      ]
     },
     {
       "number": 41,
@@ -578,7 +1302,23 @@
       "monsters": [
         "Wretch"
       ],
-      "note": "Lots of food, but some of it moves"
+      "note": "Lots of food, but some of it moves",
+      "surfaces": {
+        "wall": "tile",
+        "floor": "tile",
+        "ceiling": "plaster",
+        "pillar": "tile"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 42,
@@ -589,7 +1329,23 @@
       "light": "dim",
       "danger": 1,
       "monsters": [],
-      "note": "Somewhere here is a book with the way out"
+      "note": "Somewhere here is a book with the way out",
+      "surfaces": {
+        "wall": "wood",
+        "floor": "wood",
+        "ceiling": "plaster",
+        "pillar": "wood"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 43,
@@ -603,7 +1359,23 @@
         "Clump",
         "Wretch"
       ],
-      "note": "The floor tilts now and then"
+      "note": "The floor tilts now and then",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        0.85,
+        0.6,
+        0.45
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 44,
@@ -616,7 +1388,23 @@
       "monsters": [
         "Faceling"
       ],
-      "note": "The photos change"
+      "note": "The photos change",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 45,
@@ -630,7 +1418,23 @@
         "Hound",
         "Wretch"
       ],
-      "note": "Falls hurt; building materials for the base"
+      "note": "Falls hurt; building materials for the base",
+      "surfaces": {
+        "wall": "concrete",
+        "floor": "concrete",
+        "ceiling": "sky",
+        "pillar": "concrete"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 46,
@@ -643,7 +1447,23 @@
       "monsters": [
         "Faceling"
       ],
-      "note": ""
+      "note": "",
+      "surfaces": {
+        "wall": "wood",
+        "floor": "wood",
+        "ceiling": "plaster",
+        "pillar": "wood"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 47,
@@ -657,7 +1477,23 @@
         "Hound",
         "Scp939"
       ],
-      "note": "A train comes through every few minutes"
+      "note": "A train comes through every few minutes",
+      "surfaces": {
+        "wall": "brick",
+        "floor": "concrete",
+        "ceiling": "concrete",
+        "pillar": "brick"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 48,
@@ -668,7 +1504,23 @@
       "light": "bright",
       "danger": 2,
       "monsters": [],
-      "note": "Peaceful until it isn't"
+      "note": "Peaceful until it isn't",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        0.85,
+        0.95
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 49,
@@ -679,9 +1531,26 @@
       "light": "dim",
       "danger": 3,
       "monsters": [
-        "Wretch"
+        "Wretch",
+        "Frostwraith"
       ],
-      "note": "Cold; food that keeps"
+      "note": "Cold; food that keeps",
+      "surfaces": {
+        "wall": "plaster",
+        "floor": "snow",
+        "ceiling": "plaster",
+        "pillar": "plaster"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.92,
+        0.97,
+        1.0
+      ]
     },
     {
       "number": 50,
@@ -693,9 +1562,26 @@
       "danger": 5,
       "monsters": [
         "Smiler",
-        "Skinstealer"
+        "Skinstealer",
+        "Partygoer"
       ],
-      "note": "The Partygoers want you to stay. Don't."
+      "note": "The Partygoers want you to stay. Don't.",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 51,
@@ -710,7 +1596,23 @@
         "Clump",
         "Smiler"
       ],
-      "note": "Arrive running; stop and die"
+      "note": "Arrive running; stop and die",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "concrete",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        0.45,
+        0.42
+      ],
+      "light_color": [
+        1.0,
+        0.25,
+        0.2
+      ]
     },
     {
       "number": 52,
@@ -721,7 +1623,23 @@
       "light": "normal",
       "danger": 1,
       "monsters": [],
-      "note": "A safe crossroads; outposts here link levels"
+      "note": "A safe crossroads; outposts here link levels",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "concrete",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 53,
@@ -732,9 +1650,26 @@
       "light": "normal",
       "danger": 3,
       "monsters": [
-        "Faceling"
+        "Faceling",
+        "Watcher"
       ],
-      "note": "Don't look through the windows for long"
+      "note": "Don't look through the windows for long",
+      "surfaces": {
+        "wall": "glass",
+        "floor": "concrete",
+        "ceiling": "sky",
+        "pillar": "glass"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 54,
@@ -745,7 +1680,23 @@
       "light": "dim",
       "danger": 2,
       "monsters": [],
-      "note": "Praying restores sanity a little"
+      "note": "Praying restores sanity a little",
+      "surfaces": {
+        "wall": "wood",
+        "floor": "wood",
+        "ceiling": "plaster",
+        "pillar": "wood"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.7,
+        0.4
+      ]
     },
     {
       "number": 55,
@@ -756,9 +1707,26 @@
       "light": "normal",
       "danger": 3,
       "monsters": [
-        "Skinstealer"
+        "Skinstealer",
+        "Mannequin"
       ],
-      "note": "One reflection is not yours"
+      "note": "One reflection is not yours",
+      "surfaces": {
+        "wall": "glass",
+        "floor": "tile",
+        "ceiling": "plaster",
+        "pillar": "glass"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 56,
@@ -769,9 +1737,26 @@
       "light": "dark",
       "danger": 4,
       "monsters": [
-        "Deathmoth"
+        "Deathmoth",
+        "Diver"
       ],
-      "note": "Water and power: careful"
+      "note": "Water and power: careful",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "water",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.55,
+        0.7,
+        1.0
+      ]
     },
     {
       "number": 57,
@@ -785,7 +1770,23 @@
         "Hound",
         "Wretch"
       ],
-      "note": "Containers to open: supplies or worse"
+      "note": "Containers to open: supplies or worse",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "sky",
+        "pillar": "metal"
+      },
+      "tint": [
+        0.35,
+        0.33,
+        0.32
+      ],
+      "light_color": [
+        0.55,
+        0.7,
+        1.0
+      ]
     },
     {
       "number": 58,
@@ -799,7 +1800,23 @@
         "Clump",
         "Wretch"
       ],
-      "note": "Machines crush; scrap for the base"
+      "note": "Machines crush; scrap for the base",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 59,
@@ -812,7 +1829,23 @@
       "monsters": [
         "Hound"
       ],
-      "note": "Walls of hedge you can't see over"
+      "note": "Walls of hedge you can't see over",
+      "surfaces": {
+        "wall": "hedge",
+        "floor": "dirt",
+        "ceiling": "sky",
+        "pillar": "hedge"
+      },
+      "tint": [
+        0.8,
+        0.8,
+        0.82
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 60,
@@ -824,9 +1857,26 @@
       "danger": 4,
       "monsters": [
         "Skinstealer",
-        "Wretch"
+        "Wretch",
+        "Patient"
       ],
-      "note": "Some cells lock behind you"
+      "note": "Some cells lock behind you",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 61,
@@ -837,7 +1887,23 @@
       "light": "dark",
       "danger": 1,
       "monsters": [],
-      "note": "Looking through it shows the Foundation base"
+      "note": "Looking through it shows the Foundation base",
+      "surfaces": {
+        "wall": "glass",
+        "floor": "tile",
+        "ceiling": "plaster",
+        "pillar": "glass"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 62,
@@ -848,9 +1914,26 @@
       "light": "dim",
       "danger": 3,
       "monsters": [
-        "Clump"
+        "Clump",
+        "Diver"
       ],
-      "note": "Slides are fast ways down"
+      "note": "Slides are fast ways down",
+      "surfaces": {
+        "wall": "tile",
+        "floor": "water",
+        "ceiling": "plaster",
+        "pillar": "tile"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 63,
@@ -864,7 +1947,23 @@
         "Wretch",
         "Hound"
       ],
-      "note": ""
+      "note": "",
+      "surfaces": {
+        "wall": "brick",
+        "floor": "concrete",
+        "ceiling": "concrete",
+        "pillar": "brick"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 64,
@@ -877,7 +1976,23 @@
       "monsters": [
         "Deathmoth"
       ],
-      "note": "Fall and you're in another level"
+      "note": "Fall and you're in another level",
+      "surfaces": {
+        "wall": "concrete",
+        "floor": "dirt",
+        "ceiling": "sky",
+        "pillar": "concrete"
+      },
+      "tint": [
+        0.35,
+        0.33,
+        0.32
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 65,
@@ -889,9 +2004,26 @@
       "danger": 4,
       "monsters": [
         "Faceling",
-        "Smiler"
+        "Smiler",
+        "Doll"
       ],
-      "note": "They turn their heads to follow you"
+      "note": "They turn their heads to follow you",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 66,
@@ -904,7 +2036,23 @@
       "monsters": [
         "Scp939"
       ],
-      "note": "939 learns voices here"
+      "note": "939 learns voices here",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 67,
@@ -917,7 +2065,23 @@
       "monsters": [
         "Hound"
       ],
-      "note": "Water runs out fast"
+      "note": "Water runs out fast",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "sand",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 68,
@@ -930,7 +2094,23 @@
       "monsters": [
         "Scp173"
       ],
-      "note": "Statues everywhere: one of them is 173"
+      "note": "Statues everywhere: one of them is 173",
+      "surfaces": {
+        "wall": "wood",
+        "floor": "wood",
+        "ceiling": "plaster",
+        "pillar": "wood"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 69,
@@ -944,7 +2124,23 @@
         "Clump",
         "Skinstealer"
       ],
-      "note": ""
+      "note": "",
+      "surfaces": {
+        "wall": "flesh",
+        "floor": "flesh",
+        "ceiling": "flesh",
+        "pillar": "flesh"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 70,
@@ -956,9 +2152,26 @@
       "danger": 3,
       "monsters": [
         "Hound",
-        "Skinstealer"
+        "Skinstealer",
+        "Scarecrow"
       ],
-      "note": "Firewood and shelter"
+      "note": "Firewood and shelter",
+      "surfaces": {
+        "wall": "hedge",
+        "floor": "dirt",
+        "ceiling": "sky",
+        "pillar": "hedge"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.55,
+        0.7,
+        1.0
+      ]
     },
     {
       "number": 71,
@@ -969,9 +2182,26 @@
       "light": "dark",
       "danger": 3,
       "monsters": [
-        "Clump"
+        "Clump",
+        "Diver"
       ],
-      "note": "Row across to the far shore"
+      "note": "Row across to the far shore",
+      "surfaces": {
+        "wall": "rock",
+        "floor": "water",
+        "ceiling": "rock",
+        "pillar": "rock"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 72,
@@ -982,7 +2212,23 @@
       "light": "dim",
       "danger": 2,
       "monsters": [],
-      "note": "Time runs strange here: sanity holds still"
+      "note": "Time runs strange here: sanity holds still",
+      "surfaces": {
+        "wall": "wood",
+        "floor": "wood",
+        "ceiling": "plaster",
+        "pillar": "wood"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 73,
@@ -995,7 +2241,23 @@
       "monsters": [
         "Smiler"
       ],
-      "note": "The film shows where monsters are"
+      "note": "The film shows where monsters are",
+      "surfaces": {
+        "wall": "wood",
+        "floor": "wood",
+        "ceiling": "plaster",
+        "pillar": "wood"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 74,
@@ -1008,7 +2270,23 @@
       "monsters": [
         "Wretch"
       ],
-      "note": "Clean water"
+      "note": "Clean water",
+      "surfaces": {
+        "wall": "tile",
+        "floor": "tile",
+        "ceiling": "plaster",
+        "pillar": "tile"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 75,
@@ -1021,7 +2299,23 @@
       "monsters": [
         "Deathmoth"
       ],
-      "note": "Ride an elevator: another level"
+      "note": "Ride an elevator: another level",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 76,
@@ -1033,9 +2327,27 @@
       "danger": 3,
       "monsters": [
         "Skinstealer",
-        "Hound"
+        "Hound",
+        "Scarecrow",
+        "Farmthing"
       ],
-      "note": "Livestock-like things to keep at the base?"
+      "note": "Livestock-like things to keep at the base?",
+      "surfaces": {
+        "wall": "wood",
+        "floor": "grass",
+        "ceiling": "sky",
+        "pillar": "wood"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.7,
+        0.4
+      ]
     },
     {
       "number": 77,
@@ -1048,7 +2360,23 @@
       "monsters": [
         "Scp939"
       ],
-      "note": "Orders and intel; an MTF radio"
+      "note": "Orders and intel; an MTF radio",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 78,
@@ -1060,9 +2388,26 @@
       "danger": 4,
       "monsters": [
         "Smiler",
-        "Faceling"
+        "Faceling",
+        "Clown"
       ],
-      "note": "Win a prize: a rare item"
+      "note": "Win a prize: a rare item",
+      "surfaces": {
+        "wall": "concrete",
+        "floor": "dirt",
+        "ceiling": "sky",
+        "pillar": "concrete"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.55,
+        0.7,
+        1.0
+      ]
     },
     {
       "number": 79,
@@ -1075,7 +2420,23 @@
       "monsters": [
         "Hound"
       ],
-      "note": ""
+      "note": "",
+      "surfaces": {
+        "wall": "glass",
+        "floor": "tile",
+        "ceiling": "plaster",
+        "pillar": "glass"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 80,
@@ -1088,9 +2449,28 @@
       "monsters": [
         "Skinstealer",
         "Faceling",
-        "Scp106"
+        "Scp106",
+        "Scp049",
+        "Patient",
+        "Nurse"
       ],
-      "note": "Sanity drains fast"
+      "note": "Sanity drains fast",
+      "surfaces": {
+        "wall": "tile",
+        "floor": "tile",
+        "ceiling": "plaster",
+        "pillar": "tile"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 81,
@@ -1101,7 +2481,23 @@
       "light": "normal",
       "danger": 2,
       "monsters": [],
-      "note": "Rest here"
+      "note": "Rest here",
+      "surfaces": {
+        "wall": "tile",
+        "floor": "water",
+        "ceiling": "plaster",
+        "pillar": "tile"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.7,
+        0.4
+      ]
     },
     {
       "number": 82,
@@ -1112,9 +2508,27 @@
       "light": "bright",
       "danger": 3,
       "monsters": [
-        "Faceling"
+        "Faceling",
+        "Mannequin",
+        "Plush"
       ],
-      "note": ""
+      "note": "",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 83,
@@ -1126,9 +2540,26 @@
       "danger": 3,
       "monsters": [
         "Clump",
-        "Hound"
+        "Hound",
+        "Miner"
       ],
-      "note": "Metal ore for the base"
+      "note": "Metal ore for the base",
+      "surfaces": {
+        "wall": "rock",
+        "floor": "rock",
+        "ceiling": "rock",
+        "pillar": "rock"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.7,
+        0.4
+      ]
     },
     {
       "number": 84,
@@ -1140,9 +2571,26 @@
       "danger": 5,
       "monsters": [
         "Clump",
-        "Wretch"
+        "Wretch",
+        "Crawler"
       ],
-      "note": "Everything here is alive"
+      "note": "Everything here is alive",
+      "surfaces": {
+        "wall": "flesh",
+        "floor": "flesh",
+        "ceiling": "flesh",
+        "pillar": "flesh"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 85,
@@ -1153,7 +2601,23 @@
       "light": "bright",
       "danger": 1,
       "monsters": [],
-      "note": "Boards show where each gate leads"
+      "note": "Boards show where each gate leads",
+      "surfaces": {
+        "wall": "glass",
+        "floor": "tile",
+        "ceiling": "plaster",
+        "pillar": "glass"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 86,
@@ -1167,7 +2631,23 @@
         "Deathmoth",
         "Hound"
       ],
-      "note": "Don't fall"
+      "note": "Don't fall",
+      "surfaces": {
+        "wall": "concrete",
+        "floor": "concrete",
+        "ceiling": "sky",
+        "pillar": "concrete"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 87,
@@ -1179,9 +2659,26 @@
       "danger": 3,
       "monsters": [
         "Scp939",
-        "Skinstealer"
+        "Skinstealer",
+        "Scp049"
       ],
-      "note": "Research data; SCP-500 can turn up"
+      "note": "Research data; SCP-500 can turn up",
+      "surfaces": {
+        "wall": "tile",
+        "floor": "tile",
+        "ceiling": "plaster",
+        "pillar": "tile"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.92,
+        0.97,
+        1.0
+      ]
     },
     {
       "number": 88,
@@ -1194,7 +2691,23 @@
       "monsters": [
         "Smiler"
       ],
-      "note": "The music tells you where monsters are"
+      "note": "The music tells you where monsters are",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 89,
@@ -1208,7 +2721,23 @@
         "Clump",
         "Hound"
       ],
-      "note": ""
+      "note": "",
+      "surfaces": {
+        "wall": "hedge",
+        "floor": "dirt",
+        "ceiling": "sky",
+        "pillar": "hedge"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 90,
@@ -1219,7 +2748,23 @@
       "light": "bright",
       "danger": 2,
       "monsters": [],
-      "note": "No sound, no shadow: sanity drains"
+      "note": "No sound, no shadow: sanity drains",
+      "surfaces": {
+        "wall": "plaster",
+        "floor": "plaster",
+        "ceiling": "plaster",
+        "pillar": "plaster"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.92,
+        0.97,
+        1.0
+      ]
     },
     {
       "number": 91,
@@ -1233,7 +2778,23 @@
         "Wretch",
         "Scp106"
       ],
-      "note": "One stone has your agent's name"
+      "note": "One stone has your agent's name",
+      "surfaces": {
+        "wall": "hedge",
+        "floor": "dirt",
+        "ceiling": "sky",
+        "pillar": "hedge"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.55,
+        0.7,
+        1.0
+      ]
     },
     {
       "number": 92,
@@ -1247,7 +2808,23 @@
         "Deathmoth",
         "Skinstealer"
       ],
-      "note": "Low gravity: jump far"
+      "note": "Low gravity: jump far",
+      "surfaces": {
+        "wall": "metal",
+        "floor": "metal",
+        "ceiling": "metal",
+        "pillar": "metal"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.55,
+        0.7,
+        1.0
+      ]
     },
     {
       "number": 93,
@@ -1258,7 +2835,23 @@
       "light": "bright",
       "danger": 1,
       "monsters": [],
-      "note": "Calm; driftwood and fish"
+      "note": "Calm; driftwood and fish",
+      "surfaces": {
+        "wall": "rock",
+        "floor": "sand",
+        "ceiling": "sky",
+        "pillar": "rock"
+      },
+      "tint": [
+        0.8,
+        0.8,
+        0.82
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 94,
@@ -1271,7 +2864,23 @@
       "monsters": [
         "Faceling"
       ],
-      "note": "The world moves in frames"
+      "note": "The world moves in frames",
+      "surfaces": {
+        "wall": "concrete",
+        "floor": "dirt",
+        "ceiling": "sky",
+        "pillar": "concrete"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 95,
@@ -1283,9 +2892,26 @@
       "danger": 3,
       "monsters": [
         "Wretch",
-        "Smiler"
+        "Smiler",
+        "Burnt"
       ],
-      "note": ""
+      "note": "",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        0.35,
+        0.33,
+        0.32
+      ],
+      "light_color": [
+        1.0,
+        0.7,
+        0.4
+      ]
     },
     {
       "number": 96,
@@ -1297,9 +2923,26 @@
       "danger": 4,
       "monsters": [
         "Clump",
-        "Deathmoth"
+        "Deathmoth",
+        "Crawler"
       ],
-      "note": "Something climbs up the walls"
+      "note": "Something climbs up the walls",
+      "surfaces": {
+        "wall": "rock",
+        "floor": "rock",
+        "ceiling": "rock",
+        "pillar": "rock"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 97,
@@ -1310,9 +2953,26 @@
       "light": "normal",
       "danger": 3,
       "monsters": [
-        "Skinstealer"
+        "Skinstealer",
+        "Doll"
       ],
-      "note": "Memories: sanity heals, then breaks"
+      "note": "Memories: sanity heals, then breaks",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        1.0,
+        0.93,
+        0.8
+      ]
     },
     {
       "number": 98,
@@ -1324,9 +2984,26 @@
       "danger": 4,
       "monsters": [
         "Smiler",
-        "Faceling"
+        "Faceling",
+        "Watcher"
       ],
-      "note": "Walls blink in and out"
+      "note": "Walls blink in and out",
+      "surfaces": {
+        "wall": "wallpaper",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "wallpaper"
+      },
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "light_color": [
+        0.85,
+        0.55,
+        1.0
+      ]
     },
     {
       "number": 99,
@@ -1341,7 +3018,23 @@
         "Scp173",
         "Scp106"
       ],
-      "note": "The last level. Is it really the way out?"
+      "note": "The last level. Is it really the way out?",
+      "surfaces": {
+        "wall": "plaster",
+        "floor": "carpet",
+        "ceiling": "ceilingtile",
+        "pillar": "plaster"
+      },
+      "tint": [
+        0.8,
+        1.0,
+        0.8
+      ],
+      "light_color": [
+        0.6,
+        1.0,
+        0.6
+      ]
     }
   ]
 }

@@ -161,14 +161,148 @@ more = [
 for row in more:
     add(*row)
 
+
+# ---------------------------------------------------------------- the 16 monsters made for these levels (Nov 27)
+NEW_MONSTERS = {
+    "Partygoer": [50], "Dancer": [38, 26], "Scp049": [15, 20, 87, 80], "Scarecrow": [76, 70],
+    "Diver": [7, 21, 56, 71, 62], "Burnt": [95, 24], "Patient": [80, 60], "Nurse": [20, 80],
+    "Clown": [78, 33], "Miner": [83, 8], "Frostwraith": [39, 49], "Farmthing": [76],
+    "Crawler": [8, 36, 96, 84], "Doll": [65, 18, 97], "Mannequin": [22, 55, 82], "Watcher": [53, 98], "Plush": [82, 18],
+}
+
 L.sort(key=lambda r: r["number"])
 assert len(L) == 100 and len({r["number"] for r in L}) == 100, (len(L), sorted(set(range(100)) - {r["number"] for r in L}))
 assert all(r["layout"] in LAYOUTS for r in L)
 
+
+for kind, numbers in NEW_MONSTERS.items():
+    for n in numbers:
+        row = L[n]
+        assert row["number"] == n
+        if kind not in row["monsters"]:
+            row["monsters"].append(kind)
+
+# Every monster kind the game knows, in MonsterSpawnerComponent's order (bit i of a level's mask = kind i).
+KINDS = ["Smiler", "Faceling", "Scp096", "Scp106", "Scp173", "Hound", "Wretch", "Skinstealer", "Staff3008", "Scp939",
+         "Clump", "Deathmoth"] + list(NEW_MONSTERS)
+assert all(m in KINDS for r in L for m in r["monsters"]), sorted({m for r in L for m in r["monsters"]} - set(KINDS))
+
+# ---------------------------------------------------------------- what each level is made of
+# Surfaces (textures made by Tools/Levels/make_catalog_levels.py). Each level gets a wall, floor, ceiling and pillar
+# surface picked from its look by keyword (first match wins), then its layout's default.
+SURFACE_WORDS = [
+    # (words in the look or name, wall, floor, ceiling)
+    (("flesh", "meat"), "flesh", "flesh", "flesh"),
+    (("snow", "frozen", "freezer", "frost", "ice"), "plaster", "snow", "plaster"),
+    (("sand",), "wallpaper", "sand", "ceilingtile"),
+    (("beach",), "rock", "sand", "sky"),
+    (("wheat", "field", "farm", "grass"), "wood", "grass", "sky"),
+    (("forest", "swamp", "graveyard", "hedge", "maze", "overgrown", "vine"), "hedge", "dirt", "sky"),
+    (("pool", "tile", "bathroom", "shower", "hospital", "laundromat", "kitchen", "white room", "lab"), "tile", "tile", "plaster"),
+    (("brick", "electrical", "sewer", "subway", "transformer"), "brick", "concrete", "concrete"),
+    (("rock", "cave", "mine", "lake", "pit"), "rock", "rock", "rock"),
+    (("wood", "attic", "barn", "church", "library", "theatre", "ballroom", "hotel", "cinema", "museum", "clock", "motel"),
+     "wood", "wood", "plaster"),
+    (("metal", "ship", "server", "space", "pipe", "boiler", "factory", "bunker", "elevator", "prison", "train", "docks",
+      "data center", "radio", "foundation"), "metal", "metal", "metal"),
+    (("carpet", "office", "apartment", "arcade", "classroom", "school", "house", "kindergarten", "toy", "home", "mall"),
+     "wallpaper", "carpet", "ceilingtile"),
+    (("concrete", "garage", "parking", "construction", "stair", "rooftop", "city", "plains", "suburb"),
+     "concrete", "concrete", "concrete"),
+    (("glass", "mirror", "greenhouse", "observatory", "airport"), "glass", "tile", "plaster"),
+]
+LAYOUT_SURFACES = {
+    "rooms": ("wallpaper", "carpet", "ceilingtile"), "halls": ("concrete", "concrete", "concrete"),
+    "corridors": ("metal", "concrete", "metal"), "outdoor": ("concrete", "dirt", "sky"),
+    "caves": ("rock", "rock", "rock"), "water": ("tile", "water", "plaster"), "stairs": ("concrete", "concrete", "concrete"),
+}
+# Tints (multiplied over the surface's own colour) and light colours, by keyword.
+TINT_WORDS = [
+    (("red",), (1.0, 0.45, 0.42)), (("yellow", "mono-yellow"), (1.0, 0.95, 0.7)), (("pastel",), (1.0, 0.85, 0.95)),
+    (("blue",), (0.7, 0.8, 1.0)), (("green", "exit"), (0.8, 1.0, 0.8)), (("soot", "burnt", "black", "ash", "charred"), (0.35, 0.33, 0.32)),
+    (("white", "too clean"), (1.0, 1.0, 1.0)), (("rust",), (0.85, 0.6, 0.45)), (("grey", "gray", "overcast"), (0.8, 0.8, 0.82)),
+    (("neon",), (0.9, 0.7, 1.0)),
+]
+LIGHT_WORDS = [
+    (("red",), (1.0, 0.25, 0.2)), (("blue", "led", "server", "space", "night"), (0.55, 0.7, 1.0)),
+    (("green", "exit"), (0.6, 1.0, 0.6)), (("neon", "arcade", "static"), (0.85, 0.55, 1.0)),
+    (("candle", "fire", "furnace", "boiler", "lantern", "hotel", "theatre", "ballroom", "church", "dusk"), (1.0, 0.7, 0.4)),
+    (("fluorescent", "hospital", "lab", "office", "white", "freezer", "snow"), (0.92, 0.97, 1.0)),
+]
+
+
+def pick(text, table, default):
+    import re
+    for words, *value in table:
+        if any(re.search(r"\b" + re.escape(w), text) for w in words):  # whole words ("ice" is not in "office")
+            return value if len(value) > 1 else value[0]
+    return default
+
+
+for row in L:
+    text = (row["name"] + " " + row["look"]).lower()
+    wall, floor, ceiling = pick(text, SURFACE_WORDS, list(LAYOUT_SURFACES[row["layout"]]))
+    if row["layout"] == "water":
+        floor = "water"
+    if row["layout"] == "outdoor":
+        ceiling = "sky"
+    row["surfaces"] = dict(wall=wall, floor=floor, ceiling=ceiling, pillar=wall)
+    row["tint"] = list(pick(text, TINT_WORDS, (1.0, 1.0, 1.0)))
+    row["light_color"] = list(pick(text, LIGHT_WORDS, (1.0, 0.93, 0.8)))
+# Where the keywords pick wrong, by hand (wall, floor, ceiling).
+SURFACE_FIXES = {
+    6: ("wallpaper", "carpet", "ceilingtile"), 9: ("concrete", "grass", "sky"), 18: ("wallpaper", "carpet", "ceilingtile"),
+    19: ("metal", "metal", "metal"), 24: ("metal", "concrete", "metal"), 25: ("wallpaper", "grass", "ceilingtile"),
+    46: ("wood", "wood", "plaster"), 53: ("glass", "concrete", "sky"), 80: ("tile", "tile", "plaster"),
+    90: ("plaster", "plaster", "plaster"), 95: ("wallpaper", "carpet", "ceilingtile"), 99: ("plaster", "carpet", "ceilingtile"),
+}
+for number, (wall, floor, ceiling) in SURFACE_FIXES.items():
+    L[number]["surfaces"] = dict(wall=wall, floor=floor, ceiling=ceiling, pillar=wall)
+SURFACES = sorted({v for r in L for v in r["surfaces"].values()})
+
+LAYOUT_IDS = {name: i for i, name in enumerate(LAYOUTS)}
+LIGHT_IDS = {"bright": 0, "normal": 1, "dim": 2, "dark": 3, "pitch": 4}
+
+
+def write_header(path):
+    """Gem/Source/Level/LevelCatalog.h: the same table for the game (generated: don't edit by hand)."""
+    def c(text):
+        return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    lines = ["// Generated by Levels/catalog.py from the 100-level catalog. Don't edit: change catalog.py and rerun it.",
+             "#pragma once", "", "#include <cstdint>", "", "namespace NoclipProtocol::Catalog", "{",
+             "    // Layouts: " + ", ".join(f"{i} {n}" for n, i in LAYOUT_IDS.items()),
+             "    // Light: 0 bright, 1 normal, 2 dim, 3 dark, 4 pitch black",
+             "    inline constexpr int LevelCount = %d;" % len(L),
+             "    inline constexpr int KindCount = %d;" % len(KINDS),
+             "    inline constexpr const char* Kinds[KindCount] = { " + ", ".join(c(k) for k in KINDS) + " };",
+             "    struct Level",
+             "    {",
+             "        int m_number;",
+             "        const char* m_name;",
+             "        bool m_fan;",
+             "        int m_layout;",
+             "        int m_light;",
+             "        int m_danger;        // 1 calm .. 5 deadly",
+             "        uint32_t m_monsters; // bit i = Kinds[i] lives here",
+             "        float m_lightColor[3];",
+             "        const char* m_note;",
+             "    };",
+             "    inline constexpr Level Levels[LevelCount] = {"]
+    for r in L:
+        mask = sum(1 << KINDS.index(m) for m in r["monsters"])
+        col = ", ".join(f"{v:.2f}f" for v in r["light_color"])
+        lines.append(f"        {{ {r['number']}, {c(r['name'])}, {'true' if r['kind'] == 'fan' else 'false'}, "
+                     f"{LAYOUT_IDS[r['layout']]}, {LIGHT_IDS[r['light']]}, {r['danger']}, 0x{mask:x}u, {{ {col} }}, {c(r['note'])} }},")
+    lines += ["    };", "} // namespace NoclipProtocol::Catalog", ""]
+    with open(path, "w") as f:
+        f.write("\n".join(lines))
+
+
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog.json")
     with open(out, "w") as f:
-        json.dump({"layouts": LAYOUTS, "levels": L}, f, indent=2)
+        json.dump({"layouts": LAYOUTS, "kinds": KINDS, "surfaces": SURFACES, "levels": L}, f, indent=2)
         f.write("\n")
+    write_header(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Gem", "Source", "Level", "LevelCatalog.h"))
     fans = sum(r["kind"] == "fan" for r in L)
     print(f"wrote {len(L)} levels ({fans} fan favourites, {len(L) - fans} new) to Levels/catalog.json")

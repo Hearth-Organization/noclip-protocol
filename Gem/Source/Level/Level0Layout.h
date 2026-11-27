@@ -47,11 +47,23 @@ namespace NoclipProtocol::Level0
         float m_noclipChance = 0.08f;  // chance a chunk has a noclip spot (a tear you walk through into the next level)
         float m_clutterChance = 0.6f;  // per cell: something that ended up here (ApplyStyle sets it per level; 0 = none)
         float m_scatterChance = 0.4f;  // per cell: small things lying about (cans, papers, a backpack)
+
+        // Catalog levels (Levels/catalog.json, LevelCatalog.h): the level's number (-1: one of the hand-made levels),
+        // its layout (0 rooms, 1 halls, 2 corridors, 3 outdoor, 4 caves, 5 water, 6 stairs) and light (0 bright .. 4 pitch).
+        // m_style then holds the nearest hand-made level (0, 1 or 2), for its clutter, supplies and props.
+        int m_catalog = -1;
+        int m_layout = 0;
+        int m_light = 1;
     };
 
     //! Level 1 and 2 presets: sizes, openness, pillars, rooms, lights and props for that level's look.
     //! Leaves the seed, dark zone share and working lights as they are. Level 0 (style 0) is unchanged.
     void ApplyStyle(Settings& settings);
+
+    //! A catalog level: the nearest hand-made level's style for its layout (rooms/outdoor/water 0, halls/caves 1,
+    //! corridors/stairs 2), that style's settings, then the layout's own sizes and the light's dark share.
+    //! Keeps the seed. Sizes must match Tools/Levels/make_catalog_levels.py's LAYOUT.
+    void ApplyCatalog(Settings& settings, int number, int layout, int light);
 
     //! An axis-aligned box: center and full size, in world meters. Z is up; floor top is z = 0.
     struct Box

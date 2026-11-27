@@ -141,7 +141,7 @@ namespace NoclipProtocol
             registry->Get(menu, "/NoclipProtocol/Menu/Active");
             AZStd::string level;
             registry->Get(level, "/NoclipProtocol/Save/Level");
-            return !menu && (level == "Level0" || level == "Level1" || level == "Level2");
+            return !menu && (level == "Level0" || level == "Level1" || level == "Level2" || level.starts_with("Backrooms:"));
         }
 
         static bool HandsFree()

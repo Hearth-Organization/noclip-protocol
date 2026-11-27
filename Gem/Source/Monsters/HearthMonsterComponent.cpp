@@ -791,6 +791,55 @@ namespace NoclipProtocol
             return;
         }
 
+        if (m_kind == "Doll" || m_kind == "Mannequin" || m_kind == "Plush" || m_kind == "Watcher")
+        {
+            // Statues of a kind: they move only while nobody looks at them (the Watcher never moves: looking at it
+            // wears on you instead). Reaching you hurts and shakes you; they can't be hurt.
+            const bool watched = distance > 0.01f && playerAhead.Dot(-flat / distance) >= 0.55f && LineOfSight(playerAt, at);
+            if (m_kind == "Watcher")
+            {
+                Walk(at, Cell(at), 0.0f, deltaTime, distance < 25.0f, playerAt);
+                if (watched && distance < 25.0f)
+                {
+                    drainSanity(0.03 * deltaTime);
+                }
+                Report(at, watched ? "Staring back" : "Watching");
+                return;
+            }
+            if (watched)
+            {
+                Walk(at, Cell(at), 0.0f, deltaTime, false, playerAt);
+                Report(at, "Watched (still)");
+                return;
+            }
+            if (distance < 1.3f && m_attackCooldown <= 0.0f && registry)
+            {
+                double damage = 0.0;
+                registry->Get(damage, "/NoclipProtocol/Player/Damage");
+                registry->Set("/NoclipProtocol/Player/Damage", damage + (m_kind == "Plush" ? 0.15 : 0.25));
+                drainSanity(0.12);
+                m_attackCooldown = 2.0f;
+                Report(at, "Reached " + playerName);
+                return;
+            }
+            at = Walk(at, Cell(playerAt), m_speed, deltaTime, true, playerAt);
+            Report(at, "Moving (unwatched)");
+            return;
+        }
+
+        if (m_kind == "Scarecrow" && !sees && m_sinceHeard >= 6.0f)
+        {
+            // Stands stock still out in the open until you come close.
+            Walk(at, Cell(at), 0.0f, deltaTime, false, playerAt);
+            Report(at, "Standing in the field");
+            return;
+        }
+
+        if (sees && (m_kind == "Frostwraith" || m_kind == "Partygoer" || m_kind == "Clown" || m_kind == "Dancer"))
+        {
+            drainSanity(0.008 * deltaTime);
+        }
+
         if (m_kind == "Deathmoth")
         {
             // Flutters about at head height and is drawn to light: a lit flashlight within 20 m and it comes for
@@ -882,7 +931,11 @@ namespace NoclipProtocol
         }
         if (m_attack >= 0.0f)
         {
-            const float damage = m_kind == "Skinstealer" ? 0.25f : m_kind == "Hound" ? 0.12f : m_kind == "Wretch" ? 0.10f : 0.15f;
+            float damage = m_kind == "Skinstealer" ? 0.25f : m_kind == "Hound" ? 0.12f : m_kind == "Wretch" ? 0.10f : 0.15f;
+            if (m_kind == "Scp049") { damage = 0.5f; }   // its touch: "the cure"
+            else if (m_kind == "Diver" || m_kind == "Nurse") { damage = 0.25f; }
+            else if (m_kind == "Crawler" || m_kind == "Patient") { damage = 0.12f; }
+            else if (m_kind == "Miner" || m_kind == "Farmthing" || m_kind == "Scarecrow") { damage = 0.2f; }
             Strike(deltaTime, distance, flat, damage, 0.03f, playerName, at);
             return;
         }

@@ -9,6 +9,7 @@
 #include <AzCore/Component/Component.h>
 #include <AzCore/Component/EntityId.h>
 #include <AzCore/Component/TickBus.h>
+#include <AzCore/Math/Color.h>
 #include <AzCore/Math/Vector3.h>
 #include <AzCore/std/containers/unordered_map.h>
 #include <AzCore/std/containers/vector.h>
@@ -37,8 +38,10 @@ namespace NoclipProtocol
         AZ::u64 GetSeed() const { return m_settings.m_seed; }
         //! The layout settings in use (seed included), for monsters finding their way.
         const Level0::Settings& GetSettings() const { return m_settings; }
-        //! 0 = Level 0, 1 = Level 1, 2 = Level 2, 3 = the intro facility.
+        //! 0 = Level 0, 1 = Level 1, 2 = Level 2, 3 = the intro facility, 4 = a catalog level (see GetLevelNumber).
         int GetStyle() const { return m_styleField; }
+        //! The level's number in the catalog (0-99; the intro is -1).
+        int GetLevelNumber() const { return m_settings.m_catalog >= 0 ? m_settings.m_catalog : (m_styleField <= 2 ? m_styleField : -1); }
 
     protected:
         void Activate() override;
@@ -95,7 +98,16 @@ namespace NoclipProtocol
         void SpawnChunk(int chunkX, int chunkY);
         void DespawnChunk(Chunk& chunk);
         void SpawnBox(AzFramework::EntitySpawnTicket& ticket, const Level0::Box& box, bool stretch, float yawRadians = 0.0f,
-            bool hum = false);
+            bool hum = false, int dress = -1);
+
+        // Catalog levels (style 4): one O3DE level plays any of Levels 3-99. The level's own materials go on the tile
+        // pieces as they spawn (dress 0 wall and pillar, 1 floor, 2 ceiling) and its colour and brightness on the lights (3).
+        AZ::Data::AssetId m_dressMaterials[3];
+        AZ::Color m_lightTint = AZ::Color::CreateOne();
+        float m_lightIntensityScale = 1.0f;
+        float m_lightRadiusScale = 1.0f;
+        void SetUpCatalogLevel();
+        void DressEntity(AZ::EntityId id, int dress);
         void UpdateHums(float deltaTime);
 
         // Base building (Base::State): the placed pieces' own spawns, so each can be removed again, and their lights
