@@ -1,0 +1,1347 @@
+{
+  "layouts": {
+    "rooms": "Rooms and halls on a grid (Level 0's own: offices, lobbies, hotels, apartments)",
+    "halls": "Huge open bays with columns (warehouses, garages, pools, malls)",
+    "corridors": "Narrow winding corridors (pipes, maintenance, bunkers)",
+    "outdoor": "Open ground under a sky or a ceiling too high to see (fields, streets, suburbs)",
+    "caves": "Rough organic tunnels and chambers (caves, mines, flesh)",
+    "water": "Flooded rooms and pools: wade, swim, never see the bottom",
+    "stairs": "Shafts, stairwells and drops: levels stacked on levels"
+  },
+  "levels": [
+    {
+      "number": 0,
+      "name": "The Lobby",
+      "kind": "fan",
+      "layout": "rooms",
+      "look": "mono-yellow wallpaper, damp carpet, buzzing fluorescents",
+      "light": "normal",
+      "danger": 2,
+      "monsters": [
+        "Smiler",
+        "Faceling",
+        "Deathmoth",
+        "Scp096",
+        "Scp173"
+      ],
+      "note": "Where every expedition starts; the base is built here"
+    },
+    {
+      "number": 1,
+      "name": "Habitable Zone",
+      "kind": "fan",
+      "layout": "halls",
+      "look": "concrete warehouse, puddles, crates, strip lights",
+      "light": "normal",
+      "danger": 2,
+      "monsters": [
+        "Wretch",
+        "Hound",
+        "Skinstealer",
+        "Clump",
+        "Scp939",
+        "Smiler"
+      ],
+      "note": "Supply crates turn up most often here"
+    },
+    {
+      "number": 2,
+      "name": "Pipe Dreams",
+      "kind": "fan",
+      "layout": "corridors",
+      "look": "hot concrete tunnels lined with pipes and valves, steam",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Wretch",
+        "Deathmoth",
+        "Scp106",
+        "Smiler"
+      ],
+      "note": "Burning pipes hurt; valves can be shut"
+    },
+    {
+      "number": 3,
+      "name": "Electrical Station",
+      "kind": "fan",
+      "layout": "corridors",
+      "look": "narrow brick halls, humming transformers, sparking cables",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Hound",
+        "Skinstealer",
+        "Smiler"
+      ],
+      "note": "Live wires; the hum hides footsteps (monsters hear less, so do you)"
+    },
+    {
+      "number": 4,
+      "name": "Abandoned Office",
+      "kind": "fan",
+      "layout": "rooms",
+      "look": "empty office floors, cubicles, windows onto white nothing",
+      "light": "bright",
+      "danger": 1,
+      "monsters": [
+        "Faceling"
+      ],
+      "note": "Quiet: water coolers of Almond Water, good for a first outpost"
+    },
+    {
+      "number": 5,
+      "name": "Terror Hotel",
+      "kind": "fan",
+      "layout": "rooms",
+      "look": "1920s hotel halls, red carpet, boiler-room heat, numbered doors",
+      "light": "dim",
+      "danger": 4,
+      "monsters": [
+        "Skinstealer",
+        "Wretch",
+        "Smiler"
+      ],
+      "note": "Some room doors open onto other rooms of the same hotel"
+    },
+    {
+      "number": 6,
+      "name": "Lights Out",
+      "kind": "fan",
+      "layout": "rooms",
+      "look": "nothing to see: pitch black halls",
+      "light": "pitch",
+      "danger": 5,
+      "monsters": [
+        "Smiler",
+        "Deathmoth"
+      ],
+      "note": "Flashlight only; Smilers everywhere you aren't looking"
+    },
+    {
+      "number": 7,
+      "name": "Thalassophobia",
+      "kind": "fan",
+      "layout": "water",
+      "look": "a small room, then an endless dark sea under a low ceiling",
+      "light": "dark",
+      "danger": 4,
+      "monsters": [
+        "Deathmoth"
+      ],
+      "note": "Swim through; something big moves below (never seen)"
+    },
+    {
+      "number": 8,
+      "name": "Cave System",
+      "kind": "fan",
+      "layout": "caves",
+      "look": "wet rock tunnels, stalactites, rope bridges",
+      "light": "dark",
+      "danger": 4,
+      "monsters": [
+        "Hound",
+        "Scp939",
+        "Clump"
+      ],
+      "note": "Echoes: shots carry twice as far"
+    },
+    {
+      "number": 9,
+      "name": "The Suburbs",
+      "kind": "fan",
+      "layout": "outdoor",
+      "look": "endless night-time suburbs, every house the same, streetlights",
+      "light": "dim",
+      "danger": 4,
+      "monsters": [
+        "Skinstealer",
+        "Hound",
+        "Faceling"
+      ],
+      "note": "Houses are rooms to search; never stay out after the streetlights die"
+    },
+    {
+      "number": 10,
+      "name": "Field of Wheat",
+      "kind": "fan",
+      "layout": "outdoor",
+      "look": "a wheat field to every horizon under an overcast sky, a few barns",
+      "light": "bright",
+      "danger": 1,
+      "monsters": [],
+      "note": "Safe and calm; crops and water: farmland for the base"
+    },
+    {
+      "number": 11,
+      "name": "Endless City",
+      "kind": "fan",
+      "layout": "outdoor",
+      "look": "empty city blocks, skyscrapers, no people",
+      "light": "normal",
+      "danger": 2,
+      "monsters": [
+        "Wretch",
+        "Faceling"
+      ],
+      "note": "Shops to loot; climbing a tower shows the city never ends"
+    },
+    {
+      "number": 12,
+      "name": "The Matrix",
+      "kind": "fan",
+      "layout": "corridors",
+      "look": "a corridor that is only a corridor, with doors to other levels",
+      "light": "normal",
+      "danger": 1,
+      "monsters": [],
+      "note": "A crossroads: each door opens onto another level"
+    },
+    {
+      "number": 13,
+      "name": "Infinite Apartments",
+      "kind": "fan",
+      "layout": "rooms",
+      "look": "70s apartment block, the same flat over and over",
+      "light": "normal",
+      "danger": 2,
+      "monsters": [
+        "Faceling",
+        "Skinstealer"
+      ],
+      "note": "Kitchens with food in the fridges"
+    },
+    {
+      "number": 14,
+      "name": "SCP-3008: Endless Store",
+      "kind": "fan",
+      "layout": "halls",
+      "look": "an endless flat-pack furniture store, showrooms and aisles",
+      "light": "bright",
+      "danger": 3,
+      "monsters": [
+        "Staff3008"
+      ],
+      "note": "Day: the staff ignore you. Night (lights go out): they hunt. Beds and food everywhere"
+    },
+    {
+      "number": 15,
+      "name": "Site-19 Ruins",
+      "kind": "new",
+      "layout": "corridors",
+      "look": "a Foundation site swallowed by the Backrooms: containment doors, red lights",
+      "light": "dim",
+      "danger": 4,
+      "monsters": [
+        "Scp173",
+        "Scp106",
+        "Scp939"
+      ],
+      "note": "Foundation lockers and dead MTF with gear; SCP items to recover"
+    },
+    {
+      "number": 16,
+      "name": "SCP-106's Pocket Dimension",
+      "kind": "fan",
+      "layout": "caves",
+      "look": "corroded black corridors that twist into each other",
+      "light": "dark",
+      "danger": 5,
+      "monsters": [
+        "Scp106"
+      ],
+      "note": "Where 106 drags you: one way out, 60 seconds"
+    },
+    {
+      "number": 17,
+      "name": "The Parking Garage",
+      "kind": "new",
+      "layout": "halls",
+      "look": "multi-storey car park, dead cars, ramps that never reach the top",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Hound",
+        "Wretch"
+      ],
+      "note": "Cars to search; a horn sounds somewhere and draws monsters"
+    },
+    {
+      "number": 18,
+      "name": "Kindergarten",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "bright childish murals, tiny chairs, a radio playing nursery songs",
+      "light": "bright",
+      "danger": 3,
+      "monsters": [
+        "Faceling"
+      ],
+      "note": "Toys move when you aren't looking"
+    },
+    {
+      "number": 19,
+      "name": "Server Farm",
+      "kind": "new",
+      "layout": "halls",
+      "look": "rows of humming server racks, blue LEDs, cold air",
+      "light": "dim",
+      "danger": 2,
+      "monsters": [
+        "Deathmoth"
+      ],
+      "note": "Terminals that show the Foundation's lost camera feeds"
+    },
+    {
+      "number": 20,
+      "name": "The Hospital Wing",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "white hospital wards, curtains, gurneys, a nurses' station",
+      "light": "normal",
+      "danger": 3,
+      "monsters": [
+        "Faceling",
+        "Skinstealer"
+      ],
+      "note": "Medkits are common here"
+    },
+    {
+      "number": 21,
+      "name": "Flooded Basement",
+      "kind": "new",
+      "layout": "water",
+      "look": "knee-deep black water over a concrete basement",
+      "light": "dark",
+      "danger": 3,
+      "monsters": [
+        "Clump",
+        "Wretch"
+      ],
+      "note": "Slow going; sounds of splashing behind you"
+    },
+    {
+      "number": 22,
+      "name": "The Mall",
+      "kind": "new",
+      "layout": "halls",
+      "look": "a closed 90s shopping mall, fountain, escalators, shop fronts",
+      "light": "normal",
+      "danger": 2,
+      "monsters": [
+        "Wretch",
+        "Faceling"
+      ],
+      "note": "Shops to loot; the music still plays"
+    },
+    {
+      "number": 23,
+      "name": "Stairwell",
+      "kind": "new",
+      "layout": "stairs",
+      "look": "a concrete stairwell going down for ever, a door on every floor",
+      "light": "dim",
+      "danger": 2,
+      "monsters": [
+        "Wretch"
+      ],
+      "note": "Each door: a short room; the floor number counts on and on"
+    },
+    {
+      "number": 24,
+      "name": "The Boiler Room",
+      "kind": "new",
+      "layout": "corridors",
+      "look": "furnaces, rusted boilers, catwalks over pits",
+      "light": "dim",
+      "danger": 4,
+      "monsters": [
+        "Clump",
+        "Hound"
+      ],
+      "note": "Heat drains stamina"
+    },
+    {
+      "number": 25,
+      "name": "Overgrown Office",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "Level 4's offices taken over by vines and moss, birdsong from nowhere",
+      "light": "normal",
+      "danger": 1,
+      "monsters": [],
+      "note": "Food can be grown here"
+    },
+    {
+      "number": 26,
+      "name": "The Theatre",
+      "kind": "new",
+      "layout": "halls",
+      "look": "an old theatre, red seats, a stage, the curtain moves",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Faceling",
+        "Smiler"
+      ],
+      "note": "Sitting in the front row starts the show"
+    },
+    {
+      "number": 27,
+      "name": "Laundromat",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "rows of washers spinning on their own, warm and humid",
+      "light": "normal",
+      "danger": 1,
+      "monsters": [],
+      "note": "Clothes to swap; quiet place to rest"
+    },
+    {
+      "number": 28,
+      "name": "Classroom Halls",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "school corridors, lockers, classrooms, chalkboards",
+      "light": "normal",
+      "danger": 2,
+      "monsters": [
+        "Faceling",
+        "Wretch"
+      ],
+      "note": "Chalkboards hold notes from earlier agents"
+    },
+    {
+      "number": 29,
+      "name": "The Archive",
+      "kind": "new",
+      "layout": "halls",
+      "look": "endless shelves of Foundation files and boxes",
+      "light": "dim",
+      "danger": 2,
+      "monsters": [
+        "Deathmoth"
+      ],
+      "note": "Documents that unlock research"
+    },
+    {
+      "number": 30,
+      "name": "Concrete Plains",
+      "kind": "new",
+      "layout": "outdoor",
+      "look": "flat grey concrete to the horizon, a hard white sky",
+      "light": "bright",
+      "danger": 2,
+      "monsters": [
+        "Hound"
+      ],
+      "note": "Nowhere to hide; you can see what's coming"
+    },
+    {
+      "number": 31,
+      "name": "Motel",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "a roadside motel at night, flickering neon VACANCY",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Skinstealer"
+      ],
+      "note": "Every room number is your own agent number"
+    },
+    {
+      "number": 32,
+      "name": "The Bunker",
+      "kind": "new",
+      "layout": "corridors",
+      "look": "Cold War bunker, blast doors, bunk rooms, rations",
+      "light": "dim",
+      "danger": 2,
+      "monsters": [
+        "Wretch"
+      ],
+      "note": "Supplies; a working radio to call the Foundation"
+    },
+    {
+      "number": 33,
+      "name": "Arcade",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "dark arcade, cabinets glowing, carpets with neon patterns",
+      "light": "dim",
+      "danger": 2,
+      "monsters": [
+        "Smiler"
+      ],
+      "note": "Machines still work; one high score has your name"
+    },
+    {
+      "number": 34,
+      "name": "Train Station",
+      "kind": "new",
+      "layout": "halls",
+      "look": "an underground station, a train that never leaves",
+      "light": "normal",
+      "danger": 2,
+      "monsters": [
+        "Wretch",
+        "Faceling"
+      ],
+      "note": "Board the train: it goes to another level"
+    },
+    {
+      "number": 35,
+      "name": "The Greenhouse",
+      "kind": "new",
+      "layout": "halls",
+      "look": "glass greenhouses, warm, plants that are not quite plants",
+      "light": "bright",
+      "danger": 2,
+      "monsters": [
+        "Clump"
+      ],
+      "note": "Herbs for medicine"
+    },
+    {
+      "number": 36,
+      "name": "Attic",
+      "kind": "new",
+      "layout": "corridors",
+      "look": "low wooden attic beams, dust, old furniture under sheets",
+      "light": "dark",
+      "danger": 3,
+      "monsters": [
+        "Smiler",
+        "Deathmoth"
+      ],
+      "note": "Crouch to move"
+    },
+    {
+      "number": 37,
+      "name": "The Poolrooms",
+      "kind": "fan",
+      "layout": "water",
+      "look": "white tiles, warm shallow pools, bright sourceless light",
+      "light": "bright",
+      "danger": 1,
+      "monsters": [],
+      "note": "Calm, almost no monsters, and still the most unsettling place you've been"
+    },
+    {
+      "number": 38,
+      "name": "The Ballroom",
+      "kind": "new",
+      "layout": "halls",
+      "look": "a grand ballroom, chandeliers, a waltz playing, nobody dancing",
+      "light": "normal",
+      "danger": 3,
+      "monsters": [
+        "Faceling"
+      ],
+      "note": "Dancers appear if you stand still too long"
+    },
+    {
+      "number": 39,
+      "name": "Snow Level",
+      "kind": "new",
+      "layout": "outdoor",
+      "look": "a frozen field under endless snowfall, buried lamp posts",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Hound"
+      ],
+      "note": "Cold drains health away from fire"
+    },
+    {
+      "number": 40,
+      "name": "Red Rooms",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "Level 0's rooms in deep red, a low hum",
+      "light": "dim",
+      "danger": 4,
+      "monsters": [
+        "Smiler",
+        "Skinstealer"
+      ],
+      "note": "Sanity drains slowly here"
+    },
+    {
+      "number": 41,
+      "name": "The Kitchen",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "industrial kitchens, steel counters, hanging pans",
+      "light": "normal",
+      "danger": 2,
+      "monsters": [
+        "Wretch"
+      ],
+      "note": "Lots of food, but some of it moves"
+    },
+    {
+      "number": 42,
+      "name": "Library of Babel",
+      "kind": "new",
+      "layout": "halls",
+      "look": "hexagonal library rooms, every book unreadable but one",
+      "light": "dim",
+      "danger": 1,
+      "monsters": [],
+      "note": "Somewhere here is a book with the way out"
+    },
+    {
+      "number": 43,
+      "name": "The Ship",
+      "kind": "new",
+      "layout": "corridors",
+      "look": "the corridors of a rusting cargo ship, the hull groans",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Clump",
+        "Wretch"
+      ],
+      "note": "The floor tilts now and then"
+    },
+    {
+      "number": 44,
+      "name": "Suburban Interior",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "inside one house that goes on and on, family photos with no faces",
+      "light": "normal",
+      "danger": 2,
+      "monsters": [
+        "Faceling"
+      ],
+      "note": "The photos change"
+    },
+    {
+      "number": 45,
+      "name": "Construction Site",
+      "kind": "new",
+      "layout": "outdoor",
+      "look": "half-built concrete floors, scaffolding, cranes in fog",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Hound",
+        "Wretch"
+      ],
+      "note": "Falls hurt; building materials for the base"
+    },
+    {
+      "number": 46,
+      "name": "The Gym",
+      "kind": "new",
+      "layout": "halls",
+      "look": "a school gym, bleachers, a basketball bouncing by itself",
+      "light": "normal",
+      "danger": 2,
+      "monsters": [
+        "Faceling"
+      ],
+      "note": ""
+    },
+    {
+      "number": 47,
+      "name": "Subway Tunnels",
+      "kind": "new",
+      "layout": "corridors",
+      "look": "dark subway tunnels, live third rail, distant trains",
+      "light": "dark",
+      "danger": 4,
+      "monsters": [
+        "Hound",
+        "Scp939"
+      ],
+      "note": "A train comes through every few minutes"
+    },
+    {
+      "number": 48,
+      "name": "Pastel Rooms",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "soft pastel rooms, too clean, a sweet smell",
+      "light": "bright",
+      "danger": 2,
+      "monsters": [],
+      "note": "Peaceful until it isn't"
+    },
+    {
+      "number": 49,
+      "name": "The Freezer",
+      "kind": "new",
+      "layout": "corridors",
+      "look": "walk-in freezers end to end, frost, hanging plastic",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Wretch"
+      ],
+      "note": "Cold; food that keeps"
+    },
+    {
+      "number": 50,
+      "name": "Level Fun =)",
+      "kind": "fan",
+      "layout": "rooms",
+      "look": "a children's party that never ends, balloons, streamers",
+      "light": "bright",
+      "danger": 5,
+      "monsters": [
+        "Smiler",
+        "Skinstealer"
+      ],
+      "note": "The Partygoers want you to stay. Don't."
+    },
+    {
+      "number": 51,
+      "name": "Run For Your Life (Level !)",
+      "kind": "fan",
+      "layout": "corridors",
+      "look": "a red-lit corridor that only goes forward",
+      "light": "dim",
+      "danger": 5,
+      "monsters": [
+        "Hound",
+        "Clump",
+        "Smiler"
+      ],
+      "note": "Arrive running; stop and die"
+    },
+    {
+      "number": 52,
+      "name": "The Hub",
+      "kind": "fan",
+      "layout": "corridors",
+      "look": "a hall of doors, each a way into a different level",
+      "light": "normal",
+      "danger": 1,
+      "monsters": [],
+      "note": "A safe crossroads; outposts here link levels"
+    },
+    {
+      "number": 53,
+      "name": "The Windows",
+      "kind": "fan",
+      "layout": "outdoor",
+      "look": "a courtyard of windows from every side, something watches back",
+      "light": "normal",
+      "danger": 3,
+      "monsters": [
+        "Faceling"
+      ],
+      "note": "Don't look through the windows for long"
+    },
+    {
+      "number": 54,
+      "name": "Church",
+      "kind": "new",
+      "layout": "halls",
+      "look": "an empty church, pews, candles that relight themselves",
+      "light": "dim",
+      "danger": 2,
+      "monsters": [],
+      "note": "Praying restores sanity a little"
+    },
+    {
+      "number": 55,
+      "name": "Hall of Mirrors",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "mirror-lined rooms, your reflection lags behind",
+      "light": "normal",
+      "danger": 3,
+      "monsters": [
+        "Skinstealer"
+      ],
+      "note": "One reflection is not yours"
+    },
+    {
+      "number": 56,
+      "name": "Data Center Flooded",
+      "kind": "new",
+      "layout": "water",
+      "look": "server racks half under water, sparking",
+      "light": "dark",
+      "danger": 4,
+      "monsters": [
+        "Deathmoth"
+      ],
+      "note": "Water and power: careful"
+    },
+    {
+      "number": 57,
+      "name": "Docks",
+      "kind": "new",
+      "layout": "outdoor",
+      "look": "night-time docks, containers, cranes, black water",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Hound",
+        "Wretch"
+      ],
+      "note": "Containers to open: supplies or worse"
+    },
+    {
+      "number": 58,
+      "name": "Factory Floor",
+      "kind": "new",
+      "layout": "halls",
+      "look": "assembly lines still running, making nothing",
+      "light": "normal",
+      "danger": 3,
+      "monsters": [
+        "Clump",
+        "Wretch"
+      ],
+      "note": "Machines crush; scrap for the base"
+    },
+    {
+      "number": 59,
+      "name": "The Maze",
+      "kind": "new",
+      "layout": "corridors",
+      "look": "tall hedges in a maze under a grey sky",
+      "light": "normal",
+      "danger": 3,
+      "monsters": [
+        "Hound"
+      ],
+      "note": "Walls of hedge you can't see over"
+    },
+    {
+      "number": 60,
+      "name": "Prison Block",
+      "kind": "new",
+      "layout": "corridors",
+      "look": "cell blocks, open doors, an empty guard tower",
+      "light": "dim",
+      "danger": 4,
+      "monsters": [
+        "Skinstealer",
+        "Wretch"
+      ],
+      "note": "Some cells lock behind you"
+    },
+    {
+      "number": 61,
+      "name": "Observatory",
+      "kind": "new",
+      "layout": "halls",
+      "look": "a domed observatory, a telescope pointed at a sky with no stars",
+      "light": "dark",
+      "danger": 1,
+      "monsters": [],
+      "note": "Looking through it shows the Foundation base"
+    },
+    {
+      "number": 62,
+      "name": "Waterpark",
+      "kind": "new",
+      "layout": "water",
+      "look": "an abandoned indoor waterpark, slides into dark pools",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Clump"
+      ],
+      "note": "Slides are fast ways down"
+    },
+    {
+      "number": 63,
+      "name": "Sewers",
+      "kind": "new",
+      "layout": "corridors",
+      "look": "brick sewer tunnels, slow brown water, rats",
+      "light": "dark",
+      "danger": 3,
+      "monsters": [
+        "Wretch",
+        "Hound"
+      ],
+      "note": ""
+    },
+    {
+      "number": 64,
+      "name": "The Void Bridge",
+      "kind": "new",
+      "layout": "outdoor",
+      "look": "a narrow bridge over a black void",
+      "light": "dark",
+      "danger": 4,
+      "monsters": [
+        "Deathmoth"
+      ],
+      "note": "Fall and you're in another level"
+    },
+    {
+      "number": 65,
+      "name": "Doll Factory",
+      "kind": "new",
+      "layout": "halls",
+      "look": "shelves of dolls, a conveyor of doll heads",
+      "light": "dim",
+      "danger": 4,
+      "monsters": [
+        "Faceling",
+        "Smiler"
+      ],
+      "note": "They turn their heads to follow you"
+    },
+    {
+      "number": 66,
+      "name": "Radio Station",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "a small radio station, on air, playing your own voice",
+      "light": "normal",
+      "danger": 2,
+      "monsters": [
+        "Scp939"
+      ],
+      "note": "939 learns voices here"
+    },
+    {
+      "number": 67,
+      "name": "Sand Halls",
+      "kind": "new",
+      "layout": "halls",
+      "look": "Level 0's halls filled with drifting sand, hot and dry",
+      "light": "bright",
+      "danger": 2,
+      "monsters": [
+        "Hound"
+      ],
+      "note": "Water runs out fast"
+    },
+    {
+      "number": 68,
+      "name": "Museum",
+      "kind": "new",
+      "layout": "halls",
+      "look": "a natural history museum, skeletons, dioramas, a giant whale",
+      "light": "dim",
+      "danger": 2,
+      "monsters": [
+        "Scp173"
+      ],
+      "note": "Statues everywhere: one of them is 173"
+    },
+    {
+      "number": 69,
+      "name": "Butcher's",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "cold-store rooms, hanging meat, tiled floors",
+      "light": "dim",
+      "danger": 4,
+      "monsters": [
+        "Clump",
+        "Skinstealer"
+      ],
+      "note": ""
+    },
+    {
+      "number": 70,
+      "name": "Forest",
+      "kind": "new",
+      "layout": "outdoor",
+      "look": "a dark pine forest, fog, the trees too evenly spaced",
+      "light": "dark",
+      "danger": 3,
+      "monsters": [
+        "Hound",
+        "Skinstealer"
+      ],
+      "note": "Firewood and shelter"
+    },
+    {
+      "number": 71,
+      "name": "Underground Lake",
+      "kind": "new",
+      "layout": "water",
+      "look": "a huge cave lake, a jetty, a rowing boat",
+      "light": "dark",
+      "danger": 3,
+      "monsters": [
+        "Clump"
+      ],
+      "note": "Row across to the far shore"
+    },
+    {
+      "number": 72,
+      "name": "Clock Tower",
+      "kind": "new",
+      "layout": "stairs",
+      "look": "inside a clock tower, gears, a staircase around them",
+      "light": "dim",
+      "danger": 2,
+      "monsters": [],
+      "note": "Time runs strange here: sanity holds still"
+    },
+    {
+      "number": 73,
+      "name": "The Cinema",
+      "kind": "new",
+      "layout": "halls",
+      "look": "a multiplex, screens showing your expedition",
+      "light": "dark",
+      "danger": 3,
+      "monsters": [
+        "Smiler"
+      ],
+      "note": "The film shows where monsters are"
+    },
+    {
+      "number": 74,
+      "name": "Bathroom Level",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "endless public toilets and showers, dripping taps",
+      "light": "normal",
+      "danger": 2,
+      "monsters": [
+        "Wretch"
+      ],
+      "note": "Clean water"
+    },
+    {
+      "number": 75,
+      "name": "Elevator Shaft",
+      "kind": "new",
+      "layout": "stairs",
+      "look": "a huge shaft of elevators going nowhere",
+      "light": "dark",
+      "danger": 3,
+      "monsters": [
+        "Deathmoth"
+      ],
+      "note": "Ride an elevator: another level"
+    },
+    {
+      "number": 76,
+      "name": "The Farm",
+      "kind": "new",
+      "layout": "outdoor",
+      "look": "a farmhouse and barns at dusk, animals that aren't",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Skinstealer",
+        "Hound"
+      ],
+      "note": "Livestock-like things to keep at the base?"
+    },
+    {
+      "number": 77,
+      "name": "Bunker Command",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "a Foundation command post, maps, a long-dead team",
+      "light": "dim",
+      "danger": 2,
+      "monsters": [
+        "Scp939"
+      ],
+      "note": "Orders and intel; an MTF radio"
+    },
+    {
+      "number": 78,
+      "name": "The Carnival",
+      "kind": "new",
+      "layout": "outdoor",
+      "look": "an empty carnival at night, rides turning, music box tunes",
+      "light": "dim",
+      "danger": 4,
+      "monsters": [
+        "Smiler",
+        "Faceling"
+      ],
+      "note": "Win a prize: a rare item"
+    },
+    {
+      "number": 79,
+      "name": "Glass Halls",
+      "kind": "new",
+      "layout": "halls",
+      "look": "walls of glass, you can see far but not reach",
+      "light": "bright",
+      "danger": 2,
+      "monsters": [
+        "Hound"
+      ],
+      "note": ""
+    },
+    {
+      "number": 80,
+      "name": "Asylum",
+      "kind": "new",
+      "layout": "corridors",
+      "look": "an old asylum, padded rooms, chalk on the walls",
+      "light": "dim",
+      "danger": 5,
+      "monsters": [
+        "Skinstealer",
+        "Faceling",
+        "Scp106"
+      ],
+      "note": "Sanity drains fast"
+    },
+    {
+      "number": 81,
+      "name": "Hotel Pool",
+      "kind": "new",
+      "layout": "water",
+      "look": "a hotel's indoor pool, steam, deck chairs, a party long over",
+      "light": "normal",
+      "danger": 2,
+      "monsters": [],
+      "note": "Rest here"
+    },
+    {
+      "number": 82,
+      "name": "Toy Store",
+      "kind": "new",
+      "layout": "halls",
+      "look": "an enormous toy store, plush animals on every shelf",
+      "light": "bright",
+      "danger": 3,
+      "monsters": [
+        "Faceling"
+      ],
+      "note": ""
+    },
+    {
+      "number": 83,
+      "name": "Mines",
+      "kind": "new",
+      "layout": "caves",
+      "look": "mine tunnels, rails, carts, lanterns, ore",
+      "light": "dark",
+      "danger": 3,
+      "monsters": [
+        "Clump",
+        "Hound"
+      ],
+      "note": "Metal ore for the base"
+    },
+    {
+      "number": 84,
+      "name": "The Meat Level",
+      "kind": "new",
+      "layout": "caves",
+      "look": "walls of flesh, warm and breathing",
+      "light": "dim",
+      "danger": 5,
+      "monsters": [
+        "Clump",
+        "Wretch"
+      ],
+      "note": "Everything here is alive"
+    },
+    {
+      "number": 85,
+      "name": "Airport Terminal",
+      "kind": "new",
+      "layout": "halls",
+      "look": "an empty airport, departure boards listing other levels",
+      "light": "bright",
+      "danger": 1,
+      "monsters": [],
+      "note": "Boards show where each gate leads"
+    },
+    {
+      "number": 86,
+      "name": "Rooftops",
+      "kind": "new",
+      "layout": "outdoor",
+      "look": "flat rooftops joined by planks, a city below in fog",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Deathmoth",
+        "Hound"
+      ],
+      "note": "Don't fall"
+    },
+    {
+      "number": 87,
+      "name": "Laboratory",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "a Foundation lab, broken containment glass, notes",
+      "light": "normal",
+      "danger": 3,
+      "monsters": [
+        "Scp939",
+        "Skinstealer"
+      ],
+      "note": "Research data; SCP-500 can turn up"
+    },
+    {
+      "number": 88,
+      "name": "Cathedral of Pipes",
+      "kind": "new",
+      "layout": "halls",
+      "look": "an organ of pipes rising out of sight, playing",
+      "light": "dim",
+      "danger": 3,
+      "monsters": [
+        "Smiler"
+      ],
+      "note": "The music tells you where monsters are"
+    },
+    {
+      "number": 89,
+      "name": "Swamp",
+      "kind": "new",
+      "layout": "outdoor",
+      "look": "a foggy swamp, dead trees, boardwalks",
+      "light": "dark",
+      "danger": 4,
+      "monsters": [
+        "Clump",
+        "Hound"
+      ],
+      "note": ""
+    },
+    {
+      "number": 90,
+      "name": "The White Room",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "a perfectly white empty room that never ends",
+      "light": "bright",
+      "danger": 2,
+      "monsters": [],
+      "note": "No sound, no shadow: sanity drains"
+    },
+    {
+      "number": 91,
+      "name": "Graveyard",
+      "kind": "new",
+      "layout": "outdoor",
+      "look": "a graveyard at night, every stone an agent's name",
+      "light": "dark",
+      "danger": 3,
+      "monsters": [
+        "Wretch",
+        "Scp106"
+      ],
+      "note": "One stone has your agent's name"
+    },
+    {
+      "number": 92,
+      "name": "Space Station",
+      "kind": "new",
+      "layout": "corridors",
+      "look": "corridors of a station, stars outside the windows",
+      "light": "normal",
+      "danger": 3,
+      "monsters": [
+        "Deathmoth",
+        "Skinstealer"
+      ],
+      "note": "Low gravity: jump far"
+    },
+    {
+      "number": 93,
+      "name": "Beach",
+      "kind": "new",
+      "layout": "outdoor",
+      "look": "a grey beach under an endless overcast, the tide never comes in",
+      "light": "bright",
+      "danger": 1,
+      "monsters": [],
+      "note": "Calm; driftwood and fish"
+    },
+    {
+      "number": 94,
+      "name": "Motion (Level 94)",
+      "kind": "fan",
+      "layout": "outdoor",
+      "look": "a cartoon-like town where things move like animation",
+      "light": "bright",
+      "danger": 3,
+      "monsters": [
+        "Faceling"
+      ],
+      "note": "The world moves in frames"
+    },
+    {
+      "number": 95,
+      "name": "Burnt Halls",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "Level 0 after a fire: soot, ash, melted ceiling tiles",
+      "light": "dark",
+      "danger": 3,
+      "monsters": [
+        "Wretch",
+        "Smiler"
+      ],
+      "note": ""
+    },
+    {
+      "number": 96,
+      "name": "The Pit",
+      "kind": "new",
+      "layout": "stairs",
+      "look": "a ring of walkways around a bottomless pit",
+      "light": "dark",
+      "danger": 4,
+      "monsters": [
+        "Clump",
+        "Deathmoth"
+      ],
+      "note": "Something climbs up the walls"
+    },
+    {
+      "number": 97,
+      "name": "Childhood Home",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "a house that looks like your agent's childhood home",
+      "light": "normal",
+      "danger": 3,
+      "monsters": [
+        "Skinstealer"
+      ],
+      "note": "Memories: sanity heals, then breaks"
+    },
+    {
+      "number": 98,
+      "name": "The Static",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "rooms flickering like a broken TV picture",
+      "light": "dim",
+      "danger": 4,
+      "monsters": [
+        "Smiler",
+        "Faceling"
+      ],
+      "note": "Walls blink in and out"
+    },
+    {
+      "number": 99,
+      "name": "The Exit?",
+      "kind": "new",
+      "layout": "rooms",
+      "look": "a plain office with a green EXIT sign over a door",
+      "light": "bright",
+      "danger": 5,
+      "monsters": [
+        "Scp096",
+        "Scp173",
+        "Scp106"
+      ],
+      "note": "The last level. Is it really the way out?"
+    }
+  ]
+}
