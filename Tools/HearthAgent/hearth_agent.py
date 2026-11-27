@@ -1746,7 +1746,16 @@ def _voice_srt(path, text, seconds):
     Path(path).write_text("\n".join(out))
 
 
+_voice_lock = threading.Lock()
+
+
 def op_voice_lines(args):
+    """One batch at a time (they share the lines file)."""
+    with _voice_lock:
+        return _voice_lines(args)
+
+
+def _voice_lines(args):
     """voice_lines {"scene": name, "lines": [{"id", "who", "voice", "text", "mood", "speed", "room", "usedIn"}], "remake": false}:
     adds (or updates, by id) the lines in the project's Voice Studio and makes each one that's new or changed."""
     import hashlib
@@ -1777,6 +1786,14 @@ def op_voice_lines(args):
         relative = f"{scene_folder}/{line['id']}.wav"
         if (line.get("made") or {}).get("hash") == digest and (folder / relative).is_file() and not args.get("remake"):
             continue
+        if not line.get("made") and (folder / relative).is_file() and args.get("adopt"):
+            # Already recorded (its entry was lost): keep the recording, just list it again.
+            with wave.open(str(folder / relative)) as w:
+                seconds = w.getnframes() / float(w.getframerate() or 24000)
+            line["made"] = {"hash": digest, "file": relative, "takes": [], "subtitles": f"{scene_folder}/{line['id']}.srt",
+                            "lipsync": "", "seconds": round(seconds, 3)}
+            made.append({"id": line["id"], "seconds": round(seconds, 2), "adopted": True})
+            continue
         mood = VOICE_MOODS.index(line["mood"]) if line["mood"] in VOICE_MOODS else 0
         code, audio = _voice_http("POST", "/v1/audio/speech", {"input": line["text"], "voice": line["voice"], "speed": float(line["speed"]),
                                                               "response_format": "wav", "instructions": VOICE_MOOD_INSTRUCTIONS[mood]}, timeout=300)
@@ -1804,6 +1821,92 @@ def op_voice_lines(args):
 
 
 OPS.update({"voice_status": op_voice_status, "voice_design": op_voice_design, "voice_lines": op_voice_lines})
+
+def op_engine_check(args):
+    """Why the editor can't open: what's in the engine folders, engine.json, and how the launchers start it."""
+    out = {}
+    for root in ("/opt/hearth-engine", "/var/opt/hearth-engine", "/usr/share/hearth-engine"):
+        p = Path(root)
+        info = {"exists": p.exists(), "is_symlink": p.is_symlink(), "real": os.path.realpath(root)}
+        if p.is_dir():
+            try:
+                info["top"] = sorted(x.name for x in p.iterdir())[:60]
+            except OSError as error:
+                info["top_error"] = str(error)
+            ej = p / "engine.json"
+            info["engine_json"] = ej.exists()
+            if ej.exists():
+                try:
+                    data = json.loads(ej.read_text())
+                    info["engine_json_name"] = data.get("engine_name")
+                    info["engine_json_version"] = data.get("version")
+                    info["engine_json_ok"] = True
+                except (OSError, ValueError) as error:
+                    info["engine_json_ok"] = False
+                    info["engine_json_error"] = str(error)[:200]
+                st = ej.stat()
+                info["engine_json_mode"] = oct(st.st_mode & 0o777)
+                info["engine_json_size"] = st.st_size
+        out[root] = info
+    launchers = []
+    for d in ("/usr/share/applications", str(Path.home() / ".local/share/applications")):
+        for f in glob.glob(d + "/*hearth*engine*.desktop") + glob.glob(d + "/*o3de*.desktop"):
+            try:
+                launchers.append({"file": f, "exec": [l for l in open(f) if l.startswith(("Exec=", "Path="))]})
+            except OSError:
+                pass
+    out["launchers"] = launchers
+    manifest = Path.home() / ".o3de" / "o3de_manifest.json"
+    if manifest.exists():
+        try:
+            m = json.loads(manifest.read_text())
+            out["o3de_manifest_engines"] = m.get("engines")
+            out["o3de_manifest_default_engines_folder"] = m.get("default_engines_folder")
+        except (OSError, ValueError) as error:
+            out["o3de_manifest_error"] = str(error)[:200]
+    pj = PROJECT / "project.json"
+    try:
+        out["project_engine"] = json.loads(pj.read_text()).get("engine")
+    except (OSError, ValueError):
+        pass
+    user_pj = PROJECT / "user" / "project.json"
+    if user_pj.exists():
+        try:
+            out["user_project_json"] = json.loads(user_pj.read_text())
+        except (OSError, ValueError):
+            pass
+    out["editor_log_tail"] = tail(LOG_DIR / "Editor.log", 20) if (LOG_DIR / "Editor.log").exists() else None
+    return out
+
+
+OPS.update({"engine_check": op_engine_check})
+
+def op_engine_python(args):
+    """The engine's Python (what the Project Manager / Hub uses to read engine.json): does it start and import o3de?"""
+    engine = Path("/var/opt/hearth-engine")
+    out = {}
+    out["venvs"] = sorted(glob.glob(str(Path.home() / ".o3de" / "Python" / "venv" / "*")))
+    out["python_sh"] = (engine / "python" / "python.sh").exists()
+    for name, cmd in (("o3de_import", [str(engine / "python" / "python.sh"), "-c",
+                                       "import o3de, o3de.manifest as m; print(m.get_engine_json_data(engine_path='/var/opt/hearth-engine') is not None)"]),):
+        try:
+            done = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=str(engine))
+            out[name] = {"code": done.returncode, "out": done.stdout[-1500:], "err": done.stderr[-2500:]}
+        except (OSError, subprocess.TimeoutExpired) as error:
+            out[name] = {"error": str(error)}
+    logs = sorted(glob.glob(str(Path.home() / "O3DE" / "HearthEngine" / "logs" / "*")), key=os.path.getmtime)[-3:]
+    out["hub_logs"] = {f: tail(Path(f), 40) for f in logs}
+    which = shutil.which("hearth-engine")
+    out["launcher"] = which
+    if which:
+        try:
+            out["launcher_head"] = open(which, errors="replace").read(1500)
+        except OSError:
+            pass
+    return out
+
+
+OPS.update({"engine_python": op_engine_python})
 
 # ---------- request loop ----------
 
