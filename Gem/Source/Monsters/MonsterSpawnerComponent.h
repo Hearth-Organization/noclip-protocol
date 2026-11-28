@@ -298,12 +298,20 @@ namespace NoclipProtocol
                     }
                     return;
                 }
+                AZStd::string name = pending;
+                float meters = 0.0f; // "Kind@2.5": that close, not snapped to a cell's middle
+                if (const size_t a = name.find('@'); a != AZStd::string::npos)
+                {
+                    meters = AZStd::stof(name.substr(a + 1));
+                    name = name.substr(0, a);
+                }
                 for (int i = 0; i < count; ++i)
                 {
-                    if (pending == kinds[i].m_name || pending == AZStd::string(kinds[i].m_name).substr(0, pending.size()))
+                    if (name == kinds[i].m_name || name == AZStd::string(kinds[i].m_name).substr(0, name.size()))
                     {
-                        const AZ::Vector3 ahead = playerTm.GetBasisY().GetNormalized() * 10.0f;
-                        const AZ::Vector3 at(snap(playerAt.GetX() + ahead.GetX()), snap(playerAt.GetY() + ahead.GetY()), playerAt.GetZ());
+                        const AZ::Vector3 ahead = playerTm.GetBasisY().GetNormalized() * (meters > 0.0f ? meters : 10.0f);
+                        const AZ::Vector3 at = meters > 0.0f ? AZ::Vector3(playerAt.GetX() + ahead.GetX(), playerAt.GetY() + ahead.GetY(), playerAt.GetZ())
+                            : AZ::Vector3(snap(playerAt.GetX() + ahead.GetX()), snap(playerAt.GetY() + ahead.GetY()), playerAt.GetZ());
                         Spawn(i, at, std::atan2(-(playerAt.GetX() - at.GetX()), playerAt.GetY() - at.GetY()), true);
                     }
                 }

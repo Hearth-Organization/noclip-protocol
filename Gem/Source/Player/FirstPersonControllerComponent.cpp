@@ -26,6 +26,8 @@
 #include <AzFramework/Input/Devices/Keyboard/InputDeviceKeyboard.h>
 #include <AzFramework/Input/Devices/Mouse/InputDeviceMouse.h>
 #include <AzFramework/Physics/CharacterBus.h>
+#include <AzFramework/Physics/Common/PhysicsSceneQueries.h>
+#include <AzFramework/Physics/PhysicsScene.h>
 
 namespace NoclipProtocol
 {
@@ -107,6 +109,23 @@ namespace NoclipProtocol
         AZ_CONSOLEFREEFUNC("noclip_walk", NoclipWalk, AZ::ConsoleFunctorFlags::Null,
             "Walk the player forward: noclip_walk <seconds> [sprint 0/1]");
 
+        // noclip_run <seconds> [sprint 0/1] [first turn: l/r]: run through the maze on its own, turning at walls (trailer).
+        void NoclipRun(const AZ::ConsoleCommandContainer& arguments)
+        {
+            if (!s_activePlayer || arguments.empty())
+            {
+                AZ_Printf("Noclip", "noclip_run <seconds> [sprint 0/1] [l/r]%s", s_activePlayer ? "" : " (no player)");
+                return;
+            }
+            const float seconds = AZStd::stof(AZStd::string(arguments[0]));
+            const bool sprint = arguments.size() > 1 && AZStd::string(arguments[1]) != "0";
+            const float side = arguments.size() > 2 && AZStd::string(arguments[2]) == "r" ? -1.0f : 1.0f;
+            s_activePlayer->RunFor(seconds, sprint, side);
+            AZ_Printf("Noclip", "noclip_run: %.1f s%s", seconds, sprint ? " sprinting" : "");
+        }
+        AZ_CONSOLEFREEFUNC("noclip_run", NoclipRun, AZ::ConsoleFunctorFlags::Null,
+            "Run through the maze on autopilot: noclip_run <seconds> [sprint 0/1] [first turn l/r]");
+
         // weapon_give <all | pistol | shotgun | carbine | flaregun | knife | shield | ammo | flares | medkit>: as if the
         // Foundation's crate had brought it (testing).
         void WeaponGive(const AZ::ConsoleCommandContainer& arguments)
@@ -168,10 +187,14 @@ namespace NoclipProtocol
             {
                 kind[0] = static_cast<char>(toupper(kind[0]));
             }
+            if (arguments.size() > 1)
+            {
+                kind += "@" + AZStd::string(arguments[1]); // monster_spawn <kind> <meters ahead> (the trailer's scare)
+            }
             MonsterSpawnerComponent::Request(kind);
             AZ_Printf("Noclip", "monster_spawn %s", kind.c_str());
         }
-        AZ_CONSOLEFREEFUNC("monster_spawn", MonsterSpawn, AZ::ConsoleFunctorFlags::Null, "monster_spawn <smiler> (testing, Level 0)");
+        AZ_CONSOLEFREEFUNC("monster_spawn", MonsterSpawn, AZ::ConsoleFunctorFlags::Null, "monster_spawn <smiler> [meters ahead] (testing, Level 0)");
 
         // monster_debug [freeze 0/1]: lists every monster (where it is, its components); freeze 1 stops them in
         // place (they keep playing their idle) for screenshots, freeze 0 lets them go again.
@@ -484,6 +507,74 @@ namespace NoclipProtocol
         AZ::TransformBus::Event(m_rayTracedLight, &AZ::TransformBus::Events::SetWorldTM, AZ::Transform::CreateTranslation(at));
     }
 
+    void FirstPersonControllerComponent::Steer(float deltaTime)
+    {
+        // Feel ahead with rays at chest height, the way a runner glances: keep to the middle of the corridor, and at a
+        // wall turn towards the open side (the given side first when both are open), easing in and out of the turn.
+        auto* scenes = AZ::Interface<AzPhysics::SceneInterface>::Get();
+        const AzPhysics::SceneHandle scene = scenes ? scenes->GetSceneHandle(AzPhysics::DefaultPhysicsSceneName) : AzPhysics::InvalidSceneHandle;
+        if (scene == AzPhysics::InvalidSceneHandle)
+        {
+            AZ_Printf("Noclip", "noclip_run: no physics scene");
+            return;
+        }
+        AZ::Vector3 at = AZ::Vector3::CreateZero();
+        AZ::TransformBus::EventResult(at, GetEntityId(), &AZ::TransformBus::Events::GetWorldTranslation);
+        if (m_cameraEntity.IsValid())
+        {
+            AZ::TransformBus::EventResult(at, m_cameraEntity, &AZ::TransformBus::Events::GetWorldTranslation);
+            at -= AZ::Vector3(0.0f, 0.0f, 0.4f);
+        }
+        const AZ::EntityId self = GetEntityId();
+        auto free = [&](float offsetDegrees)
+        {
+            const float yaw = m_yaw + AZ::DegToRad(offsetDegrees);
+            AzPhysics::RayCastRequest request;
+            request.m_start = at;
+            request.m_direction = AZ::Quaternion::CreateRotationZ(yaw).TransformVector(AZ::Vector3::CreateAxisY());
+            request.m_distance = 12.0f;
+            request.m_filterCallback = [self](const AzPhysics::SimulatedBody* body, [[maybe_unused]] const Physics::Shape* shape)
+            {
+                return body && body->GetEntityId() == self ? AzPhysics::SceneQuery::QueryHitType::None : AzPhysics::SceneQuery::QueryHitType::Block;
+            };
+            AzPhysics::SceneQueryHits hits = scenes->QueryScene(scene, &request);
+            return hits ? hits.m_hits.front().m_distance : 12.0f;
+        };
+        m_steerTime += deltaTime;
+        const float ahead = free(0.0f);
+        const float left = free(50.0f), right = free(-50.0f);
+        const float farLeft = free(90.0f), farRight = free(-90.0f);
+        float want = 0.0f; // yaw speed wanted, radians a second (+ is left)
+        if (ahead < 3.2f)
+        {
+            // A wall: turn hard to the open side.
+            const float l = left + farLeft * 0.5f, r = right + farRight * 0.5f;
+            const float side = std::fabs(l - r) < 1.5f ? m_steerSide : (l > r ? 1.0f : -1.0f);
+            want = side * AZ::DegToRad(150.0f);
+        }
+        else
+        {
+            // Open ahead: drift to the middle (more room on one side pulls that way), and a turn now and then into a
+            // side opening, as if looking for the way out.
+            want = AZ::GetClamp((left - right) * 0.10f, -0.6f, 0.6f);
+            if (m_steerTime > 2.2f && (m_steerSide > 0.0f ? farLeft : farRight) > 7.0f && ahead < 9.0f)
+            {
+                want = m_steerSide * AZ::DegToRad(130.0f);
+                m_steerTime = 1.2f;
+            }
+        }
+        if (static_cast<int>((m_steerTime - deltaTime) * 2.0f) != static_cast<int>(m_steerTime * 2.0f))
+        {
+            AZ_Printf("Noclip", "noclip_run: at %.1f %.1f %.1f yaw %.0f ahead %.1f left %.1f right %.1f far %.1f %.1f -> %.0f deg/s",
+                at.GetX(), at.GetY(), at.GetZ(), AZ::RadToDeg(m_yaw), ahead, left, right, farLeft, farRight, AZ::RadToDeg(want));
+        }
+        const float ease = AZ::GetMin(1.0f, deltaTime * 6.0f);
+        m_steerRate += (want - m_steerRate) * ease;
+        m_yaw += m_steerRate * deltaTime;
+        // The head bobs with the run and looks a little down, like someone running scared.
+        m_pitch += (AZ::DegToRad(-4.0f) + AZ::DegToRad(1.2f) * std::sin(m_steerTime * 9.0f) - m_pitch) * ease * 0.5f;
+    }
+
     void FirstPersonControllerComponent::OnTick(float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
         if (deltaTime <= 0.0f)
@@ -593,6 +684,10 @@ namespace NoclipProtocol
         m_mouseDeltaX = 0.0f;
         m_mouseDeltaY = 0.0f;
 
+        if (m_autoSteer && m_autoWalkSeconds > 0.0f)
+        {
+            Steer(deltaTime);
+        }
         m_lastWrittenRotation = AZ::Quaternion::CreateRotationZ(m_yaw);
         AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion, m_lastWrittenRotation);
         if (m_cameraEntity.IsValid())

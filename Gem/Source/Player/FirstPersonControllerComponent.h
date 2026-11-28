@@ -29,7 +29,9 @@ namespace NoclipProtocol
         void Teleport(const AZ::Vector3& position, float yaw, float pitch, bool setYaw, bool setPitch);
         AZ::Entity* UiEntity() const { return m_uiEntity; } // the HUD, vitals and weapons
         //! Walk forward for a while as if W were held (the noclip_walk dev command).
-        void WalkFor(float seconds, bool sprint) { m_autoWalkSeconds = seconds; m_autoWalkSprint = sprint; }
+        void WalkFor(float seconds, bool sprint) { m_autoWalkSeconds = seconds; m_autoWalkSprint = sprint; m_autoSteer = false; }
+        //! The same, steering round walls by itself like someone running through the maze (noclip_run; the trailer).
+        void RunFor(float seconds, bool sprint, float firstTurn) { WalkFor(seconds, sprint); m_autoSteer = true; m_steerSide = firstTurn; m_steerTime = 0.0f; }
 
     protected:
         void Activate() override;
@@ -82,5 +84,10 @@ namespace NoclipProtocol
         AZ::Entity* m_uiEntity = nullptr; // HUD, pause menu and vitals, made at runtime so levels don't need them
         float m_autoWalkSeconds = 0.0f;
         bool m_autoWalkSprint = false;
+        bool m_autoSteer = false;
+        float m_steerSide = 1.0f;  // which way to turn when both sides are open: +1 left, -1 right
+        float m_steerRate = 0.0f;  // the yaw's speed, eased
+        float m_steerTime = 0.0f;
+        void Steer(float deltaTime);
     };
 } // namespace NoclipProtocol

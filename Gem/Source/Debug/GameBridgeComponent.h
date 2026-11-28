@@ -4,11 +4,17 @@
 //   {"op":"console","command":"..."}        run a console command (hud_key, noclip_tp, LoadLevel, ...)
 //   {"op":"screenshot","path":"/abs/x.png"} capture the screen
 //   {"op":"registry","path":"/NoclipProtocol/..."} read a value (string, number or bool)
+//   {"op":"record","dir":"/abs/dir","frames":N,"fps":30,"script":[[frame,"command"],...]}
+//       film the game: a screenshot every frame (dir/f00000.png ...) and each frame's game time (dir/times.txt), the
+//       script's console commands on their frames (the trailer); "scale" slows the game (t_simulationTickScale) for
+//       more frames per game second. The answer comes when it's done. (t_simulationTickDeltaOverride stopped time.)
 // Only in builds with the AZ_RELEASE_BUILD off (development and profile).
 #pragma once
 
 #include <AzCore/Component/Component.h>
 #include <AzCore/Component/TickBus.h>
+#include <AzCore/std/containers/vector.h>
+#include <AzCore/std/utils.h>
 #include <AzCore/std/string/string.h>
 
 namespace NoclipProtocol
@@ -31,5 +37,16 @@ namespace NoclipProtocol
         AZStd::string m_folder; // <project>/user/ClaudeBridge
         AZStd::string m_token;
         float m_wait = 0.0f;
+        void Record(float deltaTime);
+        struct Recording
+        {
+            AZStd::string m_id, m_dir;
+            int m_frames = 0, m_frame = 0, m_failed = 0;
+            AZStd::vector<AZStd::pair<int, AZStd::string>> m_script;
+            AZStd::vector<float> m_times; // game time of each frame (the frames are resampled to an even rate later)
+            float m_time = 0.0f;
+            bool m_scaled = false;
+        };
+        Recording m_recording;
     };
 } // namespace NoclipProtocol

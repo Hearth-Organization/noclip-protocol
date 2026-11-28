@@ -92,8 +92,53 @@ namespace NoclipProtocol
         AZ::TickBus::Handler::BusDisconnect();
     }
 
+    void GameBridgeComponent::Record(float deltaTime)
+    {
+        Recording& r = m_recording;
+        auto* console = AZ::Interface<AZ::IConsole>::Get();
+        if (r.m_frame > 0)
+        {
+            r.m_time += deltaTime;
+        }
+        r.m_times.push_back(r.m_time);
+        for (const auto& [frame, command] : r.m_script)
+        {
+            if (frame == r.m_frame && console)
+            {
+                console->PerformCommand(command.c_str());
+            }
+        }
+        AZ::Render::FrameCaptureOutcome outcome;
+        const AZStd::string shot = AZStd::string::format("%s/f%05d.png", r.m_dir.c_str(), r.m_frame);
+        AZ::Render::FrameCaptureRequestBus::BroadcastResult(outcome, &AZ::Render::FrameCaptureRequestBus::Events::CaptureScreenshot, shot);
+        if (!outcome.IsSuccess())
+        {
+            ++r.m_failed;
+        }
+        if (++r.m_frame >= r.m_frames)
+        {
+            if (console && r.m_scaled)
+            {
+                console->PerformCommand("t_simulationTickScale 1");
+            }
+            AZStd::string times;
+            for (float t : r.m_times)
+            {
+                times += AZStd::string::format("%.5f\n", t);
+            }
+            WriteText(r.m_dir + "/times.txt", times);
+            WriteText(m_folder + "/game_outbox/" + r.m_id + ".json",
+                AZStd::string::format("{\"ok\": true, \"frames\": %d, \"failed\": %d, \"dir\": %s}\n", r.m_frames, r.m_failed, Escape(r.m_dir).c_str()));
+            r = Recording();
+        }
+    }
+
     void GameBridgeComponent::OnTick(float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
+        if (m_recording.m_frames > 0)
+        {
+            Record(deltaTime);
+        }
         m_wait -= deltaTime;
         if (m_wait > 0.0f)
         {
@@ -193,6 +238,40 @@ namespace NoclipProtocol
             else
             {
                 answer = "{\"ok\": false, \"error\": \"no such value\"}";
+            }
+        }
+        else if (str("op") == "record")
+        {
+            Recording r;
+            r.m_id = id;
+            r.m_dir = str("dir");
+            r.m_frames = request.HasMember("frames") && request["frames"].IsInt() ? request["frames"].GetInt() : 0;
+            const int fps = request.HasMember("fps") && request["fps"].IsInt() ? request["fps"].GetInt() : 30;
+            if (request.HasMember("script") && request["script"].IsArray())
+            {
+                for (const auto& step : request["script"].GetArray())
+                {
+                    if (step.IsArray() && step.Size() == 2 && step[0].IsInt() && step[1].IsString())
+                    {
+                        r.m_script.push_back({ step[0].GetInt(), AZStd::string(step[1].GetString()) });
+                    }
+                }
+            }
+            if (r.m_dir.empty() || r.m_frames <= 0 || fps <= 0)
+            {
+                answer = "{\"ok\": false, \"error\": \"record needs dir and frames\"}";
+            }
+            else
+            {
+                AZ::IO::SystemFile::CreateDir(r.m_dir.c_str());
+                const double scale = request.HasMember("scale") && request["scale"].IsNumber() ? request["scale"].GetDouble() : 1.0;
+                if (auto* console = AZ::Interface<AZ::IConsole>::Get(); console && scale != 1.0)
+                {
+                    console->PerformCommand(AZStd::string::format("t_simulationTickScale %g", scale).c_str());
+                    r.m_scaled = true;
+                }
+                m_recording = AZStd::move(r);
+                return; // answered when the last frame is taken
             }
         }
         else
