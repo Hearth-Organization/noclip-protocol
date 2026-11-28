@@ -1,0 +1,307 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "StreetlampFlicker",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 5800616913293446161
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 4470910155217105070
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 8866402556920550453
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 223619706808515809
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 4150307549635530119
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 8163431260151172289
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 4614503727685590165
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 121217534892096161
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 2365038260453608096
+            },
+            "EditorStaticRigidBodyComponent": {
+                "$type": "EditorStaticRigidBodyComponent",
+                "Id": 4991590278919180519
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 4041622248536874322,
+                "Parent Entity": ""
+            },
+            "AZ::Render::EditorMeshComponent": {
+                "$type": "AZ::Render::EditorMeshComponent",
+                "Id": 2330105781751203553,
+                "Controller": {
+                    "Configuration": {
+                        "ModelAsset": {
+                            "assetId": {
+                                "guid": "{E0B3798F-7235-50A9-960F-755D9CFA3574}",
+                                "subId": 278422535
+                            },
+                            "assetHint": "assets/models/landmarks/streetlamp/streetlamp.fbx.azmodel"
+                        }
+                    }
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 7356507376927573947,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{B626B544-92E2-57A4-9B67-B1B5C5A633DA}"
+                                    },
+                                    "assetHint": "assets/models/landmarks/streetlamp/streetlamp.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "EditorColliderComponent": {
+                "$type": "EditorColliderComponent",
+                "Id": 2207026650456359872,
+                "ColliderConfiguration": {
+                    "Position": [
+                        0.0,
+                        0.0,
+                        2.5
+                    ],
+                    "MaterialSlots": {
+                        "Slots": [
+                            {
+                                "Name": "Entire object"
+                            }
+                        ]
+                    }
+                },
+                "ShapeConfiguration": {
+                    "ShapeType": 2,
+                    "Capsule": {
+                        "Height": 5.0,
+                        "Radius": 0.15
+                    }
+                }
+            }
+        }
+    },
+    "Entities": {
+        "Entity_[6875862357207]": {
+            "Id": "Entity_[6875862357207]",
+            "Name": "L0_LightFlickerRoot",
+            "Components": {
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 5702767111729509788
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 331188490281587105
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 15966064109972957310,
+                    "Child Entity Order": [
+                        "Entity_[31534674874410]",
+                        "Entity_[31538969841706]",
+                        "Entity_[835375472636]"
+                    ]
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 3696093238742331258
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 4878524448958967219
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 7644536145166066570
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 15767267708634454357
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 17583059037674348090
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 11687184161568352483,
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            4.85
+                        ]
+                    }
+                },
+                "FlickerLightComponent": {
+                    "$type": "GenericComponentWrapper",
+                    "Id": 1732804360746816839,
+                    "m_template": {
+                        "$type": "FlickerLightComponent",
+                        "LightEntity": "Entity_[8433407554133]"
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 3824783722205516927,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": false,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{CF7D2A05-AEED-5775-94B6-A99DC3579CC2}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/level0/level0_zap.wav.miniaudio"
+                            },
+                            "Volume": 100.0,
+                            "Loop": false,
+                            "Spatialization": true,
+                            "Min Distance": 1.0,
+                            "Max Distance": 8.0,
+                            "Auto-follow": true
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[8433407554133]": {
+            "Id": "Entity_[8433407554133]",
+            "Name": "L0_FlickerBulb",
+            "Components": {
+                "AZ::Render::EditorAreaLightComponent": {
+                    "$type": "AZ::Render::EditorAreaLightComponent",
+                    "Id": 962502846974648429,
+                    "Controller": {
+                        "Configuration": {
+                            "LightType": 2,
+                            "Color": [
+                                1.0,
+                                0.72,
+                                0.42
+                            ],
+                            "Intensity": 324.0,
+                            "AttenuationRadiusMode": 0,
+                            "AttenuationRadius": 16.0
+                        }
+                    }
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 7524381265356299080
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 2008467906811648330
+                },
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 850485308104573549
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 12921549688875151195
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 9301027293950364395
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 16958683234226058406
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 13082031975430409172
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 14508373774504307792
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 4115625389580090653,
+                    "Parent Entity": "Entity_[6875862357207]",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            -0.05
+                        ],
+                        "Rotate": [
+                            180.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                "EditorMiniAudioPlaybackComponent": {
+                    "$type": "EditorMiniAudioPlaybackComponent",
+                    "Id": 7029400739945980706,
+                    "Controller": {
+                        "Config": {
+                            "Autoplay": true,
+                            "Sound": {
+                                "assetId": {
+                                    "guid": "{28F5FEAC-4AB6-5C01-A47D-95F9B46111AB}",
+                                    "subId": 1
+                                },
+                                "assetHint": "assets/sounds/level0/level0_hum.wav.miniaudio"
+                            },
+                            "Volume": 2.5,
+                            "Loop": true,
+                            "Spatialization": true,
+                            "Min Distance": 0.800000011920929,
+                            "Max Distance": 8.0,
+                            "Auto-follow": true
+                        }
+                    }
+                },
+                "EditorDiskShapeComponent": {
+                    "$type": "EditorDiskShapeComponent",
+                    "Id": 188777183928653033,
+                    "ShapeColor": [
+                        1.0,
+                        0.96,
+                        0.85,
+                        1.0
+                    ],
+                    "DiskShape": {
+                        "Configuration": {
+                            "Radius": 0.3
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

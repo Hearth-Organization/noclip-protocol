@@ -9,6 +9,9 @@
 #include "LevelCatalogMaterials.h"
 #include <AtomLyIntegration/CommonFeatures/CoreLights/AreaLightBus.h>
 #include <AtomLyIntegration/CommonFeatures/Material/MaterialComponentBus.h>
+#include <AtomLyIntegration/CommonFeatures/Material/MaterialComponentConstants.h>
+#include <AtomLyIntegration/CommonFeatures/Mesh/MeshComponentBus.h>
+#include <AtomLyIntegration/CommonFeatures/Mesh/MeshComponentConstants.h>
 #include <AtomLyIntegration/CommonFeatures/CoreLights/DirectionalLightBus.h>
 #include <AtomLyIntegration/CommonFeatures/ImageBasedLights/ImageBasedLightComponentBus.h>
 #include <AtomLyIntegration/CommonFeatures/PostProcess/ExposureControl/ExposureControlBus.h>
@@ -735,6 +738,7 @@ namespace NoclipProtocol
     void EndlessLevelComponent::Deactivate()
     {
         LiveLevels().erase(AZStd::remove(LiveLevels().begin(), LiveLevels().end(), this), LiveLevels().end());
+        RemoveSkyDisc();
         AZ::TickBus::Handler::BusDisconnect();
         for (auto& [key, chunk] : m_chunks)
         {
@@ -922,6 +926,7 @@ namespace NoclipProtocol
         {
             SetUpOutdoors(deltaTime);
         }
+        UpdateSkyDisc();
         CheckNoclipSpots();
         CheckExits();
         if (s_exitGo != -2 && m_followEntity.IsValid())
@@ -1356,17 +1361,23 @@ namespace NoclipProtocol
             SpawnBox(chunk.m_tickets[PieceWall], wall, true, 0.0f, false, 0);
         }
         // Outdoors the pillars are landmarks: trees, houses and street lamps (Tripo3D models), not boxes.
+        // The trees, houses and lamps must all be there; the grass is spawned only where its prefab is (else bare lawn).
         bool landmarks = IsOutdoors();
-        for (auto& asset : m_landmarkAssets)
+        for (int i = 0; i < 5; ++i)
         {
-            landmarks = landmarks && asset.IsReady();
+            landmarks = landmarks && m_landmarkAssets[i].IsReady();
         }
         const size_t landmarkTickets = chunk.m_tickets.size();
+        int ticketOf[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
         if (landmarks)
         {
-            for (auto& asset : m_landmarkAssets)
+            for (int i = 0; i < 8; ++i)
             {
-                chunk.m_tickets.emplace_back(asset);
+                if (m_landmarkAssets[i].IsReady())
+                {
+                    ticketOf[i] = static_cast<int>(chunk.m_tickets.size() - landmarkTickets);
+                    chunk.m_tickets.emplace_back(m_landmarkAssets[i]);
+                }
             }
         }
         if (m_enablePillars)
@@ -1386,6 +1397,32 @@ namespace NoclipProtocol
                 SpawnBox(chunk.m_tickets[PiecePillar], pillar, true, 0.0f, false, 0);
             }
         }
+        // Outdoor scenes: the street surface, raised sidewalks, and the houses, trees and lamps standing on them.
+        for (const Level0::Box& road : layout.m_roads)
+        {
+            SpawnBox(chunk.m_tickets[PieceFloor], road, true, 0.0f, false, 4);
+        }
+        for (const Level0::Box& walk : layout.m_sidewalks)
+        {
+            SpawnBox(chunk.m_tickets[PieceFloor], walk, true, 0.0f, false, 5);
+        }
+        if (landmarks)
+        {
+            for (const Level0::ChunkLayout::Placed& placed : layout.m_placed)
+            {
+                const int kind = AZStd::clamp(placed.m_kind, 0, 7);
+                if (ticketOf[kind] < 0)
+                {
+                    continue;
+                }
+                SpawnBox(chunk.m_tickets[landmarkTickets + ticketOf[kind]], Level0::Box{ placed.m_at.m_x, placed.m_at.m_y, 0.0f, 1.0f, 1.0f, 1.0f },
+                    false, placed.m_yaw);
+                if (kind == 3 || kind == 4)
+                {
+                    chunk.m_litLights.push_back(AZ::Vector3(placed.m_at.m_x, placed.m_at.m_y, kind == 4 ? -1.0f : 1.0f));
+                }
+            }
+        }
         if (layout.m_hasSlabs)
         {
             // A hole only when its stairs or pool can go in it (their prefabs loaded), else the floor whole.
@@ -1396,7 +1433,7 @@ namespace NoclipProtocol
             }
             if (layout.m_floorParts.empty() || !holesReady)
             {
-                SpawnBox(chunk.m_tickets[PieceFloor], layout.m_floor, true, 0.0f, false, 1);
+                SpawnBox(chunk.m_tickets[PieceFloor], layout.m_floor, true, 0.0f, false, m_settings.m_scene == 1 ? 6 : 1);
             }
             for (const Level0::Box& part : holesReady ? layout.m_floorParts : std::vector<Level0::Box>())
             {
@@ -1570,6 +1607,10 @@ namespace NoclipProtocol
         {
             chunk.m_solids.push_back(frame);
         }
+        for (const Level0::Box& blocker : layout.m_blockers)
+        {
+            chunk.m_solids.push_back(blocker);
+        }
         AddSolidBodies(chunk);
         m_chunks.emplace(Key(chunkX, chunkY), AZStd::move(chunk));
     }
@@ -1699,9 +1740,11 @@ namespace NoclipProtocol
         }
         if (IsOutdoors())
         {
-            static const char* const landmarks[3] = { "prefabs/landmarks/tree.spawnable", "prefabs/landmarks/house.spawnable",
-                                                      "prefabs/landmarks/streetlamp.spawnable" };
-            for (int i = 0; i < 3; ++i)
+            static const char* const landmarks[8] = { "prefabs/landmarks/tree.spawnable", "prefabs/landmarks/house.spawnable",
+                                                      "prefabs/landmarks/streetlamp.spawnable", "prefabs/landmarks/streetlamplit.spawnable",
+                                                      "prefabs/landmarks/streetlampflicker.spawnable", "prefabs/foliage/grasspatchshort.spawnable",
+                                                      "prefabs/foliage/grasspatchlong.spawnable", "prefabs/foliage/grasspatchdry.spawnable" };
+            for (int i = 0; i < 8; ++i)
             {
                 AZ::Data::AssetId id;
                 AZ::Data::AssetCatalogRequestBus::BroadcastResult(id, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath, landmarks[i],
@@ -1722,8 +1765,84 @@ namespace NoclipProtocol
             m_landmarkShare[0] = town ? 15 : (bare ? 70 : 80);
             m_landmarkShare[1] = town ? 55 : (bare ? 10 : 12);
         }
+        // Hand-built outdoor scenes from the Backrooms wiki (the owner, Nov 28: "make them look exactly like them").
+        m_settings.m_scene = 0;
+        for (auto& id : m_sceneMaterials)
+        {
+            id = AZ::Data::AssetId();
+        }
+        if (AZStd::string(level.m_name).find("Suburbs") != AZStd::string::npos)
+        {
+            m_settings.m_scene = 1;
+            static const char* const scene[3] = { "assets/materials/outdoor/suburb_road.azmaterial",
+                "assets/materials/outdoor/suburb_sidewalk.azmaterial", "assets/materials/outdoor/suburb_lawn.azmaterial" };
+            for (int i = 0; i < 3; ++i)
+            {
+                AZ::Data::AssetCatalogRequestBus::BroadcastResult(m_sceneMaterials[i], &AZ::Data::AssetCatalogRequests::GetAssetIdByPath,
+                    scene[i], AZ::Data::s_invalidAssetType, false);
+                AZ_Warning("NoclipProtocol", m_sceneMaterials[i].IsValid(), "Suburb: '%s' not found", scene[i]);
+            }
+        }
         AZ_Printf("NoclipProtocol", "Catalog level %d: %s (layout %d, light %d, danger %d)", static_cast<int>(number), level.m_name,
             level.m_layout, level.m_light, level.m_danger);
+    }
+
+    void EndlessLevelComponent::MakeSkyDisc(AZ::EntityId sun, bool moon)
+    {
+        RemoveSkyDisc();
+        AZ::Transform sunTM = AZ::Transform::CreateIdentity();
+        AZ::TransformBus::EventResult(sunTM, sun, &AZ::TransformBus::Events::GetWorldTM);
+        m_skyDiscDirection = -sunTM.GetBasisY().GetNormalized(); // the light falls along +Y; the disc is where it comes from
+        AZ::Data::AssetId model, material;
+        AZ::Data::AssetCatalogRequestBus::BroadcastResult(model, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath,
+            "models/sphere.fbx.azmodel", AZ::Data::s_invalidAssetType, false);
+        AZ::Data::AssetCatalogRequestBus::BroadcastResult(material, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath,
+            moon ? "assets/materials/outdoor/moon.azmaterial" : "assets/materials/outdoor/sun.azmaterial", AZ::Data::s_invalidAssetType, false);
+        if (!model.IsValid() || !material.IsValid())
+        {
+            AZ_Warning("NoclipProtocol", false, "Sky disc: sphere model or %s material not found", moon ? "moon" : "sun");
+            return;
+        }
+        m_skyDisc = aznew AZ::Entity(moon ? "Moon" : "SunDisc");
+        m_skyDisc->CreateComponent<AzFramework::TransformComponent>();
+        m_skyDisc->CreateComponent(AZ::Render::MeshComponentTypeId);
+        m_skyDisc->CreateComponent(AZ::Render::MaterialComponentTypeId);
+        m_skyDisc->Init();
+        m_skyDisc->Activate();
+        const AZ::EntityId id = m_skyDisc->GetId();
+        AZ::Render::MeshComponentRequestBus::Event(id, &AZ::Render::MeshComponentRequests::SetModelAssetId, model);
+        AZ::Render::MaterialComponentRequestBus::Event(id, &AZ::Render::MaterialComponentRequests::SetMaterialAssetIdOnDefaultSlot, material);
+        UpdateSkyDisc();
+        AZ_Printf("NoclipProtocol", "Sky disc: %s at %.2f %.2f %.2f", moon ? "moon" : "sun", m_skyDiscDirection.GetX(),
+            m_skyDiscDirection.GetY(), m_skyDiscDirection.GetZ());
+    }
+
+    void EndlessLevelComponent::UpdateSkyDisc()
+    {
+        if (!m_skyDisc)
+        {
+            return;
+        }
+        AZ::Vector3 eye = AZ::Vector3::CreateZero();
+        if (m_followEntity.IsValid())
+        {
+            AZ::TransformBus::EventResult(eye, m_followEntity, &AZ::TransformBus::Events::GetWorldTranslation);
+        }
+        // 700 m off (inside the camera's 1 km reach), drawn larger than life (about 1.5 degrees) as games do.
+        constexpr float distance = 700.0f, diameter = 18.0f;
+        AZ::Transform tm = AZ::Transform::CreateTranslation(eye + m_skyDiscDirection * distance);
+        tm.SetUniformScale(diameter);
+        AZ::TransformBus::Event(m_skyDisc->GetId(), &AZ::TransformBus::Events::SetWorldTM, tm);
+    }
+
+    void EndlessLevelComponent::RemoveSkyDisc()
+    {
+        if (m_skyDisc)
+        {
+            m_skyDisc->Deactivate();
+            delete m_skyDisc;
+            m_skyDisc = nullptr;
+        }
     }
 
     void EndlessLevelComponent::SetUpOutdoors(float deltaTime)
@@ -1756,19 +1875,26 @@ namespace NoclipProtocol
         static const float compensation[3] = { 0.0f, 0.3f, 1.2f };
         static const AZ::Color sunColor[3] = { AZ::Color(1.0f, 0.97f, 0.9f, 1.0f), AZ::Color(1.0f, 0.62f, 0.38f, 1.0f),
                                                AZ::Color(0.55f, 0.65f, 1.0f, 1.0f) };
+        // The suburb (the wiki): midnight, darker than any other night, the streets lit only by the few lamps that work.
+        const bool midnight = m_settings.m_scene == 1;
+        const float moonLux = midnight ? 0.025f : sunLux[mood];
+        const float skyEv = midnight ? -13.0f : skyExposure[mood];
+        const float iblEv = midnight ? -8.5f : iblExposure[mood];
+        const float exposureEv = midnight ? 0.8f : compensation[mood];
         if (sun.IsValid())
         {
-            AZ::Render::DirectionalLightRequestBus::Event(sun, &AZ::Render::DirectionalLightRequests::SetColor, sunColor[mood]);
+            AZ::Render::DirectionalLightRequestBus::Event(sun, &AZ::Render::DirectionalLightRequests::SetColor,
+                midnight ? AZ::Color(0.45f, 0.55f, 0.75f, 1.0f) : sunColor[mood]);
             AZ::Render::DirectionalLightRequestBus::Event(sun,
-                static_cast<void (AZ::Render::DirectionalLightRequests::*)(float)>(&AZ::Render::DirectionalLightRequests::SetIntensity), sunLux[mood]);
+                static_cast<void (AZ::Render::DirectionalLightRequests::*)(float)>(&AZ::Render::DirectionalLightRequests::SetIntensity), moonLux);
             const float yaw = AZ::DegToRad(static_cast<float>((level.m_number * 47) % 360));
             AZ::TransformBus::Event(sun, &AZ::TransformBus::Events::SetWorldRotationQuaternion,
                 AZ::Quaternion::CreateRotationZ(yaw) * AZ::Quaternion::CreateRotationX(AZ::DegToRad(sunPitch[mood])));
         }
         if (sky.IsValid())
         {
-            AZ::Render::HDRiSkyboxRequestBus::Event(sky, &AZ::Render::HDRiSkyboxRequests::SetExposure, skyExposure[mood]);
-            AZ::Render::ImageBasedLightComponentRequestBus::Event(sky, &AZ::Render::ImageBasedLightComponentRequests::SetExposure, iblExposure[mood]);
+            AZ::Render::HDRiSkyboxRequestBus::Event(sky, &AZ::Render::HDRiSkyboxRequests::SetExposure, skyEv);
+            AZ::Render::ImageBasedLightComponentRequestBus::Event(sky, &AZ::Render::ImageBasedLightComponentRequests::SetExposure, iblEv);
         }
         if (environment.IsValid())
         {
@@ -1779,7 +1905,11 @@ namespace NoclipProtocol
             AZ::Render::DeferredFogRequestsBus::Event(environment, &AZ::Render::DeferredFogRequests::SetFogStartDistance, far * 0.4f);
             AZ::Render::DeferredFogRequestsBus::Event(environment, &AZ::Render::DeferredFogRequests::SetFogEndDistance, far);
             AZ::Render::DeferredFogRequestsBus::Event(environment, &AZ::Render::DeferredFogRequests::SetFogMaxHeight, 60.0f);
-            AZ::Render::ExposureControlRequestBus::Event(environment, &AZ::Render::ExposureControlRequests::SetManualCompensation, compensation[mood]);
+            AZ::Render::ExposureControlRequestBus::Event(environment, &AZ::Render::ExposureControlRequests::SetManualCompensation, exposureEv);
+        }
+        if (sun.IsValid())
+        {
+            MakeSkyDisc(sun, mood == 2 || midnight);
         }
         AZ_Printf("NoclipProtocol", "Outdoors: level %d, mood %d (sun %s, sky %s)", level.m_number, mood, sun.IsValid() ? "yes" : "no",
             sky.IsValid() ? "yes" : "no");
@@ -1787,7 +1917,15 @@ namespace NoclipProtocol
 
     void EndlessLevelComponent::DressEntity(AZ::EntityId id, int dress)
     {
-        if (dress >= 0 && dress < 3)
+        if (dress >= 4 && dress < 7)
+        {
+            const AZ::Data::AssetId& material = m_sceneMaterials[dress - 4];
+            if (material.IsValid())
+            {
+                AZ::Render::MaterialComponentRequestBus::Event(id, &AZ::Render::MaterialComponentRequests::SetMaterialAssetIdOnDefaultSlot, material);
+            }
+        }
+        else if (dress >= 0 && dress < 3)
         {
             if (m_dressMaterials[dress].IsValid())
             {

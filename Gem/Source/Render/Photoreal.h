@@ -13,7 +13,7 @@ namespace NoclipProtocol::Photoreal
     //!   dazzles for a moment), around the level's own exposure,
     //! - motion blur on fast turns and a soft lens vignette, like the bodycam it is.
     //! Returns false until the scene and the environment are ready; call it each frame until it returns true.
-    bool Apply(AZ::EntityId environment, bool rayTraced);
+    bool Apply(AZ::EntityId environment, bool rayTraced, bool outdoors);
     //! True once after gfx_set changed an effect: apply again.
     bool TakeReapply();
 } // namespace NoclipProtocol::Photoreal

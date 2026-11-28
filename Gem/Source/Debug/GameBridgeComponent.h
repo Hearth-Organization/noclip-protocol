@@ -48,5 +48,11 @@ namespace NoclipProtocol
             bool m_scaled = false;
         };
         Recording m_recording;
+        // level_tour: a picture of every level in turn (the owner, Nov 28: "pictures from every level").
+        // Its place is kept in the settings registry, since a level load replaces this component.
+        void Tour(float deltaTime);
+        float m_tourClock = 0.0f;
+        bool m_tourShot = false;
+        AZ::s64 m_tourSerial = -1;
     };
 } // namespace NoclipProtocol

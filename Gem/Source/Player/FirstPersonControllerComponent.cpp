@@ -496,14 +496,20 @@ namespace NoclipProtocol
         }
         m_photorealWait = 0.5f;
         AZ::EntityId environment;
-        AZ::ComponentApplicationBus::Broadcast(&AZ::ComponentApplicationRequests::EnumerateEntities, [&environment](AZ::Entity* entity)
+        bool outdoors = false; // outdoor levels have a sun
+        AZ::ComponentApplicationBus::Broadcast(&AZ::ComponentApplicationRequests::EnumerateEntities, [&environment, &outdoors](AZ::Entity* entity)
         {
-            if (!environment.IsValid() && entity->GetState() == AZ::Entity::State::Active && entity->GetName() == "Atom Default Environment")
+            if (entity->GetState() != AZ::Entity::State::Active)
+            {
+                return;
+            }
+            if (!environment.IsValid() && entity->GetName() == "Atom Default Environment")
             {
                 environment = entity->GetId();
             }
+            outdoors = outdoors || entity->GetName() == "Sun";
         });
-        if (Photoreal::Apply(environment, RayTracing::IsOn()))
+        if (Photoreal::Apply(environment, RayTracing::IsOn(), outdoors))
         {
             m_photorealDone = true;
             AZ_Printf("NoclipProtocol", "Photoreal look applied (gfx_set changes one effect)");

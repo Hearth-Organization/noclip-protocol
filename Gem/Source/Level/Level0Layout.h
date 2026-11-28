@@ -35,6 +35,7 @@ namespace NoclipProtocol::Level0
         float m_darkZoneShare = 0.4f;  // share of the world inside dark zones (dead / missing lights)
         float m_darkZoneScale = 3.5f;  // dark zones are about this many cells across
         float m_decalChance = 0.3f;    // chance a cell gets a floor stain
+        int m_scene = 0;               // a hand-built outdoor scene instead of the open ground: 1 = Level 9's suburb (the wiki's)
         float m_lightShare = 1.0f;     // share of the lights that would work which really do, every level (owner, Nov 28: "turn off some lights on every level ... so it's not all blown out")
         float m_workingLights = 0.66f; // share of lights in lit areas that work; lower = more dead and flickering (ray tracing uses 0.33)
 
@@ -120,6 +121,17 @@ namespace NoclipProtocol::Level0
         std::vector<Light> m_lights; // cells with no light at all are simply absent
         std::vector<Decal> m_decals;
         std::vector<Box> m_props;    // Level 1 crates, Level 2 pipes (one stretched box each)
+        // Outdoor scenes (m_scene): road surface, raised sidewalks, and the things standing on them.
+        std::vector<Box> m_roads;
+        std::vector<Box> m_sidewalks;
+        struct Placed
+        {
+            Point m_at;
+            float m_yaw;
+            int m_kind;   // 0 tree, 1 house, 2 street lamp (dead), 3 street lamp (lit), 4 street lamp (flickering), 5-7 grass patch (short, long, dry)
+        };
+        std::vector<Placed> m_placed;
+        std::vector<Box> m_blockers;  // solid but drawn by their models (houses, trunks, lamp posts)
         std::vector<Point> m_noclipSpots; // on the floor, in the middle of a cell
         //! Ways into other levels besides the tears (owner, Nov 27: "doorways or stairs or a drop off into water").
         struct Exit

@@ -202,7 +202,15 @@ namespace NoclipProtocol
         bool m_outdoorSet = false;        // its sun, sky and fog have been set for this level
         float m_outdoorTries = 0.0f;
         void SetUpOutdoors(float deltaTime);
-        AZ::Data::Asset<AzFramework::Spawnable> m_landmarkAssets[3]; // tree, house, street lamp (outdoors)
+        AZ::Data::Asset<AzFramework::Spawnable> m_landmarkAssets[8]; // tree, house, street lamp; lit and flickering street lamps; grass (short, long, dry)
+        AZ::Data::AssetId m_sceneMaterials[3];
+        // The sun or moon you can see (the owner, Nov 28: "make the moon and sun visible"): a glowing disc far off,
+        // opposite the way the sunlight falls, kept round the player like the sky.
+        AZ::Entity* m_skyDisc = nullptr;
+        AZ::Vector3 m_skyDiscDirection = AZ::Vector3::CreateAxisZ();
+        void MakeSkyDisc(AZ::EntityId sun, bool moon);
+        void UpdateSkyDisc();
+        void RemoveSkyDisc();                        // outdoor scenes: road, sidewalk, lawn (dress 4, 5, 6)
         int m_landmarkShare[2] = { 70, 20 };                           // % trees, % houses (the rest street lamps)
         AZStd::string m_framePrefab;      // breach frame (empty = none)
         AZStd::string m_screenPrefab;     // terminal screen (empty = none)

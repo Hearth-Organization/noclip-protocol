@@ -17,6 +17,106 @@ namespace NoclipProtocol
 {
     namespace
     {
+        constexpr const char* TourKey = "/NoclipProtocol/Tour";
+
+        void GoToLevel(int number)
+        {
+            // Next frame, never inside the bridge's own tick (a load tears the bridge down).
+            AZ::TickBus::QueueFunction([number]()
+            {
+                if (auto* console = AZ::Interface<AZ::IConsole>::Get())
+                {
+                    console->PerformCommand(AZStd::string::format("level_go %d", number).c_str());
+                }
+            });
+        }
+
+        // level_tour <first> <last> <folder> [seconds]: visits catalog levels first..last, and in each, after it has
+        // settled for the given seconds (default 14), saves <folder>/levelNN.png with the HUD hidden and monsters frozen.
+        void LevelTour(const AZ::ConsoleCommandContainer& arguments)
+        {
+            auto* registry = AZ::SettingsRegistry::Get();
+            if (arguments.size() < 3 || !registry)
+            {
+                AZ_Printf("NoclipProtocol", "level_tour <first> <last> <folder> [seconds]");
+                return;
+            }
+            const int first = AZStd::stoi(AZStd::string(arguments[0]));
+            const int last = AZStd::stoi(AZStd::string(arguments[1]));
+            const double wait = arguments.size() >= 4 ? AZStd::stod(AZStd::string(arguments[3])) : 14.0;
+            registry->Set(AZStd::string(TourKey) + "/Current", static_cast<AZ::s64>(first));
+            registry->Set(AZStd::string(TourKey) + "/Last", static_cast<AZ::s64>(last));
+            registry->Set(AZStd::string(TourKey) + "/Dir", AZStd::string(arguments[2]));
+            registry->Set(AZStd::string(TourKey) + "/Wait", wait);
+            registry->Set(AZStd::string(TourKey) + "/Active", true);
+            AZ::s64 serial = 0;
+            registry->Get(serial, AZStd::string(TourKey) + "/Serial");
+            registry->Set(AZStd::string(TourKey) + "/Serial", serial + 1); // a new tour: every bridge starts its clock again
+            AZ_Printf("NoclipProtocol", "level_tour: levels %d to %d, %.0f s each", first, last, wait);
+            GoToLevel(first);
+        }
+        AZ_CONSOLEFREEFUNC("level_tour", LevelTour, AZ::ConsoleFunctorFlags::Null,
+            "level_tour <first> <last> <folder> [seconds]: a screenshot of each catalog level in turn");
+    }
+
+    void GameBridgeComponent::Tour(float deltaTime)
+    {
+        auto* registry = AZ::SettingsRegistry::Get();
+        bool active = false;
+        if (!registry || !registry->Get(active, AZStd::string(TourKey) + "/Active") || !active)
+        {
+            return;
+        }
+        AZ::s64 current = 0, last = 0;
+        double wait = 14.0;
+        AZStd::string dir;
+        registry->Get(current, AZStd::string(TourKey) + "/Current");
+        registry->Get(last, AZStd::string(TourKey) + "/Last");
+        registry->Get(wait, AZStd::string(TourKey) + "/Wait");
+        registry->Get(dir, AZStd::string(TourKey) + "/Dir");
+        AZ::s64 serial = 0;
+        registry->Get(serial, AZStd::string(TourKey) + "/Serial");
+        if (serial != m_tourSerial)
+        {
+            m_tourSerial = serial;
+            m_tourClock = 0.0f;
+            m_tourShot = false;
+        }
+        if (m_tourClock == 0.0f)
+        {
+            if (auto* console = AZ::Interface<AZ::IConsole>::Get())
+            {
+                console->PerformCommand("hud_show 0");
+                console->PerformCommand("player_god 1");
+                console->PerformCommand("monster_debug freeze 1");
+            }
+        }
+        m_tourClock += deltaTime;
+        if (!m_tourShot && m_tourClock >= static_cast<float>(wait))
+        {
+            m_tourShot = true;
+            AZ::IO::SystemFile::CreateDir(dir.c_str());
+            const AZStd::string shot = AZStd::string::format("%s/level%02d.png", dir.c_str(), static_cast<int>(current));
+            AZ::Render::FrameCaptureOutcome outcome;
+            AZ::Render::FrameCaptureRequestBus::BroadcastResult(outcome, &AZ::Render::FrameCaptureRequestBus::Events::CaptureScreenshot, shot);
+            AZ_Printf("NoclipProtocol", "level_tour: level %d -> %s", static_cast<int>(current), shot.c_str());
+        }
+        if (m_tourShot && m_tourClock >= static_cast<float>(wait) + 1.5f)
+        {
+            if (current >= last)
+            {
+                registry->Set(AZStd::string(TourKey) + "/Active", false);
+                AZ_Printf("NoclipProtocol", "level_tour: done");
+                return;
+            }
+            registry->Set(AZStd::string(TourKey) + "/Current", current + 1);
+            m_tourShot = false;
+            m_tourClock = -20.0f; // this bridge goes with the level (if a load never comes, it carries on after 20 s)
+            GoToLevel(static_cast<int>(current + 1));
+        }
+    }
+    namespace
+    {
         bool WriteText(const AZStd::string& path, const AZStd::string& text)
         {
             const AZStd::string tmp = path + ".tmp";
@@ -139,6 +239,7 @@ namespace NoclipProtocol
         {
             Record(deltaTime);
         }
+        Tour(deltaTime);
         m_wait -= deltaTime;
         if (m_wait > 0.0f)
         {

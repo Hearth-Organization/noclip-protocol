@@ -56,7 +56,7 @@ namespace NoclipProtocol::Photoreal
         return again;
     }
 
-    bool Apply(AZ::EntityId environment, bool rayTraced)
+    bool Apply(AZ::EntityId environment, bool rayTraced, bool outdoors)
     {
         if (!environment.IsValid())
         {
@@ -105,7 +105,8 @@ namespace NoclipProtocol::Photoreal
         // Contact shadows where things meet: wall and floor, under a desk, the back of a corridor.
         if (auto* ao = settings->GetOrCreateAoSettingsInterface())
         {
-            ao->SetEnabled(look && Flag("Gtao", true));
+            // Not outdoors: under the open sky GTAO hung the GPU two seconds into every outdoor level (Nov 28).
+            ao->SetEnabled(look && !outdoors && Flag("Gtao", true));
             ao->SetAoMethod(AZ::Render::Ao::AoMethodType::GTAO);
             ao->SetGtaoQuality(AZ::Render::Ao::GtaoQualityLevel::High);
             ao->SetGtaoStrength(1.1f);
@@ -120,7 +121,8 @@ namespace NoclipProtocol::Photoreal
         {
             exposure->SetExposureControlType(look && Flag("EyeAdaptation", true) ? AZ::Render::ExposureControl::ExposureControlType::EyeAdaptation
                                                   : AZ::Render::ExposureControl::ExposureControlType::ManualOnly);
-            exposure->SetEyeAdaptationExposureMin(-2.0f);
+            // Under the open sky it may only stop down: opening up turned Level 9's midnight into dusk (Nov 28).
+            exposure->SetEyeAdaptationExposureMin(outdoors ? 0.0f : -2.0f);
             // Half a stop darker than each level was set up for (the owner, Nov 28: "not all blown out").
             // The level's own value is kept once, so applying again never darkens twice.
             static AZStd::unordered_map<AZ::EntityId, float> original;
