@@ -176,6 +176,12 @@ namespace NoclipProtocol
         AZStd::string m_kind;
         AZStd::string m_motions;
         AZStd::string m_playing;
+        // Bodies don't pass through the world: every move is checked against the level's real colliders
+        // (walls, pillars, furniture, shifted rooms), sliding along them instead of walking through.
+        float WallRay(const AZ::Vector3& from, const AZ::Vector3& direction, float distance, AZ::Vector3& normal) const;
+        AZ::Vector3 Collide(const AZ::Vector3& from, const AZ::Vector3& to, float radius) const;
+        AZ::Vector3 PushOut(const AZ::Vector3& at, float radius) const;
+        float m_radius = 0.38f; // its body's half-width
         // Its motions, loaded as soon as it spawns: a motion loaded on first use left the bare rest pose (a T-pose) on screen
         // until it arrived (owner, Nov 28).
         AZStd::vector<AZ::Data::Asset<AZ::Data::AssetData>> m_preloaded;

@@ -38,6 +38,12 @@
 
 #include <cctype>
 #include <cmath>
+#include <AzCore/Console/IConsole.h>
+#include <AzFramework/Physics/Common/PhysicsSceneQueries.h>
+#include <AzFramework/Physics/PhysicsScene.h>
+#include <AzFramework/Physics/Configuration/StaticRigidBodyConfiguration.h>
+#include <AzFramework/Physics/ShapeConfiguration.h>
+#include <AzFramework/Physics/Shape.h>
 #include <cstdlib>
 
 namespace NoclipProtocol
@@ -352,8 +358,257 @@ namespace NoclipProtocol
         AZ_CONSOLEFREEFUNC("noclip_cross", NoclipCross, AZ::ConsoleFunctorFlags::Null, "noclip_cross arrives in Level 0 as if through Breach 4-A (testing)");
     } // namespace
 
+    namespace
+    {
+        AZStd::vector<EndlessLevelComponent*>& LiveLevels()
+        {
+            static AZStd::vector<EndlessLevelComponent*> levels;
+            return levels;
+        }
+    }
+
+    AZ::Vector3 EndlessLevelComponent::KeepOutOfSolids(const AZ::Vector3& at, float radius, float height)
+    {
+        AZ::Vector3 p = at;
+        for (EndlessLevelComponent* level : LiveLevels())
+        {
+            if (level->m_chunks.empty())
+            {
+                continue;
+            }
+            int cx = 0, cy = 0;
+            Level0::WorldToChunk(level->m_settings, p.GetX(), p.GetY(), cx, cy);
+            for (int pass = 0; pass < 3; ++pass)
+            {
+                bool moved = false;
+                for (int dy = -1; dy <= 1; ++dy)
+                {
+                    for (int dx = -1; dx <= 1; ++dx)
+                    {
+                        auto it = level->m_chunks.find(Key(cx + dx, cy + dy));
+                        if (it == level->m_chunks.end())
+                        {
+                            continue;
+                        }
+                        for (const Level0::Box& b : it->second.m_solids)
+                        {
+                            // Only what's at body height (not pipes over its head, not a kerb it steps over).
+                            const float bottom = b.m_cz - b.m_sz * 0.5f, top = b.m_cz + b.m_sz * 0.5f;
+                            if (top < p.GetZ() + 0.3f || bottom > p.GetZ() + height)
+                            {
+                                continue;
+                            }
+                            const float hx = b.m_sx * 0.5f, hy = b.m_sy * 0.5f;
+                            const float qx = AZStd::clamp(p.GetX(), b.m_cx - hx, b.m_cx + hx);
+                            const float qy = AZStd::clamp(p.GetY(), b.m_cy - hy, b.m_cy + hy);
+                            const float ox = p.GetX() - qx, oy = p.GetY() - qy;
+                            const float d2 = ox * ox + oy * oy;
+                            if (d2 >= radius * radius)
+                            {
+                                continue;
+                            }
+                            if (d2 > 1.0e-8f)
+                            {
+                                const float d = std::sqrt(d2);
+                                p.SetX(p.GetX() + ox / d * (radius - d));
+                                p.SetY(p.GetY() + oy / d * (radius - d));
+                            }
+                            else
+                            {
+                                // Its middle is inside the box: out by the shortest way.
+                                const float left = p.GetX() - (b.m_cx - hx), right = (b.m_cx + hx) - p.GetX();
+                                const float down = p.GetY() - (b.m_cy - hy), up = (b.m_cy + hy) - p.GetY();
+                                const float best = AZStd::min(AZStd::min(left, right), AZStd::min(down, up));
+                                if (best == left) p.SetX(b.m_cx - hx - radius);
+                                else if (best == right) p.SetX(b.m_cx + hx + radius);
+                                else if (best == down) p.SetY(b.m_cy - hy - radius);
+                                else p.SetY(b.m_cy + hy + radius);
+                            }
+                            moved = true;
+                        }
+                    }
+                }
+                if (!moved)
+                {
+                    break;
+                }
+            }
+        }
+        return p;
+    }
+
+    float EndlessLevelComponent::RaySolids(const AZ::Vector3& from, const AZ::Vector3& direction, float distance)
+    {
+        float best = distance;
+        const float dx = direction.GetX(), dy = direction.GetY();
+        for (EndlessLevelComponent* level : LiveLevels())
+        {
+            for (const auto& [key, chunk] : level->m_chunks)
+            {
+                for (const Level0::Box& b : chunk.m_solids)
+                {
+                    if (from.GetZ() < b.m_cz - b.m_sz * 0.5f || from.GetZ() > b.m_cz + b.m_sz * 0.5f)
+                    {
+                        continue;
+                    }
+                    // Slab test on the box's footprint.
+                    float t0 = 0.0f, t1 = best;
+                    const float lo[2] = { b.m_cx - b.m_sx * 0.5f, b.m_cy - b.m_sy * 0.5f };
+                    const float hi[2] = { b.m_cx + b.m_sx * 0.5f, b.m_cy + b.m_sy * 0.5f };
+                    const float o[2] = { from.GetX(), from.GetY() };
+                    const float d[2] = { dx, dy };
+                    bool hit = true;
+                    for (int a = 0; a < 2 && hit; ++a)
+                    {
+                        if (std::fabs(d[a]) < 1.0e-6f)
+                        {
+                            hit = o[a] >= lo[a] && o[a] <= hi[a];
+                            continue;
+                        }
+                        float ta = (lo[a] - o[a]) / d[a], tb = (hi[a] - o[a]) / d[a];
+                        if (ta > tb) AZStd::swap(ta, tb);
+                        t0 = AZStd::max(t0, ta);
+                        t1 = AZStd::min(t1, tb);
+                        hit = t0 <= t1;
+                    }
+                    if (hit && t0 < best)
+                    {
+                        best = t0;
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    void EndlessLevelComponent::AddSolidBodies(Chunk& chunk)
+    {
+        auto* scenes = AZ::Interface<AzPhysics::SceneInterface>::Get();
+        const AzPhysics::SceneHandle scene = scenes ? scenes->GetSceneHandle(AzPhysics::DefaultPhysicsSceneName) : AzPhysics::InvalidSceneHandle;
+        if (scene == AzPhysics::InvalidSceneHandle)
+        {
+            return;
+        }
+        auto collider = AZStd::make_shared<Physics::ColliderConfiguration>();
+        chunk.m_solidBodies.reserve(chunk.m_solids.size());
+        for (const Level0::Box& b : chunk.m_solids)
+        {
+            AzPhysics::StaticRigidBodyConfiguration body;
+            body.m_debugName = "LevelSolid";
+            body.m_position = AZ::Vector3(b.m_cx, b.m_cy, b.m_cz);
+            body.m_colliderAndShapeData = AzPhysics::ShapeColliderPair(collider,
+                AZStd::make_shared<Physics::BoxShapeConfiguration>(AZ::Vector3(b.m_sx, b.m_sy, b.m_sz)));
+            const AzPhysics::SimulatedBodyHandle handle = scenes->AddSimulatedBody(scene, &body);
+            if (handle != AzPhysics::InvalidSimulatedBodyHandle)
+            {
+                chunk.m_solidBodies.push_back(handle);
+            }
+        }
+    }
+
+    void EndlessLevelComponent::RemoveSolidBodies(Chunk& chunk)
+    {
+        auto* scenes = AZ::Interface<AzPhysics::SceneInterface>::Get();
+        const AzPhysics::SceneHandle scene = scenes ? scenes->GetSceneHandle(AzPhysics::DefaultPhysicsSceneName) : AzPhysics::InvalidSceneHandle;
+        if (scene != AzPhysics::InvalidSceneHandle)
+        {
+            for (AzPhysics::SimulatedBodyHandle& handle : chunk.m_solidBodies)
+            {
+                scenes->RemoveSimulatedBody(scene, handle);
+            }
+        }
+        chunk.m_solidBodies.clear();
+    }
+
+    void EndlessLevelComponent::WallCheck()
+    {
+        auto* scenes = AZ::Interface<AzPhysics::SceneInterface>::Get();
+        const AzPhysics::SceneHandle scene = scenes ? scenes->GetSceneHandle(AzPhysics::DefaultPhysicsSceneName) : AzPhysics::InvalidSceneHandle;
+        if (scene == AzPhysics::InvalidSceneHandle)
+        {
+            return;
+        }
+        int walls = 0, missing = 0, chunks = 0;
+        for (EndlessLevelComponent* level : LiveLevels())
+        {
+            chunks += static_cast<int>(level->m_chunks.size());
+            for (const auto& [key, chunk] : level->m_chunks)
+            {
+                for (const Level0::Box& b : chunk.m_solids)
+                {
+                    ++walls;
+                    // Both faces, near both ends and in the middle, low and high: a collider the wrong size or in the
+                    // wrong place leaves part of the wall open, and that part counts as missing.
+                    const bool alongX = b.m_sx >= b.m_sy;
+                    const AZ::Vector3 across = alongX ? AZ::Vector3::CreateAxisY() : AZ::Vector3::CreateAxisX();
+                    const AZ::Vector3 along = alongX ? AZ::Vector3::CreateAxisX() : AZ::Vector3::CreateAxisY();
+                    const float half = (alongX ? b.m_sx : b.m_sy) * 0.5f;
+                    const float off = (alongX ? b.m_sy : b.m_sx) * 0.5f + 0.6f;
+                    const float bottom = b.m_cz - b.m_sz * 0.5f, top = b.m_cz + b.m_sz * 0.5f;
+                    int open = 0;
+                    AZ::Vector3 where = AZ::Vector3::CreateZero();
+                    for (float t : { -0.4f, 0.0f, 0.4f })
+                    {
+                        for (float zf : { 0.15f, 0.5f, 0.85f })
+                        {
+                            for (float sideSign : { -1.0f, 1.0f })
+                            {
+                                const AZ::Vector3 face = AZ::Vector3(b.m_cx, b.m_cy, bottom + (top - bottom) * zf) + along * (t * 2.0f * half);
+                                AzPhysics::RayCastRequest ray;
+                                ray.m_start = face - across * (off * sideSign);
+                                ray.m_direction = across * sideSign;
+                                ray.m_distance = 1.0f;
+                                ray.m_queryType = AzPhysics::SceneQuery::QueryType::Static;
+                                if (!scenes->QueryScene(scene, &ray))
+                                {
+                                    ++open;
+                                    where = face;
+                                }
+                            }
+                        }
+                    }
+                    if (open > 0)
+                    {
+                        if (++missing <= 12)
+                        {
+                            AZ_Printf("Noclip", "wall_check: box at %.1f %.1f (%.2f x %.2f x %.2f, chunk %d %d) open at %d of 18 points, e.g. %.1f %.1f %.1f",
+                                b.m_cx, b.m_cy, b.m_sx, b.m_sy, b.m_sz, chunk.m_x, chunk.m_y, open, where.GetX(), where.GetY(), where.GetZ());
+                        }
+                    }
+                }
+            }
+        }
+        AZ_Printf("Noclip", "wall_check: %d of %d wall boxes have a gap in their collider (%d chunks loaded)", missing, walls, chunks);
+    }
+
+    namespace
+    {
+        void WallCheckCommand([[maybe_unused]] const AZ::ConsoleCommandContainer& arguments)
+        {
+            EndlessLevelComponent::WallCheck();
+        }
+        AZ_CONSOLEFREEFUNC("wall_check", WallCheckCommand, AZ::ConsoleFunctorFlags::Null, "wall_check: which wall boxes have no working collider (testing)");
+    }
+
+    AZ::Vector3 EndlessLevelComponent::MoveThroughSolids(const AZ::Vector3& from, const AZ::Vector3& to, float radius, float height)
+    {
+        // Steps no longer than a third of the body's width, so it can never skip over a wall (20 cm thick) between two.
+        const AZ::Vector3 delta = to - from;
+        const float length = AZ::Vector3(delta.GetX(), delta.GetY(), 0.0f).GetLength();
+        const float stepLength = AZStd::max(0.05f, radius * 0.33f);
+        const int steps = AZStd::clamp(static_cast<int>(std::ceil(length / stepLength)), 1, 200);
+        AZ::Vector3 p = KeepOutOfSolids(from, radius, height);
+        for (int i = 0; i < steps; ++i)
+        {
+            p += delta / static_cast<float>(steps);
+            p = KeepOutOfSolids(p, radius, height);
+        }
+        return p;
+    }
+
     void EndlessLevelComponent::Activate()
     {
+        LiveLevels().push_back(this);
         m_chunkShifts.clear();
         m_shiftClock = 0.0f;
         m_shiftsDone = 0;
@@ -471,6 +726,7 @@ namespace NoclipProtocol
 
     void EndlessLevelComponent::Deactivate()
     {
+        LiveLevels().erase(AZStd::remove(LiveLevels().begin(), LiveLevels().end(), this), LiveLevels().end());
         AZ::TickBus::Handler::BusDisconnect();
         for (auto& [key, chunk] : m_chunks)
         {
@@ -1290,6 +1546,23 @@ namespace NoclipProtocol
         }
 
         chunk.m_pieces = m_spawnedPieces - piecesBefore;
+        chunk.m_solids.assign(layout.m_walls.begin(), layout.m_walls.end());
+        if (m_enablePillars)
+        {
+            for (const Level0::Box& pillar : layout.m_pillars)
+            {
+                chunk.m_solids.push_back(pillar);
+            }
+        }
+        for (const Level0::Box& prop : layout.m_props)
+        {
+            chunk.m_solids.push_back(prop);
+        }
+        for (const Level0::Box& frame : layout.m_frames)
+        {
+            chunk.m_solids.push_back(frame);
+        }
+        AddSolidBodies(chunk);
         m_chunks.emplace(Key(chunkX, chunkY), AZStd::move(chunk));
     }
 
@@ -2303,6 +2576,7 @@ namespace NoclipProtocol
 
     void EndlessLevelComponent::DespawnChunk(Chunk& chunk)
     {
+        RemoveSolidBodies(chunk);
         if (auto* spawner = AzFramework::SpawnableEntitiesInterface::Get())
         {
             for (auto& ticket : chunk.m_tickets)

@@ -6,6 +6,7 @@
 #include "WeaponsComponent.h"
 #include "../Monsters/MonsterSpawnerComponent.h"
 #include "DeathSequence.h"
+#include "../Level/EndlessLevelComponent.h"
 #include <cstdlib>
 
 #include <AzCore/Settings/SettingsRegistry.h>
@@ -560,7 +561,9 @@ namespace NoclipProtocol
                 return body && body->GetEntityId() == self ? AzPhysics::SceneQuery::QueryHitType::None : AzPhysics::SceneQuery::QueryHitType::Block;
             };
             AzPhysics::SceneQueryHits hits = scenes->QueryScene(scene, &request);
-            return hits ? hits.m_hits.front().m_distance : 12.0f;
+            const float physics = hits ? hits.m_hits.front().m_distance : 12.0f;
+            // The level's own wall boxes too: a wall whose collider failed still counts as a wall.
+            return AZStd::min(physics, EndlessLevelComponent::RaySolids(at, request.m_direction, 12.0f));
         };
         m_steerTime += deltaTime;
         const float ahead = free(0.0f);
@@ -933,6 +936,32 @@ namespace NoclipProtocol
                     }
                 }
             }
+        }
+        // Solid by the level's own layout (the owner, Nov 28: "make all walls solid"; "camera can't clip thru the wall"):
+        // the body keeps 36 cm from any wall up to head height, so the camera (in its middle) never gets near one.
+        // even where a wall's physics
+        // collider fails, its box from the layout stops the body. Where it went since last frame is walked again in small
+        // steps against every wall box; this frame's move is cut to what stays out of them.
+        {
+            const AZ::Vector3 from = m_safeKnown ? m_safeAt : base;
+            const AZ::Vector3 step = base - from;
+            const bool teleported = AZ::Vector3(step.GetX(), step.GetY(), 0.0f).GetLength() >= 3.0f;
+            const AZ::Vector3 kept = teleported ? EndlessLevelComponent::KeepOutOfSolids(base, 0.36f, 1.9f)
+                                                : EndlessLevelComponent::MoveThroughSolids(from, base, 0.36f, 1.9f);
+            if (AZ::Vector3(kept.GetX() - base.GetX(), kept.GetY() - base.GetY(), 0.0f).GetLength() > 0.002f)
+            {
+                base = AZ::Vector3(kept.GetX(), kept.GetY(), base.GetZ());
+                Physics::CharacterRequestBus::Event(GetEntityId(), &Physics::CharacterRequests::SetBasePosition, base);
+                if (++m_wallPushes % 30 == 1)
+                {
+                    AZ_Printf("Noclip", "walls: the layout kept the player out of a wall at %.1f %.1f", base.GetX(), base.GetY());
+                }
+            }
+            const float dt = AZ::GetMax(deltaTime, 1.0f / 30.0f);
+            const AZ::Vector3 ahead = base + AZ::Vector3(move.GetX(), move.GetY(), 0.0f) * dt;
+            const AZ::Vector3 allowed = EndlessLevelComponent::MoveThroughSolids(base, ahead, 0.36f, 1.9f);
+            move.SetX((allowed.GetX() - base.GetX()) / dt);
+            move.SetY((allowed.GetY() - base.GetY()) / dt);
         }
         m_safeAt = base;
         m_safeKnown = true;

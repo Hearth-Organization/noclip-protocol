@@ -8,6 +8,12 @@
 #include <MiniAudio/MiniAudioPlaybackBus.h>
 #include <MiniAudio/SoundAsset.h>
 #include <AzCore/Asset/AssetManager.h>
+#include <AzCore/Interface/Interface.h>
+#include <AzCore/std/containers/unordered_set.h>
+#include <AzFramework/Physics/Common/PhysicsSceneQueries.h>
+#include <AzFramework/Physics/Common/PhysicsSimulatedBody.h>
+#include <AzFramework/Physics/PhysicsScene.h>
+#include <AzFramework/Physics/PhysicsSystem.h>
 
 #include <AzCore/Asset/AssetManagerBus.h>
 
@@ -115,8 +121,19 @@ namespace NoclipProtocol
         }
     }
 
+    namespace
+    {
+        //! Every monster's entity: their own colliders are hit boxes for bullets, not walls for each other.
+        AZStd::unordered_set<AZ::EntityId>& MonsterBodies()
+        {
+            static AZStd::unordered_set<AZ::EntityId> bodies;
+            return bodies;
+        }
+    }
+
     void HearthMonsterComponent::Activate()
     {
+        MonsterBodies().insert(GetEntityId());
         if (m_name.empty())
         {
             m_name = GetEntity()->GetName();
@@ -145,6 +162,7 @@ namespace NoclipProtocol
 
     void HearthMonsterComponent::Deactivate()
     {
+        MonsterBodies().erase(GetEntityId());
         AZ::TickBus::Handler::BusDisconnect();
         if (auto* registry = AZ::SettingsRegistry::Get())
         {
@@ -582,6 +600,41 @@ namespace NoclipProtocol
                                        : self.GetRotation() * AZ::Quaternion::CreateRotationZ(-m_turn);
                 m_deathAt = at;
                 m_deathScale = self.GetUniformScale();
+                // It falls backwards a body's length: if a wall or furniture is behind it, it lands short of it
+                // instead of its head and shoulders sinking into the wall.
+                const bool fourLegged = m_kind == "Hound" || m_kind == "Scp939" || m_kind == "Crawler";
+                const AZ::Vector3 back = m_deathTurn.TransformVector(fourLegged ? AZ::Vector3::CreateAxisX() : -AZ::Vector3::CreateAxisY());
+                const float reach = 1.9f * AZStd::max(m_deathScale, 0.5f);
+                AZ::Vector3 n;
+                float behind = reach + 0.3f;
+                for (float height : { 0.3f, 0.8f })
+                {
+                    const float hit = WallRay(m_deathAt + AZ::Vector3(0.0f, 0.0f, height), back, reach + 0.3f, n);
+                    if (hit >= 0.0f)
+                    {
+                        behind = AZStd::min(behind, hit);
+                    }
+                }
+                if (behind < reach + 0.3f)
+                {
+                    m_deathAt = Collide(m_deathAt, m_deathAt - back * (reach + 0.3f - behind), m_radius);
+                }
+                m_deathAt = EndlessLevelComponent::KeepOutOfSolids(PushOut(m_deathAt, m_radius), m_radius, 1.0f);
+                // Where its body will lie must be clear of the layout's walls too: step it forward until it is.
+                for (int tries = 0; tries < 14; ++tries)
+                {
+                    bool clear = true;
+                    for (float along = 0.4f; along <= reach && clear; along += 0.3f)
+                    {
+                        const AZ::Vector3 lying = m_deathAt + back * along;
+                        clear = (EndlessLevelComponent::KeepOutOfSolids(lying, 0.22f, 0.8f) - lying).GetLength() < 0.001f;
+                    }
+                    if (clear)
+                    {
+                        break;
+                    }
+                    m_deathAt = EndlessLevelComponent::MoveThroughSolids(m_deathAt, m_deathAt - back * 0.15f, m_radius, 1.0f);
+                }
             }
             if (m_sinceDeath == 0.0f)
             {
@@ -1153,8 +1206,7 @@ namespace NoclipProtocol
         // It steps into the blow: a short lunge during the wind-up, never closer than arm's length.
         if (m_attack > 0.12f && m_attack < 0.45f && distance > 1.05f)
         {
-            AZ::Vector3 here = at;
-            here += flat / distance * AZStd::min(distance - 1.05f, 2.4f * deltaTime);
+            const AZ::Vector3 here = Collide(at, at + flat / distance * AZStd::min(distance - 1.05f, 2.4f * deltaTime), m_radius);
             if (!InSafe(Cell(here)))
             {
                 AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldTranslation, here);
@@ -1338,6 +1390,107 @@ namespace NoclipProtocol
         }
     }
 
+    float HearthMonsterComponent::WallRay(const AZ::Vector3& from, const AZ::Vector3& direction, float distance, AZ::Vector3& normal) const
+    {
+        auto* scenes = AZ::Interface<AzPhysics::SceneInterface>::Get();
+        const AzPhysics::SceneHandle scene = scenes ? scenes->GetSceneHandle(AzPhysics::DefaultPhysicsSceneName) : AzPhysics::InvalidSceneHandle;
+        if (scene == AzPhysics::InvalidSceneHandle || distance <= 0.0f)
+        {
+            return -1.0f;
+        }
+        AzPhysics::RayCastRequest request;
+        request.m_start = from;
+        request.m_direction = direction.GetNormalized();
+        request.m_distance = distance;
+        request.m_queryType = AzPhysics::SceneQuery::QueryType::Static; // the level itself, not the player's controller
+        request.m_filterCallback = [](const AzPhysics::SimulatedBody* body, [[maybe_unused]] const Physics::Shape* shape)
+        {
+            return body && MonsterBodies().count(body->GetEntityId()) ? AzPhysics::SceneQuery::QueryHitType::None
+                                                                       : AzPhysics::SceneQuery::QueryHitType::Block;
+        };
+        const AzPhysics::SceneQueryHits hits = scenes->QueryScene(scene, &request);
+        if (!hits)
+        {
+            return -1.0f;
+        }
+        normal = hits.m_hits.front().m_normal;
+        return hits.m_hits.front().m_distance;
+    }
+
+    AZ::Vector3 HearthMonsterComponent::Collide(const AZ::Vector3& from, const AZ::Vector3& to, float radius) const
+    {
+        // Rays at shin, waist and chest height, from its middle and both shoulders: the nearest one stops it a body's
+        // half-width short; what's left of the step slides along the surface (twice, for corners).
+        AZ::Vector3 at = from;
+        AZ::Vector3 step(to.GetX() - from.GetX(), to.GetY() - from.GetY(), 0.0f);
+        for (int pass = 0; pass < 3; ++pass)
+        {
+            const float length = step.GetLength();
+            if (length < 1.0e-4f)
+            {
+                break;
+            }
+            const AZ::Vector3 dir = step / length;
+            const AZ::Vector3 side(-dir.GetY(), dir.GetX(), 0.0f);
+            float nearest = length + radius;
+            AZ::Vector3 hitNormal = AZ::Vector3::CreateZero();
+            for (float height : { 0.35f, 0.9f, 1.5f })
+            {
+                for (float offset : { 0.0f, -0.8f, 0.8f })
+                {
+                    const AZ::Vector3 start = at + side * (offset * radius) + AZ::Vector3(0.0f, 0.0f, height);
+                    AZ::Vector3 n;
+                    const float hit = WallRay(start, dir, length + radius, n);
+                    if (hit >= 0.0f && hit < nearest)
+                    {
+                        nearest = hit;
+                        hitNormal = n;
+                    }
+                }
+            }
+            if (hitNormal.IsZero())
+            {
+                at += step;
+                break;
+            }
+            const float allowed = AZStd::clamp(nearest - radius, 0.0f, length);
+            at += dir * allowed;
+            AZ::Vector3 flatNormal(hitNormal.GetX(), hitNormal.GetY(), 0.0f);
+            if (flatNormal.GetLengthSq() < 1.0e-6f)
+            {
+                break;
+            }
+            flatNormal.Normalize();
+            const AZ::Vector3 rest = dir * (length - allowed);
+            step = rest - flatNormal * rest.Dot(flatNormal);
+        }
+        at.SetZ(to.GetZ());
+        // And the level's own wall boxes, which hold even where a collider doesn't.
+        return EndlessLevelComponent::MoveThroughSolids(from, PushOut(at, radius), radius, 1.7f);
+    }
+
+    AZ::Vector3 HearthMonsterComponent::PushOut(const AZ::Vector3& at, float radius) const
+    {
+        // Already too close to something (spawned against a wall, a room that shifted round it): step back out.
+        AZ::Vector3 out = at;
+        for (int i = 0; i < 8; ++i)
+        {
+            const float angle = static_cast<float>(i) * AZ::Constants::QuarterPi;
+            const AZ::Vector3 dir(std::cos(angle), std::sin(angle), 0.0f);
+            for (float height : { 0.35f, 0.9f })
+            {
+                AZ::Vector3 n;
+                const float hit = WallRay(out + AZ::Vector3(0.0f, 0.0f, height), dir, radius, n);
+                if (hit >= 0.0f && hit < radius)
+                {
+                    out -= dir * (radius - hit);
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
     AZ::Vector3 HearthMonsterComponent::Walk(AZ::Vector3 at, const CellPos& wanted, float speed, float deltaTime, bool closeIn,
                                              const AZ::Vector3& target)
     {
@@ -1481,6 +1634,11 @@ namespace NoclipProtocol
         if (straight && left > 0.0f)
         {
             at += heading * AZStd::min(left, distance - 1.0f);
+        }
+        at = Collide(startAt, at, m_radius);
+        if (m_curSpeed > 0.5f && (at - startAt).GetLength() < m_curSpeed * deltaTime * 0.25f)
+        {
+            m_repath = 0.0f; // pinned against something the grid doesn't know: think again
         }
         if (InSafe(Cell(at)) && !InSafe(Cell(startAt)))
         {

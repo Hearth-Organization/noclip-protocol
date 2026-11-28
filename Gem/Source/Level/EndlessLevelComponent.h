@@ -1,4 +1,5 @@
 #pragma once
+#include <AzFramework/Physics/Common/PhysicsTypes.h>
 
 #include <AzCore/std/containers/unordered_set.h>
 
@@ -43,6 +44,18 @@ namespace NoclipProtocol
         //! The level's number in the catalog (0-99; the intro is -1).
         int GetLevelNumber() const { return m_settings.m_catalog >= 0 ? m_settings.m_catalog : (m_styleField <= 2 ? m_styleField : -1); }
 
+        //! Walls are solid, whatever their physics colliders do (the owner, Nov 28: "make all walls solid so you can't
+        //! walk thru them"). Moves a body (feet position, half-width radius, height) from `from` towards `to` in small
+        //! steps, keeping it out of every wall, pillar, prop and frame of the loaded chunks, exactly as the layout built
+        //! them; returns where it ends up. Used by the player and by every monster.
+        static AZ::Vector3 MoveThroughSolids(const AZ::Vector3& from, const AZ::Vector3& to, float radius, float height);
+        //! The same for a body standing still: pushed out of anything it's inside.
+        static AZ::Vector3 KeepOutOfSolids(const AZ::Vector3& at, float radius, float height);
+        //! How far a flat ray at `from`'s height runs before it meets one of those boxes (`distance` if nothing).
+        //! wall_check: rays at every loaded wall's faces; logs the walls whose physics collider doesn't answer.
+        static void WallCheck();
+        static float RaySolids(const AZ::Vector3& from, const AZ::Vector3& direction, float distance);
+
     protected:
         void Activate() override;
         void Deactivate() override;
@@ -78,6 +91,8 @@ namespace NoclipProtocol
             int m_y = 0;
             AZStd::vector<AzFramework::EntitySpawnTicket> m_tickets;
             int m_pieces = 0; // walls, pillars, lights, stains... spawned for this chunk
+            AZStd::vector<Level0::Box> m_solids; // what a body can't pass: walls, pillars, props, the breach frame
+            AZStd::vector<AzPhysics::SimulatedBodyHandle> m_solidBodies; // their real-size physics boxes
             AZStd::vector<AZ::Vector3> m_noclipSpots;
             AZStd::vector<Level0::ChunkLayout::Exit> m_exits;              // doors, stairs, drops into water
             AZStd::vector<AzFramework::EntitySpawnTicket> m_exitTickets;
@@ -95,6 +110,10 @@ namespace NoclipProtocol
         };
 
         static AZ::u64 Key(int x, int y);
+        //! Physics boxes the size of the chunk's solids (the prefabs' own colliders stay unit size: the engine bakes a
+        //! stretched box's collider when the prefab is built, so the stretch at spawn never reaches it).
+        void AddSolidBodies(Chunk& chunk);
+        void RemoveSolidBodies(Chunk& chunk);
         bool LoadPieceAssets();
         bool PieceAssetsReady() const;
         void SpawnChunk(int chunkX, int chunkY);
