@@ -5,9 +5,14 @@ y + LENS. HELD: in the left fist (Tools/Agents/make_arms.py closes the hand roun
 Gem/Source/Player/WeaponsComponent.h has the same table (Lens()) for where the beam starts: keep them in step.
 """
 LENS = 0.085
+# The owner, Nov 27: "can you have the arms crossed when holding a pistol? Like an X", or the best way to hold a pistol
+# and a flashlight in combat. That is the Harries technique (police and military low-light shooting): the light in a
+# reverse grip in the support hand, lens out of the little-finger side, that arm crossed under the gun arm and the
+# backs of the two hands pressed together, so gun and beam point the same way.
+HARRIES = {"Pistol", "FlareGun"}
 LIGHTS = {
-    "Pistol":   ((-0.060, 0.015, -0.080), True),
-    "FlareGun": ((-0.065, -0.005, -0.080), True),
+    "Pistol":   ((0.030, -0.050, -0.170), True),     # Harries: under the gun hand, wrists crossed (HARRIES)
+    "FlareGun": ((0.030, -0.075, -0.165), True),
     "Knife":    ((-0.200, 0.030, -0.050), True),
     "Shotgun":  ((0.042, 0.240, 0.014), False),
     "Carbine":  ((0.042, 0.240, 0.034), False),

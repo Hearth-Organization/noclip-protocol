@@ -1147,8 +1147,8 @@ namespace NoclipProtocol
             constexpr float ahead = 0.085f + 0.02f;
             switch (id)
             {
-            case Weapons::Pistol: return AZ::Vector3(-0.060f, 0.015f + ahead, -0.080f);
-            case Weapons::FlareGun: return AZ::Vector3(-0.065f, -0.005f + ahead, -0.080f);
+            case Weapons::Pistol: return AZ::Vector3(0.030f, -0.050f + ahead, -0.170f); // Harries: under the gun hand
+            case Weapons::FlareGun: return AZ::Vector3(0.030f, -0.075f + ahead, -0.165f);
             case Weapons::Knife: return AZ::Vector3(-0.200f, 0.030f + ahead, -0.050f);
             case Weapons::Shotgun: return AZ::Vector3(0.042f, 0.240f + ahead, 0.014f);
             case Weapons::Carbine: return AZ::Vector3(0.042f, 0.240f + ahead, 0.034f);

@@ -42,12 +42,15 @@ HANDS = {
 }
 ARM_BONES = ("Arm", "ForeArm", "Hand")
 sys.path.insert(0, str(ROOT / "Tools" / "Weapons"))
-from lights import LIGHTS  # noqa: E402
+from lights import HARRIES, LIGHTS  # noqa: E402
 
 
 def held_light(weapon):
     """The spare hand closed round the flashlight (Tools/Weapons/lights.py): a hammer grip, the light pointing ahead."""
     (x, y, z), _ = LIGHTS[weapon]
+    if weapon in HARRIES:
+        # Harries: palm down, back of the fist up against the gun hand's wrist, knuckles reaching past it to the right.
+        return ((x - 0.07, y - 0.01, z + 0.03), (1.0, 0.12, -0.12), (0.0, 0.0, -1.0), (100, 105, 50))
     return ((x - 0.028, y - 0.02, z - 0.072), (0.0, 0.25, 0.97), (1.0, 0.0, 0.0), (88, 92, 55))
 
 
@@ -151,7 +154,12 @@ def pose(arm, weapon, origin):
         # Where the shoulder goes: back, down and out from the wrist, so the forearms rise into view from the
         # bottom corners the way they do in a shooter (straight back, they filled the screen side to side).
         sx = 1.0 if side == "Right" else -1.0
-        want = target + Vector((0.09 * sx, -0.30, -0.30)).normalized() * 0.42
+        out = 0.09
+        if weapon in HARRIES:
+            # Harries: the arms cross like an X under the gun: each shoulder well out to its own side, so the
+            # support forearm comes in from the bottom left under the gun arm, which comes in from the bottom right.
+            out = 0.24 if side == "Left" else 0.17
+        want = target + Vector((out * sx, -0.30, -0.30)).normalized() * 0.42
         far = 1.0
         if far > 0.0:
             move_world = want - head
