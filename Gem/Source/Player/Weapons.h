@@ -6,6 +6,7 @@
 #pragma once
 
 #include "../Base/BaseBuilding.h"
+#include <AzCore/Math/Quaternion.h>
 #include <AzCore/Math/Vector3.h>
 #include <AzCore/std/containers/vector.h>
 #include <AzCore/std/string/string.h>
@@ -64,6 +65,21 @@ namespace NoclipProtocol::Weapons
               18.0f, 1.6f, false, "prefabs/weapons/view_shield.spawnable", "[RMB] raise \xc2\xb7 [LMB] bash \xc2\xb7 blocks a charge" },
         };
         return defs[AZStd::clamp(id, 0, Count - 1)];
+    }
+
+    // The flashlight on what you hold (the owner, Nov 27: mounted on the side of the long guns, held beside the pistol,
+    // flare gun and knife in the spare hand; Tools/Weapons/lights.py): where its lens is this frame and which way the
+    // weapon points, in camera space (the beam hangs under the camera). WeaponsComponent::PlaceView writes it, FlashlightComponent puts the beam there.
+    struct Lens
+    {
+        bool m_valid = false;
+        AZ::Vector3 m_at = AZ::Vector3::CreateZero();
+        AZ::Quaternion m_turn = AZ::Quaternion::CreateIdentity();
+    };
+    inline Lens& HeldLens()
+    {
+        static Lens lens;
+        return lens;
     }
 
     // The wheel's six slices, clockwise from the top: as in the mockup.

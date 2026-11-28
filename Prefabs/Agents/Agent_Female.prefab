@@ -1,0 +1,98 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Agent_Female",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 147031392802114255
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 8006643181043671062
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 8882467786023075257
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 2145817736283372651
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 2923995765268216314
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 2975147318956964716
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 7408253033125238212
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 7463888378771373057
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 4170819833468078175
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 4433048899249136568,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 6254854739667090172,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{C7FE42BD-31E1-5E53-A1EC-2FA726C4232D}",
+                        "subId": 3924809600
+                    },
+                    "assetHint": "assets/models/agents/agent/agent.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 5137496093340680004,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{C04C5331-A069-573C-8279-890531AD801E}",
+                            "subId": 625397517
+                        },
+                        "assetHint": "assets/models/agents/agent/agent_walk.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 5527074174329953013,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{80253C9B-58C2-5764-B1C4-28CCA0001709}"
+                                    },
+                                    "assetHint": "assets/models/agents/agent/agent.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

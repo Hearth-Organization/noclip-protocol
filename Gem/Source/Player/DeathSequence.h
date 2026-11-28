@@ -41,6 +41,8 @@
 
 // Testing: death_speed 0.1 plays the sequence at a tenth of the speed (for screenshots of every phase).
 AZ_CVAR(float, death_speed, 1.0f, nullptr, AZ::ConsoleFunctorFlags::Null, "Speed of the death sequence (testing; 1 = normal)");
+// Testing: agent_body walk|run|off puts an agent body 3 m in front of you, facing you (the temporary body; trailer).
+AZ_CVAR(int, agent_body, 0, nullptr, AZ::ConsoleFunctorFlags::Null, "Agent body in front of you: 1 walking, 2 running, 0 off (testing)");
 
 namespace NoclipProtocol
 {
@@ -400,6 +402,7 @@ namespace NoclipProtocol
                 AZ_Printf("Noclip", "death: no agent model yet (%s)", path);
                 return;
             }
+            AZ_Printf("Noclip", "agent body: spawning %s", path);
             m_bodyAsset = AZ::Data::AssetManager::Instance().GetAsset<AzFramework::Spawnable>(id, AZ::Data::AssetLoadBehavior::PreLoad);
             m_bodyTicket = AZStd::make_shared<AzFramework::EntitySpawnTicket>(m_bodyAsset);
             AzFramework::SpawnAllEntitiesOptionalArgs args;
@@ -409,6 +412,7 @@ namespace NoclipProtocol
                 if (!view.empty())
                 {
                     *out = (*view.begin())->GetId();
+                    AZ_Printf("Noclip", "agent body: %zu entities, first %s", view.size(), (*view.begin())->GetName().c_str());
                 }
             };
             AzFramework::SpawnableEntitiesInterface::Get()->SpawnAllEntities(*m_bodyTicket, AZStd::move(args));
@@ -519,6 +523,32 @@ namespace NoclipProtocol
             r->Get(now, "/NoclipProtocol/Hud/time");
             r->Get(health, "/NoclipProtocol/Hud/player.health");
             r->Get(menu, "/NoclipProtocol/Menu/Active");
+            if (m_phase == Alive && agent_body != m_testBody)
+            {
+                m_testBody = agent_body;
+                if (m_testBody == 0)
+                {
+                    DespawnBody();
+                }
+                else
+                {
+                    SpawnBody(m_testBody == 2 ? "prefabs/agents/agent_run.spawnable" : "prefabs/agents/agent_male.spawnable");
+                    AZ::Transform eye = AZ::Transform::CreateIdentity();
+                    AZ::TransformBus::EventResult(eye, m_camera.IsValid() ? m_camera : m_player, &AZ::TransformBus::Events::GetWorldTM);
+                    AZ::Vector3 ahead = eye.GetBasisY();
+                    ahead.SetZ(0.0f);
+                    ahead.NormalizeSafe();
+                    m_testAt = eye.GetTranslation() + ahead * 3.0f;
+                    m_testAt.SetZ(m_floorZ);
+                    m_testYaw = std::atan2(ahead.GetX(), -ahead.GetY()); // facing back at you
+                    AZ_Printf("Noclip", "agent body test at %.1f %.1f (camera %s)", m_testAt.GetX(), m_testAt.GetY(), m_camera.IsValid() ? "yes" : "no");
+                }
+            }
+            if (m_phase == Alive && m_testBody != 0 && m_bodyId.IsValid())
+            {
+                AZ::TransformBus::Event(m_bodyId, &AZ::TransformBus::Events::SetWorldTM,
+                    AZ::Transform::CreateFromQuaternionAndTranslation(AZ::Quaternion::CreateRotationZ(m_testYaw), m_testAt));
+            }
             if (m_phase == WalkOut)
             {
                 Walk(deltaTime);
@@ -683,6 +713,9 @@ namespace NoclipProtocol
         float m_walkWait = 0.0f;
         float m_grace = 0.0f;
         AZ::EntityId m_bodyId;
+        int m_testBody = 0;
+        AZ::Vector3 m_testAt = AZ::Vector3::CreateZero();
+        float m_testYaw = 0.0f;
         AZ::Data::Asset<AzFramework::Spawnable> m_bodyAsset;
         AZStd::shared_ptr<AzFramework::EntitySpawnTicket> m_bodyTicket;
         AZ::Data::Asset<AzFramework::Spawnable> m_gearAsset;

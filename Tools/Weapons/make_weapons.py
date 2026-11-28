@@ -45,6 +45,7 @@ MATERIALS = {
     "wpn_steel":        ([0.50, 0.50, 0.50], 1.0, 0.25, None),
     "wpn_shield":       ([0.10, 0.11, 0.12], 0.0, 0.15, None),
     "wpn_sight":        ([0.20, 0.90, 0.40], 0.0, 0.3, ([0.3, 1.0, 0.5], 2.0)),
+    "wpn_lens":         ([0.90, 0.92, 0.85], 0.0, 0.1, ([1.0, 0.97, 0.88], 4.0)),   # the flashlight's lens (Tools/Weapons/lights.py)
 }
 
 

@@ -1,4 +1,5 @@
 #include "FlashlightComponent.h"
+#include "Weapons.h"
 
 #include <AzCore/Math/MathUtils.h>
 #include <AzCore/Math/Random.h>
@@ -120,8 +121,13 @@ namespace NoclipProtocol
         if (visible && lightEntity->GetState() == AZ::Entity::State::Init)
         {
             lightEntity->Activate();
-            // The owner, Nov 27: the flashlight lit up the gun. The beam starts out at the muzzle now, like a rail light,
-            // so the gun is behind it; a wider, softer cone at a natural brightness.
+            // Without a weapon in hand the beam comes from just ahead of the eyes, like a chest light; with one it comes
+            // from the weapon's own light (PlaceBeam).
+            if (!m_baseKept)
+            {
+                AZ::TransformBus::EventResult(m_baseRotation, m_lightEntity, &AZ::TransformBus::Events::GetLocalRotationQuaternion);
+                m_baseKept = true;
+            }
             AZ::TransformBus::Event(m_lightEntity, &AZ::TransformBus::Events::SetLocalTranslation, AZ::Vector3(0.16f, 0.95f, -0.10f));
             AZ::Render::AreaLightRequestBus::Event(m_lightEntity, [](AZ::Render::AreaLightRequests* light)
             {
@@ -134,6 +140,29 @@ namespace NoclipProtocol
         else if (!visible && lightEntity->GetState() == AZ::Entity::State::Active)
         {
             lightEntity->Deactivate();
+        }
+        if (visible)
+        {
+            PlaceBeam();
+        }
+    }
+
+    void FlashlightComponent::PlaceBeam()
+    {
+        // The owner, Nov 27: the light is on the weapon (mounted on the side of the long guns, held beside the pistol,
+        // flare gun and knife), so the beam starts at that light's lens and turns with the weapon, kick and sway included.
+        const Weapons::Lens& lens = Weapons::HeldLens();
+        if (lens.m_valid)
+        {
+            AZ::TransformBus::Event(m_lightEntity, &AZ::TransformBus::Events::SetLocalTM,
+                AZ::Transform::CreateFromQuaternionAndTranslation(lens.m_turn * m_baseRotation, lens.m_at));
+            m_onWeapon = true;
+        }
+        else if (m_onWeapon)
+        {
+            AZ::TransformBus::Event(m_lightEntity, &AZ::TransformBus::Events::SetLocalTM,
+                AZ::Transform::CreateFromQuaternionAndTranslation(m_baseRotation, AZ::Vector3(0.16f, 0.95f, -0.10f)));
+            m_onWeapon = false;
         }
     }
 

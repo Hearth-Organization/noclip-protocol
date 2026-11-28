@@ -1072,6 +1072,7 @@ namespace NoclipProtocol
                 registry->Get(paused, "/NoclipProtocol/Paused");
                 cutscene = cutscene || paused; // and none over the pause menu or settings
             }
+            Weapons::HeldLens().m_valid = false;
             for (int i = 0; i < Weapons::Count; ++i)
             {
                 const AZ::EntityId entity = m_slots->m_views[i];
@@ -1130,10 +1131,29 @@ namespace NoclipProtocol
                     }
                     const AZ::Quaternion turn = AZ::Quaternion::CreateRotationZ(yaw) * AZ::Quaternion::CreateRotationX(pitch) *
                         AZ::Quaternion::CreateRotationY(roll);
-                    tm = camera * AZ::Transform::CreateFromQuaternionAndTranslation(turn, at);
+                    const AZ::Transform local = AZ::Transform::CreateFromQuaternionAndTranslation(turn, at);
+                    tm = camera * local;
                     m_muzzle = tm.TransformPoint(Muzzle(i));
+                    Weapons::HeldLens() = { true, local.TransformPoint(LensAt(i)), turn }; // camera space
                 }
                 AZ::TransformBus::Event(entity, &AZ::TransformBus::Events::SetWorldTM, tm);
+            }
+        }
+
+        // The flashlight's lens in weapon space, just in front of the glass: Tools/Weapons/lights.py's LIGHTS centre
+        // plus LENS ahead (keep the two in step).
+        static AZ::Vector3 LensAt(int id)
+        {
+            constexpr float ahead = 0.085f + 0.02f;
+            switch (id)
+            {
+            case Weapons::Pistol: return AZ::Vector3(-0.060f, 0.015f + ahead, -0.080f);
+            case Weapons::FlareGun: return AZ::Vector3(-0.065f, -0.005f + ahead, -0.080f);
+            case Weapons::Knife: return AZ::Vector3(-0.200f, 0.030f + ahead, -0.050f);
+            case Weapons::Shotgun: return AZ::Vector3(0.042f, 0.240f + ahead, 0.014f);
+            case Weapons::Carbine: return AZ::Vector3(0.042f, 0.240f + ahead, 0.034f);
+            case Weapons::Shield: return AZ::Vector3(0.180f, 0.100f + ahead, 0.520f);
+            default: return AZ::Vector3::CreateZero();
             }
         }
 
