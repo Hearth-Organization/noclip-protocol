@@ -10,8 +10,10 @@
         ],
         "baseColor.textureMap": "../../Textures/Level1/level1_wall_basecolor.png",
         "normal.textureMap": "../../Textures/Level1/level1_wall_normal.png",
-        "normal.factor": 0.7,
-        "roughness.factor": 0.85,
-        "metallic.factor": 0.0
+        "normal.factor": 1.0,
+        "metallic.factor": 0.0,
+        "roughness.textureMap": "../../Textures/Level1/level1_wall_roughness.png",
+        "occlusion.diffuseTextureMap": "../../Textures/Level1/level1_wall_ao.png",
+        "occlusion.diffuseFactor": 1.0
     }
 }
