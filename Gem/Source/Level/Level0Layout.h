@@ -128,9 +128,17 @@ namespace NoclipProtocol::Level0
         {
             Point m_at;
             float m_yaw;
-            int m_kind;   // 0 tree, 1 house, 2 street lamp (dead), 3 street lamp (lit), 4 street lamp (flickering), 5-7 grass patch (short, long, dry)
+            int m_kind;   // 0 tree, 1 house (landmark), 2 street lamp (dead), 3 street lamp (lit), 4 street lamp (flickering), 5-7 grass patch (short, long, dry)
         };
         std::vector<Placed> m_placed;
+        //! Level 9's houses (SuburbHouses.h): which one, where its middle stands, turned by m_yaw (a quarter turn).
+        struct HousePlaced
+        {
+            Point m_at;
+            float m_yaw;
+            int m_variant;
+        };
+        std::vector<HousePlaced> m_houses;
         std::vector<Box> m_blockers;  // solid but drawn by their models (houses, trunks, lamp posts)
         std::vector<Point> m_noclipSpots; // on the floor, in the middle of a cell
         //! Ways into other levels besides the tears (owner, Nov 27: "doorways or stairs or a drop off into water").

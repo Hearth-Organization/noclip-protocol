@@ -1,5 +1,6 @@
 #include "Level0Layout.h"
 #include "ClutterCatalog.h"
+#include "SuburbHouses.h"
 
 #include <algorithm>
 #include <cmath>
@@ -323,9 +324,136 @@ namespace NoclipProtocol::Level0
     namespace
     {
         // Level 9, the wiki's "The Suburbs": midnight in an endless neighbourhood. A grid of streets (wet dark asphalt, no
-        // lane paint, puddles), stone sidewalks along them, a house on every lot (each one different, none lit), dead trees
-        // in the yards, now and then a lot left as an empty grass field, and street lamps that are mostly dead; a few
-        // flicker or come on for a moment. Streets run every third cell; the two cells between them are one block.
+        // lane paint, puddles), stone sidewalks along them, and between them blocks of four big lots, each with a full-size
+        // ranch house you can walk into (SuburbHouses.h, Tools/Levels/make_houses.py): siding, a pitched roof, rooms with
+        // furniture, some with a garage and a driveway. Lawns of real grass, dead trees, now and then an empty lot left to
+        // grow long, and street lamps that are mostly dead. Streets run every sixth cell (10 m): a block is 50 x 50 m, four
+        // 25 x 25 m lots, the two on each side facing their street. Endless, like every level: a block is built whole by
+        // the chunk holding its first cell, from its own numbers alone.
+        // The owner, Nov 28: "bigger suburban type houses all need to be able to be entered and they need to be realistic".
+        constexpr int SuburbPeriod = 6;
+
+        struct Rect
+        {
+            float m_x0, m_y0, m_x1, m_y1;
+            bool Overlaps(const Rect& o, float by) const
+            {
+                return std::min(m_x1, o.m_x1) - std::max(m_x0, o.m_x0) > by && std::min(m_y1, o.m_y1) - std::max(m_y0, o.m_y0) > by;
+            }
+        };
+
+        // A house's local point turned by a quarter turn (west lots +90 degrees, east lots -90) and moved to (cx, cy).
+        Point HouseToWorld(float lx, float ly, float cx, float cy, bool west)
+        {
+            return west ? Point{ cx - ly, cy + lx, 0.0f } : Point{ cx + ly, cy - lx, 0.0f };
+        }
+
+        void BuildBlock(const Settings& settings, ChunkLayout& layout, int bx, int by, float cell)
+        {
+            const float X0 = (static_cast<float>(bx * SuburbPeriod) + 1.0f) * cell;   // the block's inside, past its streets
+            const float Y0 = (static_cast<float>(by * SuburbPeriod) + 1.0f) * cell;
+            const float size = static_cast<float>(SuburbPeriod - 1) * cell;            // 50 m
+            const float lot = size * 0.5f;
+            const float setback = 6.0f;                                                 // the front yard
+            for (int l = 0; l < 4; ++l)
+            {
+                const bool west = (l & 1) == 0;
+                const float lx0 = X0 + (west ? 0.0f : lot), ly0 = Y0 + ((l & 2) ? lot : 0.0f);
+                const Rect lotRect{ lx0, ly0, lx0 + lot, ly0 + lot };
+                const uint64_t h = Hash(settings.m_seed, TagProp, bx * 4 + l, by, 909);
+                std::vector<Rect> bare;   // no grass here: the house, its driveway and front walk
+                const bool empty = Unit(Mix(h ^ 1)) < 0.08f;
+                if (!empty)
+                {
+                    const int variant = static_cast<int>(Mix(h ^ 2) % static_cast<uint64_t>(Suburb::HouseCount));
+                    const Suburb::House& house = Suburb::Houses[variant];
+                    // The front (+y) faces the street: west lots face -x, east lots +x.
+                    const float yaw = west ? 1.5707963f : -1.5707963f;
+                    const float midX = (house.m_minX + house.m_maxX) * 0.5f;
+                    const float cy = ly0 + lot * 0.5f + (west ? -midX : midX);
+                    const float cx = west ? lx0 + setback + house.m_maxY : lx0 + lot - setback - house.m_maxY;
+                    layout.m_houses.push_back(ChunkLayout::HousePlaced{ Point{ cx, cy, 0.0f }, yaw, variant });
+                    for (int i = 0; i < house.m_solidCount; ++i)
+                    {
+                        const Suburb::LocalBox& b = house.m_solids[i];
+                        const Point c = HouseToWorld(b.m_cx, b.m_cy, cx, cy, west);
+                        layout.m_blockers.push_back(Box{ c.m_x, c.m_y, b.m_cz, b.m_sy, b.m_sx, b.m_sz });
+                    }
+                    // Most of its furniture is still there; some is gone.
+                    for (int i = 0; i < house.m_furnitureCount; ++i)
+                    {
+                        const Suburb::Furniture& f = house.m_furniture[i];
+                        if (Unit(Mix(h ^ (100 + i))) < 0.2f)
+                        {
+                            continue;
+                        }
+                        const Point at = HouseToWorld(f.m_x, f.m_y, cx, cy, west);
+                        layout.m_clutter.push_back(ChunkLayout::Clutter{ Point{ at.m_x, at.m_y, 0.0f }, f.m_yaw + yaw, f.m_kind });
+                    }
+                    const Point c0 = HouseToWorld(house.m_minX, house.m_minY, cx, cy, west);
+                    const Point c1 = HouseToWorld(house.m_maxX, house.m_maxY, cx, cy, west);
+                    bare.push_back(Rect{ std::min(c0.m_x, c1.m_x), std::min(c0.m_y, c1.m_y), std::max(c0.m_x, c1.m_x), std::max(c0.m_y, c1.m_y) });
+                    // The front walk from the stoop to the street, and the driveway to the garage.
+                    const float streetX = west ? lx0 : lx0 + lot, frontX = west ? cx - house.m_maxY : cx + house.m_maxY;
+                    auto path = [&](float localX, float width)
+                    {
+                        const float y = HouseToWorld(localX, 0.0f, cx, cy, west).m_y;
+                        const float a = std::min(streetX, frontX), b = std::max(streetX, frontX);
+                        layout.m_sidewalks.push_back(Box{ (a + b) * 0.5f, y, 0.02f, b - a, width, 0.04f });
+                        bare.push_back(Rect{ a, y - width * 0.5f, b, y + width * 0.5f });
+                    };
+                    path(house.m_doorX, 1.2f);
+                    if (house.m_garage)
+                    {
+                        path(house.m_garageX, 3.4f);
+                    }
+                    // A dead tree in the front yard, often one out back.
+                    const float side = Unit(Mix(h ^ 3)) < 0.5f ? -1.0f : 1.0f;
+                    const float ty = ly0 + lot * 0.5f + side * lot * 0.33f;
+                    if (Unit(Mix(h ^ 4)) < 0.7f)
+                    {
+                        const Point tree{ west ? lx0 + setback * 0.5f : lx0 + lot - setback * 0.5f, ty, 0.0f };
+                        layout.m_placed.push_back({ tree, Unit(Mix(h ^ 5)) * 6.2831853f, 0 });
+                        layout.m_blockers.push_back(Box{ tree.m_x, tree.m_y, 2.0f, 0.7f, 0.7f, 4.0f });
+                    }
+                    if (Unit(Mix(h ^ 6)) < 0.5f)
+                    {
+                        const Point tree{ west ? lx0 + lot - 3.0f : lx0 + 3.0f, ly0 + lot * 0.5f - side * lot * 0.25f, 0.0f };
+                        layout.m_placed.push_back({ tree, Unit(Mix(h ^ 7)) * 6.2831853f, 0 });
+                        layout.m_blockers.push_back(Box{ tree.m_x, tree.m_y, 2.0f, 0.7f, 0.7f, 4.0f });
+                    }
+                }
+                // Grass over the lot in 5 m patches (Assets/Models/Foliage): mown short, long at the edges, dry spots;
+                // none under the house or on the paths. An empty lot is left to grow long.
+                const float patch = 5.0f;
+                const int count = static_cast<int>(lot / patch);
+                for (int i = 0; i < count; ++i)
+                {
+                    for (int j = 0; j < count; ++j)
+                    {
+                        const float px = lx0 + (static_cast<float>(i) + 0.5f) * patch, py = ly0 + (static_cast<float>(j) + 0.5f) * patch;
+                        const Rect here{ px - patch * 0.5f, py - patch * 0.5f, px + patch * 0.5f, py + patch * 0.5f };
+                        bool clear = true;
+                        for (const Rect& r : bare)
+                        {
+                            clear = clear && !here.Overlaps(r, 0.4f);
+                        }
+                        if (!clear)
+                        {
+                            continue;
+                        }
+                        const uint64_t g = Mix(h ^ (300 + i * count + j));
+                        const float roll = Unit(g);
+                        const bool edge = i == 0 || j == 0 || i == count - 1 || j == count - 1;
+                        const int kind = empty ? (roll < 0.7f ? 6 : 7) : (roll < 0.08f ? 7 : (edge && roll < 0.3f ? 6 : 5));
+                        // Quarter turns only: a patch is square, so neighbours still meet edge to edge.
+                        layout.m_placed.push_back({ Point{ px, py, 0.0f }, static_cast<float>((g >> 20) & 3ull) * 1.5707963f, kind });
+                    }
+                }
+                (void)lotRect;
+            }
+        }
+
         void BuildSuburb(const Settings& settings, ChunkLayout& layout, int baseX, int baseY, int n, float cell)
         {
             layout.m_walls.clear();
@@ -334,7 +462,7 @@ namespace NoclipProtocol::Level0
             layout.m_props.clear();
             layout.m_decals.clear();
             layout.m_clutter.clear();
-            auto road = [](int g) { return Mod(g, 3) == 0; };
+            auto road = [](int g) { return Mod(g, SuburbPeriod) == 0; };
             const float walk = 1.7f, kerb = 0.14f;
             for (int x = 0; x < n; ++x)
             {
@@ -345,113 +473,70 @@ namespace NoclipProtocol::Level0
                     const float cx = x0 + cell * 0.5f, cy = y0 + cell * 0.5f;
                     const bool rx = road(gx), ry = road(gy);
                     const uint64_t h = Hash(settings.m_seed, TagProp, gx, gy);
-                    if (rx || ry)
+                    if (!rx && !ry)
                     {
-                        layout.m_roads.push_back(Box{ cx, cy, 0.01f, cell, cell, 0.02f });
-                        // A sidewalk wherever the street meets a lot; at a crossing only the four corners.
-                        const bool lotW = !road(gx - 1) && !ry, lotE = !road(gx + 1) && !ry;
-                        const bool lotS = !road(gy - 1) && !rx, lotN = !road(gy + 1) && !rx;
-                        // As square slabs, 1.7 m each, so the paving never stretches.
-                        auto slabs = [&](float sx, float sy, bool alongX)
+                        // Inside a block: the chunk holding the block's first cell builds the whole block.
+                        if (Mod(gx, SuburbPeriod) == 1 && Mod(gy, SuburbPeriod) == 1)
                         {
-                            const int count = std::max(1, static_cast<int>(std::lround(cell / walk)));
-                            const float step = cell / static_cast<float>(count);
-                            for (int k = 0; k < count; ++k)
-                            {
-                                const float t = (static_cast<float>(k) + 0.5f) * step - cell * 0.5f;
-                                layout.m_sidewalks.push_back(alongX ? Box{ sx + t, sy, kerb * 0.5f, step, walk, kerb }
-                                                                    : Box{ sx, sy + t, kerb * 0.5f, walk, step, kerb });
-                            }
-                        };
-                        if (rx && !ry)
-                        {
-                            if (lotW) slabs(x0 + walk * 0.5f, cy, false);
-                            if (lotE) slabs(x0 + cell - walk * 0.5f, cy, false);
-                        }
-                        else if (ry && !rx)
-                        {
-                            if (lotS) slabs(cx, y0 + walk * 0.5f, true);
-                            if (lotN) slabs(cx, y0 + cell - walk * 0.5f, true);
-                        }
-                        else
-                        {
-                            for (int corner = 0; corner < 4; ++corner)
-                            {
-                                const int sx = corner & 1 ? 1 : -1, sy = corner & 2 ? 1 : -1;
-                                layout.m_sidewalks.push_back(Box{ cx + sx * (cell - walk) * 0.5f, cy + sy * (cell - walk) * 0.5f,
-                                    kerb * 0.5f, walk, walk, kerb });
-                            }
-                        }
-                        // A street lamp on one side of every stretch of street; most are dead.
-                        if (rx != ry)
-                        {
-                            const float side = Unit(Mix(h ^ 7)) < 0.5f ? -1.0f : 1.0f;
-                            const float off = (cell - walk) * 0.5f + 0.35f;
-                            const Point at = rx ? Point{ cx + side * off, cy, 0.0f } : Point{ cx, cy + side * off, 0.0f };
-                            const float yaw = rx ? (side > 0.0f ? 1.5708f : -1.5708f) : (side > 0.0f ? 3.1416f : 0.0f);
-                            const float roll = Unit(Mix(h ^ 8)) / std::max(0.2f, settings.m_lightShare);
-                            const int kind = roll < 0.10f ? 3 : (roll < 0.30f ? 4 : 2);
-                            layout.m_placed.push_back({ at, yaw, kind });
-                            layout.m_blockers.push_back(Box{ at.m_x, at.m_y, 2.5f, 0.35f, 0.35f, 5.0f });
-                        }
-                        // Leaves and puddles lie about on the asphalt (recent rain).
-                        if (Unit(Mix(h ^ 9)) < 0.45f)
-                        {
-                            layout.m_decals.push_back(Decal{ Point{ cx + (Unit(Mix(h ^ 10)) - 0.5f) * cell * 0.5f,
-                                cy + (Unit(Mix(h ^ 11)) - 0.5f) * cell * 0.5f, 0.0f }, Unit(Mix(h ^ 12)) * 6.2831853f,
-                                1.2f + Unit(Mix(h ^ 13)) * 2.2f, DecalType::Wet });
+                            const int bx = (gx - 1) >= 0 ? (gx - 1) / SuburbPeriod : -((-(gx - 1) + SuburbPeriod - 1) / SuburbPeriod);
+                            const int by = (gy - 1) >= 0 ? (gy - 1) / SuburbPeriod : -((-(gy - 1) + SuburbPeriod - 1) / SuburbPeriod);
+                            BuildBlock(settings, layout, bx, by, cell);
                         }
                         continue;
                     }
-                    // A lot. Which streets it touches: it faces one of them.
-                    const bool streetW = road(gx - 1), streetE = road(gx + 1), streetS = road(gy - 1), streetN = road(gy + 1);
-                    // Grass on the whole lot, in 2.5 m patches (Assets/Models/Foliage), mown short with long edges and dry spots;
-                    // none under the house. An empty field is left to grow long.
-                    const bool field = Unit(Mix(h ^ 1)) < 0.08f;
-                    auto grass = [&](float hx, float hy, float half)
+                    layout.m_roads.push_back(Box{ cx, cy, 0.01f, cell, cell, 0.02f });
+                    // A sidewalk wherever the street meets a block; at a crossing only the four corners.
+                    const bool lotW = !road(gx - 1) && !ry, lotE = !road(gx + 1) && !ry;
+                    const bool lotS = !road(gy - 1) && !rx, lotN = !road(gy + 1) && !rx;
+                    // As square slabs, 1.7 m each, so the paving never stretches.
+                    auto slabs = [&](float sx, float sy, bool alongX)
                     {
-                        const float patch = 2.5f;
-                        for (int i = 0; i < 4; ++i)
+                        const int count = std::max(1, static_cast<int>(std::lround(cell / walk)));
+                        const float step = cell / static_cast<float>(count);
+                        for (int k = 0; k < count; ++k)
                         {
-                            for (int j = 0; j < 4; ++j)
-                            {
-                                const float px = x0 + (static_cast<float>(i) + 0.5f) * patch, py = y0 + (static_cast<float>(j) + 0.5f) * patch;
-                                if (std::fabs(px - hx) < half && std::fabs(py - hy) < half)
-                                {
-                                    continue;
-                                }
-                                const uint64_t g = Mix(h ^ (100 + i * 4 + j));
-                                const float roll = Unit(g);
-                                const bool edge = i == 0 || j == 0 || i == 3 || j == 3;
-                                const int kind = field ? (roll < 0.7f ? 6 : 7) : (roll < 0.08f ? 7 : (edge && roll < 0.35f ? 6 : 5));
-                                // Quarter turns only: a patch is square, so its neighbours still meet edge to edge.
-                                layout.m_placed.push_back({ Point{ px, py, 0.0f }, static_cast<float>((g >> 20) & 3ull) * 1.5707963f, kind });
-                            }
+                            const float t = (static_cast<float>(k) + 0.5f) * step - cell * 0.5f;
+                            layout.m_sidewalks.push_back(alongX ? Box{ sx + t, sy, kerb * 0.5f, step, walk, kerb }
+                                                                : Box{ sx, sy + t, kerb * 0.5f, walk, step, kerb });
                         }
                     };
-                    if (field)
+                    if (rx && !ry)
                     {
-                        grass(1e9f, 1e9f, 0.0f);
-                        continue; // an empty grass field
+                        if (lotW) slabs(x0 + walk * 0.5f, cy, false);
+                        if (lotE) slabs(x0 + cell - walk * 0.5f, cy, false);
                     }
-                    const bool alongX = (streetW || streetE) && (!(streetS || streetN) || Unit(Mix(h ^ 2)) < 0.5f);
-                    float fx = 0.0f, fy = 0.0f;
-                    if (alongX) { fx = streetW ? -1.0f : 1.0f; } else { fy = streetS ? -1.0f : 1.0f; }
-                    // The house sits back from its street, its front to it; the yard behind and beside it.
-                    const Point house{ cx - fx * 1.2f, cy - fy * 1.2f, 0.0f };
-                    const float yaw = std::atan2(-fx, fy);
-                    layout.m_placed.push_back({ house, yaw, 1 });
-                    grass(house.m_x, house.m_y, 2.7f + 1.0f);
-                    layout.m_blockers.push_back(Box{ house.m_x, house.m_y, 2.75f, 5.4f, 5.4f, 5.5f });
-                    // A dead tree or two in the yard.
-                    const int trees = Unit(Mix(h ^ 3)) < 0.55f ? 1 : (Unit(Mix(h ^ 4)) < 0.5f ? 2 : 0);
-                    for (int t = 0; t < trees; ++t)
+                    else if (ry && !rx)
                     {
-                        const float a = Unit(Mix(h ^ (20 + t))) * 6.2831853f;
-                        const Point tree{ cx + fx * 3.4f + std::cos(a) * 0.8f + (fy != 0.0f ? (t ? 3.2f : -3.2f) : 0.0f),
-                                          cy + fy * 3.4f + std::sin(a) * 0.8f + (fx != 0.0f ? (t ? 3.2f : -3.2f) : 0.0f), 0.0f };
-                        layout.m_placed.push_back({ tree, Unit(Mix(h ^ (30 + t))) * 6.2831853f, 0 });
-                        layout.m_blockers.push_back(Box{ tree.m_x, tree.m_y, 2.0f, 0.7f, 0.7f, 4.0f });
+                        if (lotS) slabs(cx, y0 + walk * 0.5f, true);
+                        if (lotN) slabs(cx, y0 + cell - walk * 0.5f, true);
+                    }
+                    else
+                    {
+                        for (int corner = 0; corner < 4; ++corner)
+                        {
+                            const int sx = corner & 1 ? 1 : -1, sy = corner & 2 ? 1 : -1;
+                            layout.m_sidewalks.push_back(Box{ cx + sx * (cell - walk) * 0.5f, cy + sy * (cell - walk) * 0.5f,
+                                kerb * 0.5f, walk, walk, kerb });
+                        }
+                    }
+                    // A street lamp on one side of every other stretch of street; most are dead.
+                    if (rx != ry && Mod(rx ? gy : gx, 2) == 0)
+                    {
+                        const float side = Unit(Mix(h ^ 7)) < 0.5f ? -1.0f : 1.0f;
+                        const float off = (cell - walk) * 0.5f + 0.35f;
+                        const Point at = rx ? Point{ cx + side * off, cy, 0.0f } : Point{ cx, cy + side * off, 0.0f };
+                        const float yaw = rx ? (side > 0.0f ? 1.5708f : -1.5708f) : (side > 0.0f ? 3.1416f : 0.0f);
+                        const float roll = Unit(Mix(h ^ 8)) / std::max(0.2f, settings.m_lightShare);
+                        const int kind = roll < 0.10f ? 3 : (roll < 0.30f ? 4 : 2);
+                        layout.m_placed.push_back({ at, yaw, kind });
+                        layout.m_blockers.push_back(Box{ at.m_x, at.m_y, 2.5f, 0.35f, 0.35f, 5.0f });
+                    }
+                    // Leaves and puddles lie about on the asphalt (recent rain).
+                    if (Unit(Mix(h ^ 9)) < 0.45f)
+                    {
+                        layout.m_decals.push_back(Decal{ Point{ cx + (Unit(Mix(h ^ 10)) - 0.5f) * cell * 0.5f,
+                            cy + (Unit(Mix(h ^ 11)) - 0.5f) * cell * 0.5f, 0.0f }, Unit(Mix(h ^ 12)) * 6.2831853f,
+                            1.2f + Unit(Mix(h ^ 13)) * 2.2f, DecalType::Wet });
                     }
                 }
             }

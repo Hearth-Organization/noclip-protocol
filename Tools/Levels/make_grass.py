@@ -39,7 +39,7 @@ def gradient(path, base, tip):
     im.save(path)
 
 
-def blade(rng, height, lean, verts, faces, uvs, at=None):
+def blade(rng, height, lean, verts, faces, uvs, at=None, wide=1.0):
     """One blade: 4 segments, 2 vertices wide, narrowing to a point and bending over."""
     if at is None:
         r = 0.5 * math.sqrt(rng.random())
@@ -49,7 +49,7 @@ def blade(rng, height, lean, verts, faces, uvs, at=None):
         x0, y0 = at
     face_dir = rng.random() * math.tau
     bend = rng.random() * math.tau
-    width = rng.uniform(0.006, 0.012)
+    width = rng.uniform(0.006, 0.012) * wide
     segs = 4
     start = len(verts)
     for s in range(segs + 1):
@@ -67,14 +67,16 @@ def blade(rng, height, lean, verts, faces, uvs, at=None):
         faces.append((i, i + 1, i + 3, i + 2))
 
 
-# Patches: a 2.5 m square of blades for a whole lawn, so a yard is a dozen entities, not hundreds.
+# Patches: a 5 m square of blades for a whole lawn, so a yard is a couple of dozen entities, not hundreds
+# (2.5 m patches, 16 to a lot, froze the game loading Level 9: Nov 28). Wider blades, fewer of them.
 # name: (blades per square metre, min height, max height, base, tip, lean)
-PATCH = 2.5
+PATCH = 5.0
 PATCHES = {
-    "GrassPatchShort": (300, 0.08, 0.22, (0.09, 0.15, 0.05), (0.30, 0.40, 0.15), 0.25),
-    "GrassPatchLong": (220, 0.25, 0.65, (0.09, 0.14, 0.05), (0.36, 0.42, 0.17), 0.45),
-    "GrassPatchDry": (220, 0.15, 0.45, (0.17, 0.15, 0.08), (0.50, 0.44, 0.26), 0.40),
+    "GrassPatchShort": (110, 0.08, 0.22, (0.09, 0.15, 0.05), (0.30, 0.40, 0.15), 0.25),
+    "GrassPatchLong": (80, 0.25, 0.65, (0.09, 0.14, 0.05), (0.36, 0.42, 0.17), 0.45),
+    "GrassPatchDry": (80, 0.15, 0.45, (0.17, 0.15, 0.08), (0.50, 0.44, 0.26), 0.40),
 }
+WIDE = {"GrassPatchShort": 1.8, "GrassPatchLong": 1.6, "GrassPatchDry": 1.6}  # blades this much wider
 
 
 def tufts(rng, x, y):
@@ -94,7 +96,7 @@ def make(name, spec):
         for _ in range(int(count * PATCH * PATCH)):
             x, y = (rng.random() - 0.5) * PATCH, (rng.random() - 0.5) * PATCH
             t = max(0.0, min(1.0, tufts(rng, x, y) + rng.uniform(-0.2, 0.2)))
-            blade(rng, lo + (hi - lo) * t, lean * rng.uniform(0.6, 1.3), verts, faces, uvs, (x, y))
+            blade(rng, lo + (hi - lo) * t, lean * rng.uniform(0.6, 1.3), verts, faces, uvs, (x, y), WIDE[name])
     else:
         for _ in range(count):
             blade(rng, rng.uniform(lo, hi), lean * rng.uniform(0.6, 1.3), verts, faces, uvs)

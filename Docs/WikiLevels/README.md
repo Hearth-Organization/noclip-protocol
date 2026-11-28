@@ -4,6 +4,8 @@ The owner chose to follow the Backrooms wiki for levels 0–99: our level N shou
 These are short notes in our own words, for building each level. Read the linked page for the full text.
 The wiki's content is CC BY-SA 3.0; we only take ideas for the look, never its text or pictures.
 
+**Levels are endless unless their wiki page says otherwise** (owner, Nov 28). An endless level never ends in any direction: build it from chunks generated as the player walks (EndlessLevelComponent), never as a fixed map with an edge. A level with a stated size or edge (one room, a fixed building, a known border) is built to that. The only fixed spot of our own is the intro facility.
+
 | Level | Wiki name | Notes for our build | Page |
 |---|---|---|---|
 | 0 | Threshold | Indoors. Endless office/retail rooms, damp brown-beige carpet everywhere, yellow walls, buzzing fluorescent panels. Pillar fields that go on for miles, dark blackout zones, rare red rooms (crimson wallpaper, sticky carpet). No entities. Sound: changing hum, faint whispers. | https://backrooms-wiki.wikidot.com/level-0 |

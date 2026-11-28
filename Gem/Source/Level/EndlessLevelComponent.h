@@ -202,6 +202,7 @@ namespace NoclipProtocol
         bool m_outdoorSet = false;        // its sun, sky and fog have been set for this level
         float m_outdoorTries = 0.0f;
         void SetUpOutdoors(float deltaTime);
+        AZ::Data::Asset<AzFramework::Spawnable> m_houseAssets[4]; // Level 9's houses (SuburbHouses.h)
         AZ::Data::Asset<AzFramework::Spawnable> m_landmarkAssets[8]; // tree, house, street lamp; lit and flickering street lamps; grass (short, long, dry)
         AZ::Data::AssetId m_sceneMaterials[3];
         // The sun or moon you can see (the owner, Nov 28: "make the moon and sun visible"): a glowing disc far off,

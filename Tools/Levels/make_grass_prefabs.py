@@ -43,7 +43,7 @@ def main():
         hint, sub = model_product(db, folder, name)
         comps["AZ::Render::EditorMeshComponent"] = {
             "$type": "AZ::Render::EditorMeshComponent", "Id": nid(),
-            "Controller": {"Configuration": {"ModelAsset": {
+            "Controller": {"Configuration": {"IsRayTracingEnabled": False, "ModelAsset": {
                 "assetId": {"guid": _guid(f"{folder}/{name.lower()}.fbx"), "subId": sub},
                 "assetHint": hint}}}}
         comps["EditorMaterialComponent"] = {
