@@ -70,7 +70,8 @@ def load(glb):
     if arm.animation_data:
         arm.animation_data.action = None
     body = bpy.data.objects["vanguard_Mesh"]
-    bpy.data.objects.remove(bpy.data.objects["vanguard_visor"], do_unlink=True)
+    if "vanguard_visor" in bpy.data.objects:   # the Soldier's own visor (a Forge body has none)
+        bpy.data.objects.remove(bpy.data.objects["vanguard_visor"], do_unlink=True)
     # The glTF import guesses bone ends; point each arm and finger bone at its child so the IK bends the real
     # elbow and wrist (with the guessed ends the wrists landed 8 cm off and the IK ran away when corrected).
     bpy.context.view_layer.objects.active = arm

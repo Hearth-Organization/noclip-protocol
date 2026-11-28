@@ -59,6 +59,8 @@ class Maker:
 
     def band(self, x, lo, hi, order=2):
         lo = max(20, lo); hi = min(SR / 2 - 100, hi)
+        if lo >= hi * 0.9:
+            lo = hi * 0.5
         sos = signal.butter(order, [lo, hi], btype="band", fs=SR, output="sos")
         return signal.sosfilt(sos, x)
 
@@ -250,6 +252,120 @@ class Maker:
         x += 0.3 * self.band(self.noise(n), 100, 800) * np.exp(-np.linspace(0, 20, n))
         return x
 
+
+    # ---- more voices (Nov 28: "they all can't have the same sound"): textures that make each kind its own
+    def ringmod(self, x, hz):
+        return x * np.sin(2 * np.pi * hz * np.arange(len(x)) / SR)
+
+    def comb(self, x, hz, fb=0.7):
+        """A metallic ring: a short feedback delay tuned to hz."""
+        d = max(1, int(SR / hz))
+        y = np.copy(x)
+        for i in range(d, len(y)):
+            y[i] += fb * y[i - d]
+        return y / (np.max(np.abs(y)) + 1e-9)
+
+    def crush(self, x, bits=5, hold=3):
+        q = 2 ** bits
+        y = np.round(x * q) / q
+        return np.repeat(y[::hold], hold)[: len(x)]
+
+    def muffle(self, x, hz=900):
+        return self.lowpass(x, hz, 4) * 1.6
+
+    def reverse(self, x):
+        return x[::-1].copy()
+
+    def crackle(self, secs, rate=60):
+        """Fire: pops and a rushing bed."""
+        n = int(secs * SR)
+        pops = (self.rng.random(n) > 1 - rate / SR) * self.rng.standard_normal(n) * 4
+        x = self.band(pops, 800, 7000) + 0.25 * self.band(self.noise(n, "pink"), 200, 2500)
+        return (x / (np.max(np.abs(x)) + 1e-9)) * self.env(n, 0.05, 0.3)
+
+    def rustle(self, secs, rate=9):
+        """Straw and cloth: bursts of bright noise."""
+        n = int(secs * SR)
+        am = np.clip(self.lowpass(self.rng.standard_normal(n), rate) * 6, 0, 1)
+        x = self.band(self.noise(n), 2000, 9000) * am
+        return (x / (np.max(np.abs(x)) + 1e-9)) * self.env(n, 0.05, 0.2)
+
+    def caw(self, count=2, f0=700):
+        parts = []
+        for _ in range(count):
+            n = int(self.r(0.22, 0.32) * SR)
+            f = self.pitch_track(n, f0 * self.r(1.0, 1.2), f0 * 0.8, jitter=0.2)
+            x = self.drive(self.formants(self.pulse(f, 0.8), "a", 1.6), 4)
+            parts.append(x * self.env(n, 0.01, 0.12))
+        return self.cat(parts, (0.08, 0.2))
+
+    def whistle(self, secs, f0, f1):
+        """Wind through a gap: a breathy sliding tone."""
+        n = int(secs * SR)
+        f = self.pitch_track(n, f0, f1, vibrato=0.02, vib_hz=3, jitter=0.03)
+        tone = np.sin(2 * np.pi * np.cumsum(f) / SR)
+        x = tone * 0.5 + self.band(self.noise(n), f0 * 0.8, f1 * 1.4) * 0.8
+        return (x / (np.max(np.abs(x)) + 1e-9)) * self.env(n, secs * 0.3, secs * 0.4)
+
+    def gurgle(self, secs, f0=70):
+        """A throat full of fluid: a growl chopped by bubbles."""
+        n = int(secs * SR)
+        g = self.growl(secs, f0, "o", 0.9, 0.6, drive=3)
+        am = 0.4 + 0.6 * (np.sin(2 * np.pi * self.r(9, 15) * np.arange(n) / SR) > 0)
+        return self.mix((g * self.lowpass(am, 60), 1.0), (self.bubbles(secs, 30, 150, 600), 0.6))
+
+    def wheeze(self, secs):
+        n = int(secs * SR)
+        x = self.band(self.noise(n), 1500, 5000) * (1 + 0.8 * np.sin(2 * np.pi * 2.2 * np.arange(n) / SR))
+        x += 0.4 * self.formants(self.noise(n), "i", 1.3)
+        return (x / (np.max(np.abs(x)) + 1e-9)) * self.env(n, 0.15, 0.3)
+
+    def cough(self, count=2):
+        parts = []
+        for _ in range(count):
+            n = int(self.r(0.15, 0.25) * SR)
+            x = self.drive(self.formants(self.noise(n), "uh", 0.9) + 0.3 * self.pulse(self.pitch_track(n, 140, 90), 0.8), 3)
+            parts.append(x * self.env(n, 0.005, 0.12))
+        return self.cat(parts, (0.1, 0.25))
+
+    def clang(self, hz=420):
+        n = int(1.2 * SR)
+        tt = np.arange(n) / SR
+        x = sum(np.sin(2 * np.pi * hz * r * tt) * np.exp(-tt * d) for r, d in ((1, 3), (2.76, 5), (5.4, 8), (8.9, 12)))
+        x += self.highpass(self.rng.standard_normal(n), 2000) * np.exp(-tt * 60)
+        return x / (np.max(np.abs(x)) + 1e-9)
+
+    def shriek(self, secs, f0, f1):
+        """Thin and piercing: high, few harmonics, fast wobble."""
+        n = int(secs * SR)
+        f = self.pitch_track(n, f0, f1, vibrato=0.1, vib_hz=self.r(14, 20), jitter=0.05)
+        x = np.sin(2 * np.pi * np.cumsum(f) / SR) + 0.4 * np.sin(4 * np.pi * np.cumsum(f) / SR)
+        x += 0.2 * self.band(self.noise(n), f0, 9000)
+        return self.drive(x / (np.max(np.abs(x)) + 1e-9), 1.6) * self.env(n, 0.02, secs * 0.4)
+
+    def whisper(self, secs, vowels=("i", "a", "u", "e")):
+        n = int(secs * SR)
+        seg = n // len(vowels)
+        x = np.concatenate([self.formants(self.noise(seg), v, 1.1) * self.env(seg, 0.03, 0.05) for v in vowels])
+        return x / (np.max(np.abs(x)) + 1e-9)
+
+    def honk(self, count=2, f0=330):
+        parts = []
+        for _ in range(count):
+            n = int(0.25 * SR)
+            f = self.pitch_track(n, f0, f0 * 0.97)
+            x = np.sign(np.sin(2 * np.pi * np.cumsum(f) / SR)) * 0.5
+            parts.append(self.formants(x, "a", 1.4) * self.env(n, 0.01, 0.08))
+        return self.cat(parts, (0.06, 0.12))
+
+    def heels(self, count=4, hz=2600):
+        parts = []
+        for _ in range(count):
+            m = int(0.09 * SR)
+            k = self.band(self.rng.standard_normal(m), hz * 0.5, hz * 1.8) * np.exp(-np.linspace(0, 14, m))
+            parts.append(k + 0.5 * self.thud(180)[:m])
+        return self.cat(parts, (0.25, 0.32))
+
     def mix(self, *layers):
         n = max(len(l) for l, _ in layers)
         out = np.zeros(n)
@@ -284,61 +400,139 @@ def beast(f0, shift, quad=False):
     }
 
 
+# Every kind has its own voice in every event (owner, Nov 28: "they all can't have the same sound"): its own pitch,
+# vowel and texture (wet, burnt, metal, straw, ice, bubbles in a helmet...), so no two sound alike in a fight.
+L = lambda f: f  # (reads better below)
 KINDS = {
-    "Smiler": {**beast(70, 0.7), "idle": [lambda m: m.giggle(int(m.r(5, 9)), 210, 1.2), lambda m: m.breath(1.4, 300, 2000, wet=True)],
-               "alert": [lambda m: m.mix((m.giggle(7, 260, 1.3), 1.0), (m.growl(1.2, 60, "a", 0.9, 0.6), 0.5))]},
-    "Faceling": human_like(120, 1.0),
-    "Deathmoth": {"idle": [lambda m: m.wings(m.r(1.2, 2.0), 34), lambda m: m.mix((m.wings(1.4, 28), 1.0), (m.clicks(1.4, 8, 2500), 0.4))],
-                  "alert": [lambda m: m.mix((m.wings(1.0, 44), 1.0), (m.scream(0.6, 1800, 2400, "i", 1.6, 0.2), 0.35))],
-                  "attack": [lambda m: m.mix((m.wings(0.6, 50), 1.0), (m.hiss(0.6), 0.5))],
-                  "hurt": [lambda m: m.scream(0.25, 2200, 1500, "i", 1.8, 0.2)], "die": [lambda m: m.mix((m.wings(1.0, 18), 0.8), (m.clicks(1.0, 20, 2000), 0.4))]},
-    "Scp096": {"idle": [lambda m: m.sob(int(m.r(3, 5)), 230), lambda m: m.sob(int(m.r(2, 4)), 260)],
-               "loop": [lambda m: m.sob(7, 240)],
-               "alert": [lambda m: m.scream(2.4, 380, 900, "a", 1.15, 0.45), lambda m: m.scream(2.0, 450, 1100, "a", 1.2, 0.5)],
-               "attack": [lambda m: m.scream(1.2, 700, 1200, "a", 1.2, 0.6)], "hurt": [lambda m: m.scream(0.6, 600, 900, "e", 1.2)],
-               "die": [lambda m: m.scream(1.0, 600, 300, "a", 1.1)]},
-    "Scp173": {"loop": [lambda m: m.scrape(2.5)], "attack": [lambda m: m.snap(), lambda m: m.mix((m.snap(), 1.0), (m.thud(60), 0.5))],
-               "idle": [lambda m: m.scrape(0.6) * m.env(int(0.6 * SR), 0.05, 0.3)], "alert": [lambda m: m.scrape(0.4)],
-               "hurt": [lambda m: m.thud(140)], "die": [lambda m: m.thud(50)]},
-    "Wretch": human_like(95, 0.85),
-    "Hound": {**beast(85, 0.9, True), "idle": [lambda m: m.breath(m.r(0.8, 1.1), 400, 3000), lambda m: m.growl(1.2, 80, "o", 0.8, 0.9)]},
-    "Skinstealer": {**human_like(105, 0.95), "idle": [lambda m: m.cat([m.breath(0.5, wet=True), m.growl(0.8, 100, "e", 0.3, 1.0)]),
-                                                     lambda m: m.giggle(4, 150, 0.9, 0.1)]},
-    "Clump": {"idle": [lambda m: m.bubbles(m.r(1.4, 2.0), 10, 150, 600), lambda m: m.mix((m.bubbles(1.5, 16), 1.0), (m.moan(1.5, 70, 0.7), 0.4))],
-              "alert": [lambda m: m.mix((m.growl(1.2, 55, "o", 1.0, 0.6), 1.0), (m.bubbles(1.2, 25), 0.6))],
-              "attack": [lambda m: m.mix((m.tear(0.6), 1.0), (m.bubbles(0.6, 30, 300, 1200), 0.7))],
-              "hurt": [lambda m: m.bubbles(0.5, 40, 400, 1500)], "die": [lambda m: m.mix((m.bubbles(1.6, 30), 1.0), (m.moan(1.6, 60, 0.6), 0.7))]},
-    "Scp939": {**beast(65, 0.75), "idle": [lambda m: m.mix((m.clicks(1.2, 12, 2200), 0.6), (m.breath(1.2, 200, 1500, wet=True), 0.8)),
-                                           lambda m: m.growl(1.4, 55, "u", 0.9, 0.65)]},
-    "Scp106": {"idle": [lambda m: m.mix((m.bubbles(m.r(1.5, 2.2), 12, 120, 500), 1.0), (m.breath(2.0, 150, 1200, wet=True), 0.6)),
-                        lambda m: m.giggle(4, 95, 0.75, 0.15)],
-               "alert": [lambda m: m.mix((m.giggle(6, 90, 0.7, 0.2), 1.0), (m.bubbles(1.4, 14), 0.5))],
-               "attack": [lambda m: m.mix((m.growl(0.8, 60, "o", 0.7, 0.6), 1.0), (m.tear(0.6), 0.5), (m.bubbles(0.8, 25), 0.5))],
-               "hurt": [lambda m: m.bubbles(0.8, 35, 150, 700)], "die": [lambda m: m.bubbles(2.0, 25, 100, 400)]},
-    "Staff3008": {**human_like(110, 1.0), "idle": [lambda m: m.moan(1.6, 105, 1.0), lambda m: m.hum([0, 0, -2, -2, -4], 120)]},
-    "Partygoer": {**human_like(160, 1.15), "idle": [lambda m: m.giggle(int(m.r(5, 8)), 280, 1.25), lambda m: m.giggle(6, 240, 1.2, 0.35)]},
-    "Dancer": {**human_like(150, 1.1), "idle": [lambda m: m.hum([0, 4, 7, 4, 0, -5], 200), lambda m: m.giggle(4, 220, 1.15)]},
-    "Scp049": {**human_like(100, 0.95), "idle": [lambda m: m.hum([0, -1, 0, 3, 0], 105), lambda m: m.breath(1.5, 300, 2500)]},
-    "Scarecrow": {**human_like(90, 0.85), "idle": [lambda m: m.mix((m.breath(1.6, 1000, 6000), 1.0), (m.clicks(1.6, 3, 1200), 0.5)),
-                                                  lambda m: m.hiss(1.2)]},
-    "Diver": {**human_like(80, 0.8), "idle": [lambda m: m.bubbles(m.r(1.6, 2.4), 9, 180, 700), lambda m: m.breath(1.8, 200, 1400, wet=True)]},
-    "Burnt": human_like(100, 0.9),
-    "Patient": human_like(125, 1.05),
-    "Nurse": {**human_like(190, 1.2), "idle": [lambda m: m.hum([0, 2, 4, 2, 0, 0], 220), lambda m: m.hum([0, -3, -5, -3], 230)]},
-    "Clown": {**human_like(140, 1.1), "idle": [lambda m: m.giggle(int(m.r(7, 11)), 230, 1.2, 0.4), lambda m: m.giggle(5, 180, 1.1, 0.3)],
-              "alert": [lambda m: m.giggle(10, 300, 1.3, 0.5)]},
-    "Miner": {**human_like(95, 0.9), "idle": [lambda m: m.mix((m.thud(110), 0.8), (m.breath(1.2, 300, 2000), 0.7))]},
-    "Frostwraith": {**human_like(130, 1.0), "idle": [lambda m: m.mix((m.breath(2.0, 2000, 8000), 1.0), (m.moan(2.0, 140, 1.1), 0.3)),
-                                                    lambda m: m.hiss(1.6)]},
-    "Farmthing": beast(60, 0.7, True),
-    "Crawler": {**beast(110, 1.0), "idle": [lambda m: m.clicks(m.r(1.0, 1.6), 18, 2600), lambda m: m.mix((m.clicks(1.2, 10, 2000), 1.0), (m.hiss(1.2), 0.3))]},
-    "Doll": {"idle": [lambda m: m.giggle(3, 420, 1.4, 0.1)], "alert": [lambda m: m.giggle(5, 480, 1.5, 0.2)],
-             "attack": [lambda m: m.mix((m.snap(), 0.6), (m.giggle(2, 500, 1.5), 1.0))], "hurt": [lambda m: m.thud(300)], "die": [lambda m: m.thud(250)]},
-    "Mannequin": {"idle": [lambda m: m.clicks(0.6, 6, 900)], "alert": [lambda m: m.scrape(0.5)], "attack": [lambda m: m.snap()],
-                  "hurt": [lambda m: m.thud(200)], "die": [lambda m: m.thud(120)], "loop": [lambda m: m.scrape(2.0) * 0.6]},
-    "Plush": {"idle": [lambda m: m.giggle(3, 380, 1.4, 0.15)], "alert": [lambda m: m.giggle(4, 330, 1.3)],
-              "attack": [lambda m: m.mix((m.tear(0.4), 1.0), (m.giggle(2, 350, 1.3), 0.6))], "hurt": [lambda m: m.tear(0.3)], "die": [lambda m: m.tear(0.6)]},
-    "Watcher": {"idle": [lambda m: m.mix((m.breath(2.4, 80, 600), 1.0), (m.hum([0, 0, 0], 55), 0.3))], "alert": [lambda m: m.breath(1.6, 60, 400)]},
+    # tall grinning thing in the dark: giggles that drop into a sub growl, a wide-mouth hiss
+    "Smiler": {"idle": [L(lambda m: m.giggle(int(m.r(5, 9)), 210, 1.2)), L(lambda m: m.breath(1.4, 300, 2000, wet=True))],
+               "alert": [L(lambda m: m.mix((m.giggle(7, 260, 1.3), 1.0), (m.growl(1.2, 50, "a", 0.9, 0.55, drive=4), 0.6)))],
+               "attack": [L(lambda m: m.mix((m.growl(0.6, 45, "a", 1.0, 0.5, glide=90, drive=6), 1.0), (m.giggle(3, 320, 1.4), 0.5))),
+                          L(lambda m: m.mix((m.hiss(0.5), 0.8), (m.growl(0.5, 55, "a", 1.0, 0.5, drive=5), 1.0)))],
+               "hurt": [L(lambda m: m.giggle(3, 400, 1.5, 0.4))], "die": [L(lambda m: m.cat([m.giggle(4, 300, 1.3), m.growl(1.4, 40, "u", 0.9, 0.5)]))]},
+    # a face where a face shouldn't be: stretching skin squeaks, a choked man's voice through a closed mouth
+    "Faceling": {"idle": [L(lambda m: m.muffle(m.moan(1.6, 115, 1.0), 700)), L(lambda m: m.mix((m.clicks(1.2, 5, 4000), 0.5), (m.breath(1.2, 600, 2500), 0.6)))],
+                 "alert": [L(lambda m: m.muffle(m.scream(0.9, 260, 200, "uh", 1.0, 0.3), 1100))],
+                 "attack": [L(lambda m: m.mix((m.muffle(m.scream(0.5, 300, 220, "uh", 1.0, 0.6), 1200), 1.0), (m.tear(0.4), 0.7)))],
+                 "hurt": [L(lambda m: m.muffle(m.growl(0.35, 180, "uh", 0.4, 1.0), 900))], "die": [L(lambda m: m.muffle(m.moan(1.8, 90, 0.9), 600))]},
+    "Deathmoth": {"idle": [L(lambda m: m.wings(m.r(1.2, 2.0), 34)), L(lambda m: m.mix((m.wings(1.4, 28), 1.0), (m.clicks(1.4, 8, 2500), 0.4)))],
+                  "alert": [L(lambda m: m.mix((m.wings(1.0, 44), 1.0), (m.shriek(0.6, 2400, 3200), 0.35)))],
+                  "attack": [L(lambda m: m.mix((m.wings(0.6, 55), 1.0), (m.hiss(0.6), 0.5), (m.clicks(0.6, 30, 3500), 0.5)))],
+                  "hurt": [L(lambda m: m.shriek(0.25, 3000, 2000))], "die": [L(lambda m: m.mix((m.wings(1.0, 16), 0.8), (m.clicks(1.0, 20, 2000), 0.4)))]},
+    "Scp096": {"idle": [L(lambda m: m.sob(int(m.r(3, 5)), 230)), L(lambda m: m.sob(int(m.r(2, 4)), 260))],
+               "loop": [L(lambda m: m.sob(7, 240))],
+               "alert": [L(lambda m: m.scream(2.4, 380, 900, "a", 1.15, 0.45)), L(lambda m: m.scream(2.0, 450, 1100, "a", 1.2, 0.5))],
+               "attack": [L(lambda m: m.scream(1.2, 700, 1200, "a", 1.2, 0.6))], "hurt": [L(lambda m: m.scream(0.6, 600, 900, "e", 1.2))],
+               "die": [L(lambda m: m.scream(1.0, 600, 300, "a", 1.1))]},
+    "Scp173": {"loop": [L(lambda m: m.scrape(2.5))], "attack": [L(lambda m: m.snap()), L(lambda m: m.mix((m.snap(), 1.0), (m.thud(60), 0.5)))],
+               "idle": [L(lambda m: m.scrape(0.6) * m.env(int(0.6 * SR), 0.05, 0.3))], "alert": [L(lambda m: m.scrape(0.4))],
+               "hurt": [L(lambda m: m.thud(140))], "die": [L(lambda m: m.thud(50))]},
+    # the jumpsuit one, all skin and bone: a dry rattling wheeze, choking
+    "Wretch": {"idle": [L(lambda m: m.wheeze(m.r(1.2, 1.8))), L(lambda m: m.cat([m.cough(2), m.wheeze(0.8)]))],
+               "alert": [L(lambda m: m.mix((m.growl(1.0, 140, "i", 0.95, 1.1, glide=220, drive=5), 1.0), (m.wheeze(1.0), 0.6)))],
+               "attack": [L(lambda m: m.mix((m.growl(0.5, 200, "i", 1.0, 1.15, glide=260, drive=6), 1.0), (m.rustle(0.5, 20), 0.3))),
+                          L(lambda m: m.cat([m.cough(1), m.growl(0.4, 220, "e", 1.0, 1.1, drive=6)]))],
+               "hurt": [L(lambda m: m.cough(2))], "die": [L(lambda m: m.cat([m.growl(0.6, 160, "i", 0.9, 1.1), m.wheeze(1.6)]))]},
+    "Hound": {"idle": [L(lambda m: m.breath(m.r(0.8, 1.1), 400, 3000)), L(lambda m: m.growl(1.2, 80, "o", 0.8, 0.9))],
+              "alert": [L(lambda m: m.cat([m.growl(0.25, 260, "a", 0.6, 1.0, drive=4), m.growl(0.25, 250, "a", 0.6, 1.0, drive=4), m.growl(0.25, 270, "a", 0.6, 1.0, drive=4)], (0.08, 0.14)))],
+              "attack": [L(lambda m: m.mix((m.growl(0.5, 130, "a", 1.0, 0.9, glide=200, drive=6), 1.0), (m.snap(), 0.4)))],
+              "hurt": [L(lambda m: m.shriek(0.3, 900, 600))], "die": [L(lambda m: m.cat([m.shriek(0.5, 800, 400), m.breath(1.0, 300, 2000)]))]},
+    # wears people: wet flesh, a mimicked man's voice that comes out backwards
+    "Skinstealer": {"idle": [L(lambda m: m.cat([m.breath(0.5, wet=True), m.reverse(m.whisper(0.9))])), L(lambda m: m.mix((m.tear(1.0), 0.4), (m.breath(1.0, 300, 2500, wet=True), 1.0)))],
+                    "alert": [L(lambda m: m.mix((m.reverse(m.scream(0.9, 170, 120, "a", 0.95, 0.4)), 1.0), (m.tear(0.9), 0.5)))],
+                    "attack": [L(lambda m: m.mix((m.ringmod(m.scream(0.6, 240, 160, "a", 0.95, 0.7), 60) , 1.0), (m.tear(0.6), 0.8))),
+                               L(lambda m: m.mix((m.reverse(m.growl(0.6, 110, "e", 0.8, 1.0, drive=5)), 1.0), (m.snap(), 0.5)))],
+                    "hurt": [L(lambda m: m.mix((m.tear(0.4), 1.0), (m.growl(0.3, 150, "e", 0.6, 1.0), 0.5)))],
+                    "die": [L(lambda m: m.cat([m.reverse(m.scream(0.8, 220, 120, "a", 0.95)), m.tear(1.0)]))]},
+    "Clump": {"idle": [L(lambda m: m.bubbles(m.r(1.4, 2.0), 10, 150, 600)), L(lambda m: m.mix((m.bubbles(1.5, 16), 1.0), (m.moan(1.5, 70, 0.7), 0.4)))],
+              "alert": [L(lambda m: m.mix((m.growl(1.2, 55, "o", 1.0, 0.6), 1.0), (m.bubbles(1.2, 25), 0.6)))],
+              "attack": [L(lambda m: m.mix((m.tear(0.6), 1.0), (m.bubbles(0.6, 30, 300, 1200), 0.7)))],
+              "hurt": [L(lambda m: m.bubbles(0.5, 40, 400, 1500))], "die": [L(lambda m: m.mix((m.bubbles(1.6, 30), 1.0), (m.moan(1.6, 60, 0.6), 0.7)))]},
+    # eyeless and full of teeth, mimics: clicks, a deep roar
+    "Scp939": {"idle": [L(lambda m: m.mix((m.clicks(1.2, 12, 2200), 0.6), (m.breath(1.2, 200, 1500, wet=True), 0.8))), L(lambda m: m.growl(1.4, 55, "u", 0.9, 0.65))],
+               "alert": [L(lambda m: m.mix((m.growl(1.2, 50, "a", 1.0, 0.6, glide=80, drive=5), 1.0), (m.clicks(1.2, 25, 2600), 0.5)))],
+               "attack": [L(lambda m: m.mix((m.growl(0.6, 60, "a", 1.0, 0.6, glide=110, drive=7), 1.0), (m.snap(), 0.6)))],
+               "hurt": [L(lambda m: m.growl(0.4, 120, "e", 0.9, 0.7, drive=4))], "die": [L(lambda m: m.cat([m.growl(0.8, 70, "a", 1.0, 0.6), m.clicks(1.2, 6, 1800)]))]},
+    "Scp106": {"idle": [L(lambda m: m.mix((m.bubbles(m.r(1.5, 2.2), 12, 120, 500), 1.0), (m.breath(2.0, 150, 1200, wet=True), 0.6))), L(lambda m: m.giggle(4, 95, 0.75, 0.15))],
+               "alert": [L(lambda m: m.mix((m.giggle(6, 90, 0.7, 0.2), 1.0), (m.bubbles(1.4, 14), 0.5)))],
+               "attack": [L(lambda m: m.mix((m.growl(0.8, 60, "o", 0.7, 0.6), 1.0), (m.tear(0.6), 0.5), (m.bubbles(0.8, 25), 0.5)))],
+               "hurt": [L(lambda m: m.bubbles(0.8, 35, 150, 700))], "die": [L(lambda m: m.bubbles(2.0, 25, 100, 400))]},
+    # store staff: a flat tannoy-like voice (crushed, band-limited), "hmm" humming
+    "Staff3008": {"idle": [L(lambda m: m.crush(m.band(m.moan(1.6, 105, 1.0), 300, 3000), 5, 2)), L(lambda m: m.hum([0, 0, -2, -2, -4], 120))],
+                  "alert": [L(lambda m: m.crush(m.band(m.growl(1.0, 110, "e", 0.3, 1.0, drive=2), 300, 3200), 4, 3))],
+                  "attack": [L(lambda m: m.crush(m.band(m.scream(0.5, 260, 180, "e", 1.0, 0.4), 300, 3200), 4, 3))],
+                  "hurt": [L(lambda m: m.crush(m.band(m.growl(0.3, 150, "uh", 0.3, 1.0), 300, 3000), 4, 2))],
+                  "die": [L(lambda m: m.crush(m.band(m.moan(1.4, 90, 1.0), 300, 3000), 3, 4))]},
+    "Partygoer": {"idle": [L(lambda m: m.giggle(int(m.r(5, 8)), 280, 1.25)), L(lambda m: m.giggle(6, 240, 1.2, 0.35))],
+                  "alert": [L(lambda m: m.giggle(9, 340, 1.35, 0.5))],
+                  "attack": [L(lambda m: m.mix((m.shriek(0.5, 1200, 1600), 0.8), (m.giggle(3, 380, 1.4), 1.0)))],
+                  "hurt": [L(lambda m: m.giggle(2, 450, 1.5))], "die": [L(lambda m: m.cat([m.giggle(3, 300, 1.3), m.giggle(3, 200, 1.1, 0.1)]))]},
+    "Dancer": {"idle": [L(lambda m: m.hum([0, 4, 7, 4, 0, -5], 200)), L(lambda m: m.heels(4, 2400))],
+               "alert": [L(lambda m: m.cat([m.heels(3, 2600), m.hum([7, 7, 12], 210)]))],
+               "attack": [L(lambda m: m.mix((m.scream(0.5, 520, 700, "i", 1.25, 0.2), 1.0), (m.heels(1, 3000), 0.6)))],
+               "hurt": [L(lambda m: m.scream(0.3, 600, 450, "i", 1.25, 0.2))], "die": [L(lambda m: m.hum([0, -1, -3, -5, -8], 200))]},
+    # the plague doctor: a calm low voice, a doctor's hum, a cane tap
+    "Scp049": {"idle": [L(lambda m: m.hum([0, -1, 0, 3, 0], 105)), L(lambda m: m.breath(1.5, 300, 2500))],
+               "alert": [L(lambda m: m.cat([m.thud(260), m.hum([0, 0, 5], 98)]))],
+               "attack": [L(lambda m: m.mix((m.growl(0.6, 90, "o", 0.2, 0.9, drive=1.4), 1.0), (m.thud(220), 0.5)))],
+               "hurt": [L(lambda m: m.growl(0.3, 110, "uh", 0.2, 0.9, drive=1.3))], "die": [L(lambda m: m.moan(1.6, 85, 0.9))]},
+    "Scarecrow": {"idle": [L(lambda m: m.rustle(m.r(1.2, 1.8))), L(lambda m: m.caw(2, 650))],
+                  "alert": [L(lambda m: m.mix((m.caw(3, 750), 1.0), (m.rustle(1.0, 14), 0.6)))],
+                  "attack": [L(lambda m: m.mix((m.rustle(0.5, 30), 1.0), (m.growl(0.5, 90, "a", 0.9, 0.8, drive=3), 0.5), (m.caw(1, 900), 0.6)))],
+                  "hurt": [L(lambda m: m.rustle(0.4, 30))], "die": [L(lambda m: m.cat([m.rustle(0.8, 20), m.caw(1, 500)]))]},
+    # inside a brass helmet: everything muffled, bubbling, a ring off the glass
+    "Diver": {"idle": [L(lambda m: m.bubbles(m.r(1.6, 2.4), 9, 180, 700)), L(lambda m: m.muffle(m.breath(1.8, 200, 1400, wet=True), 700))],
+              "alert": [L(lambda m: m.mix((m.comb(m.muffle(m.growl(1.0, 80, "o", 0.6, 0.8), 1200), 180, 0.6), 1.0), (m.bubbles(1.0, 30), 0.6)))],
+              "attack": [L(lambda m: m.mix((m.comb(m.muffle(m.scream(0.6, 200, 150, "o", 0.8, 0.5), 1400), 180, 0.6), 1.0), (m.clang(300), 0.4)))],
+              "hurt": [L(lambda m: m.clang(340))], "die": [L(lambda m: m.mix((m.bubbles(2.0, 40, 150, 900), 1.0), (m.muffle(m.moan(1.6, 70, 0.8), 600), 0.6)))]},
+    # burnt alive: crackling, a hoarse scorched rasp
+    "Burnt": {"idle": [L(lambda m: m.crackle(m.r(1.4, 2.0), 40)), L(lambda m: m.mix((m.crackle(1.6, 25), 0.7), (m.wheeze(1.6), 0.6)))],
+              "alert": [L(lambda m: m.mix((m.growl(1.0, 95, "a", 1.0, 0.85, drive=7), 1.0), (m.crackle(1.0, 80), 0.6)))],
+              "attack": [L(lambda m: m.mix((m.scream(0.5, 230, 160, "a", 0.85, 0.9), 1.0), (m.crackle(0.5, 140), 0.7)))],
+              "hurt": [L(lambda m: m.crackle(0.4, 160))], "die": [L(lambda m: m.cat([m.growl(0.6, 90, "a", 1.0, 0.85, drive=6), m.crackle(1.6, 50)]))]},
+    # hospital gown, out of its mind: fast panting, hysterical laugh-sobbing
+    "Patient": {"idle": [L(lambda m: m.cat([m.breath(0.25, 600, 3000)] * int(m.r(5, 8)), (0.05, 0.1))), L(lambda m: m.sob(3, 200))],
+                "alert": [L(lambda m: m.mix((m.giggle(6, 260, 1.15, 0.6), 1.0), (m.sob(2, 240), 0.6)))],
+                "attack": [L(lambda m: m.scream(0.7, 380, 520, "e", 1.1, 0.3))],
+                "hurt": [L(lambda m: m.sob(1, 260))], "die": [L(lambda m: m.cat([m.scream(0.6, 400, 250, "e", 1.1), m.sob(2, 180)]))]},
+    "Nurse": {"idle": [L(lambda m: m.hum([0, 2, 4, 2, 0, 0], 220)), L(lambda m: m.heels(5, 2000))],
+              "alert": [L(lambda m: m.shriek(0.8, 1100, 1500))],
+              "attack": [L(lambda m: m.mix((m.shriek(0.6, 1400, 1900), 1.0), (m.heels(1, 2200), 0.5)))],
+              "hurt": [L(lambda m: m.shriek(0.3, 1600, 1100))], "die": [L(lambda m: m.cat([m.shriek(0.7, 1300, 600), m.hum([0, -2, -4], 200)]))]},
+    "Clown": {"idle": [L(lambda m: m.giggle(int(m.r(7, 11)), 230, 1.2, 0.4)), L(lambda m: m.honk(2, 320))],
+              "alert": [L(lambda m: m.cat([m.honk(2, 360), m.giggle(8, 300, 1.3, 0.5)]))],
+              "attack": [L(lambda m: m.mix((m.growl(0.5, 150, "a", 0.8, 1.1, drive=5), 1.0), (m.honk(1, 250), 0.7)))],
+              "hurt": [L(lambda m: m.honk(1, 420))], "die": [L(lambda m: m.cat([m.giggle(5, 260, 1.2, 0.2), m.honk(1, 180)]))]},
+    # lost in the tunnels: coughing, a pick on rock
+    "Miner": {"idle": [L(lambda m: m.cough(int(m.r(2, 4)))), L(lambda m: m.mix((m.clang(520), 0.5), (m.breath(1.2, 300, 2000), 0.7)))],
+              "alert": [L(lambda m: m.cat([m.clang(480), m.growl(0.8, 85, "o", 0.6, 0.85, drive=3)]))],
+              "attack": [L(lambda m: m.mix((m.growl(0.5, 100, "a", 0.8, 0.85, drive=4), 1.0), (m.clang(440), 0.7)))],
+              "hurt": [L(lambda m: m.cough(1))], "die": [L(lambda m: m.cat([m.cough(3), m.moan(1.2, 70, 0.8)]))]},
+    # cold: a whistling wind, an icy breath, glass-thin cries
+    "Frostwraith": {"idle": [L(lambda m: m.whistle(m.r(1.6, 2.4), 700, 500)), L(lambda m: m.breath(2.0, 2500, 9000))],
+                    "alert": [L(lambda m: m.mix((m.whistle(1.2, 900, 1600), 1.0), (m.shriek(1.0, 1800, 2400), 0.4)))],
+                    "attack": [L(lambda m: m.mix((m.comb(m.whistle(0.6, 1500, 800), 1200, 0.5), 1.0), (m.hiss(0.6), 0.6)))],
+                    "hurt": [L(lambda m: m.comb(m.shriek(0.3, 2000, 1500), 1500, 0.5))], "die": [L(lambda m: m.whistle(2.0, 800, 200))]},
+    # a farm animal gone wrong: bellows
+    "Farmthing": {"idle": [L(lambda m: m.moan(m.r(1.4, 2.0), 75, 0.6)), L(lambda m: m.breath(1.2, 150, 900, wet=True))],
+                  "alert": [L(lambda m: m.growl(1.6, 70, "o", 0.6, 0.55, glide=110, drive=3))],
+                  "attack": [L(lambda m: m.mix((m.growl(0.7, 90, "o", 1.0, 0.55, glide=140, drive=6), 1.0), (m.thud(55), 0.7)))],
+                  "hurt": [L(lambda m: m.growl(0.4, 120, "o", 0.8, 0.6, drive=4))], "die": [L(lambda m: m.moan(2.0, 60, 0.55))]},
+    "Crawler": {"idle": [L(lambda m: m.clicks(m.r(1.0, 1.6), 18, 2600)), L(lambda m: m.mix((m.clicks(1.2, 10, 2000), 1.0), (m.hiss(1.2), 0.3)))],
+                "alert": [L(lambda m: m.mix((m.clicks(1.0, 45, 3000), 1.0), (m.hiss(1.0), 0.6)))],
+                "attack": [L(lambda m: m.mix((m.hiss(0.5), 1.0), (m.clicks(0.5, 60, 3500), 0.8), (m.snap(), 0.4)))],
+                "hurt": [L(lambda m: m.clicks(0.3, 80, 4000))], "die": [L(lambda m: m.clicks(1.4, 12, 1800))]},
+    "Doll": {"idle": [L(lambda m: m.giggle(3, 420, 1.4, 0.1))], "alert": [L(lambda m: m.giggle(5, 480, 1.5, 0.2))],
+             "attack": [L(lambda m: m.mix((m.snap(), 0.6), (m.giggle(2, 500, 1.5), 1.0)))], "hurt": [L(lambda m: m.thud(300))], "die": [L(lambda m: m.thud(250))]},
+    # hollow plastic: knocks and creaks with a hollow ring, joints clicking into place (SCP-173 is stone)
+    "Mannequin": {"idle": [L(lambda m: m.comb(m.clicks(0.8, 5, 1400), 520, 0.75))],
+                  "alert": [L(lambda m: m.comb(m.clicks(0.6, 22, 1600), 480, 0.8))],
+                  "attack": [L(lambda m: m.mix((m.comb(m.snap(), 600, 0.7), 1.0), (m.clicks(0.4, 30, 1800), 0.6)))],
+                  "hurt": [L(lambda m: m.comb(m.thud(320), 700, 0.7))], "die": [L(lambda m: m.comb(m.cat([m.thud(260), m.clicks(1.0, 10, 1200)]), 450, 0.75))],
+                  "loop": [L(lambda m: m.comb(m.clicks(2.0, 4, 1200), 500, 0.7) * 0.6)]},
+    "Plush": {"idle": [L(lambda m: m.giggle(3, 380, 1.4, 0.15))], "alert": [L(lambda m: m.giggle(4, 330, 1.3))],
+              "attack": [L(lambda m: m.mix((m.tear(0.4), 1.0), (m.giggle(2, 350, 1.3), 0.6)))], "hurt": [L(lambda m: m.tear(0.3))], "die": [L(lambda m: m.tear(0.6))]},
+    "Watcher": {"idle": [L(lambda m: m.mix((m.breath(2.4, 80, 600), 1.0), (m.hum([0, 0, 0], 55), 0.3)))], "alert": [L(lambda m: m.breath(1.6, 60, 400))]},
 }
 
 TAKES = 3

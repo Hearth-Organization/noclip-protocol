@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Turns a Tripo3D monster (model + rig + animation .glb files) into game assets.
 
-  python3 Tools/Monsters/make_monster.py NAME TRIPO_DIR HEIGHT_M [--turn DEG] [--length] ANIM [ANIM ...]
+  python3 Tools/Monsters/make_monster.py NAME TRIPO_DIR HEIGHT_M [--turn DEG] [--length] [--dir FOLDER] ANIM[:AS] [ANIM ...]
 
 --turn DEG: an extra turn about Z for a model Tripo made facing another way than -Y (a side-view prompt).
 --length: HEIGHT_M is the body's length instead (four-legged creatures).
@@ -135,8 +135,12 @@ def main():
         import math
         TURN = math.radians(float(rest[1]))
         rest = rest[2:]
-    anims = rest
-    outdir = ROOT / "Assets" / "Models" / "Monsters" / name
+    folder = ROOT / "Assets" / "Models" / "Monsters"
+    if rest[:1] == ["--dir"]:   # e.g. --dir Assets/Models/Agents (the agents, Nov 28)
+        folder = ROOT / rest[1]
+        rest = rest[2:]
+    anims = rest   # ANIM or SRC:NAME (fall:death reads NAME-fall.glb and writes NAME_death.fbx)
+    outdir = folder / name
     outdir.mkdir(parents=True, exist_ok=True)
     arm, meshes = load(src / f"{name.lower()}-rig.glb")
     s, offset = fit(arm, meshes, height, by_length)
@@ -147,13 +151,14 @@ def main():
     place(arm, s, offset)
     export_fbx(outdir / f"{name}.fbx", True)
     for anim in anims:
+        anim, _, as_name = anim.partition(":")
         arm, meshes = load(src / f"{name.lower()}-{anim}.glb")
         for m in meshes:
             bpy.data.objects.remove(m, do_unlink=True)
         for img in list(bpy.data.images):
             bpy.data.images.remove(img)
         place(arm, s, offset)
-        export_fbx(outdir / f"{name}_{anim}.fbx", False)
+        export_fbx(outdir / f"{name}_{as_name or anim}.fbx", False)
     print(f"{name}: scale {s:.3f}, {len(anims)} motions -> {outdir.relative_to(ROOT)}")
 
 

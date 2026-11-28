@@ -1,0 +1,98 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "AgentFemale_Idle",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 5160063381348617174
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 1075156161249520040
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 2036693831167607152
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 6454372926338413634
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 5775930921392305057
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 7330192975623599978
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 6639399358789990063
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 7812391543977433931
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 8503885660663191190
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 8896758519853677028,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 7094641347627845009,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{B7D516CB-D76D-5CD8-889D-6EC6D63917F6}",
+                        "subId": 3986050036
+                    },
+                    "assetHint": "assets/models/agents/agentfemale/agentfemale.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 2116863465582176778,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{334F7D04-8731-5C03-947C-AFFDE9D33C80}",
+                            "subId": 1946725607
+                        },
+                        "assetHint": "assets/models/agents/agentfemale/agentfemale_idle.motion"
+                    },
+                    "Loop": true,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 6123549765677471464,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{FEDF0731-8363-55A3-8C78-A0531B179546}"
+                                    },
+                                    "assetHint": "assets/models/agents/agentfemale/agentfemale.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "Entities": {}
+}

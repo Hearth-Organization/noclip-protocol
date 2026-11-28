@@ -252,6 +252,14 @@ namespace NoclipProtocol
         return true;
     }
 
+    AZ::Vector3 HearthMonsterComponent::Ahead(const AZ::Transform& self) const
+    {
+        // Where its face points: the model's +Y, less the turn some models are built with.
+        const AZ::Vector3 y = AZ::Quaternion::CreateRotationZ(-m_turn).TransformVector(self.GetBasisY());
+        AZ::Vector3 flat(y.GetX(), y.GetY(), 0.0f);
+        return flat.GetLengthSq() > 1.0e-6f ? flat.GetNormalized() : AZ::Vector3::CreateAxisY();
+    }
+
     bool HearthMonsterComponent::LineOfSight(const AZ::Vector3& a, const AZ::Vector3& b)
     {
         const float length = (b - a).GetLength();
@@ -351,6 +359,12 @@ namespace NoclipProtocol
             registry->Set(base + "/Y", static_cast<double>(at.GetY()));
             registry->Set(base + "/State", state);
         }
+        if (state != m_lastState)
+        {
+            // Every change of mind goes in the log (what it was doing when a fight went wrong is the first question).
+            m_lastState = state;
+            AZ_Printf("Noclip", "monster: %s -> %s (path %d)", m_name.c_str(), state.c_str(), static_cast<int>(m_path.size()));
+        }
     }
 
     void HearthMonsterComponent::Play(const char* motion, bool loop, float speed)
@@ -389,6 +403,24 @@ namespace NoclipProtocol
     void HearthMonsterComponent::OnTick(float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
     {
         m_dt = deltaTime;
+        if (!m_preloadDone && !m_motions.empty())
+        {
+            m_preloadDone = true;
+            for (const char* motion : { "idle", "walk", "run", "slash" })
+            {
+                AZ::Data::AssetId id;
+                const AZStd::string path = m_motions + "_" + motion + ".motion";
+                AZ::Data::AssetCatalogRequestBus::BroadcastResult(id, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath, path.c_str(),
+                                                                  AZ::Data::s_invalidAssetType, false);
+                if (!id.IsValid())
+                {
+                    continue;
+                }
+                AZ::Data::AssetInfo info;
+                AZ::Data::AssetCatalogRequestBus::BroadcastResult(info, &AZ::Data::AssetCatalogRequests::GetAssetInfoById, id);
+                m_preloaded.push_back(AZ::Data::AssetManager::Instance().GetAsset(id, info.m_assetType, AZ::Data::AssetLoadBehavior::PreLoad));
+            }
+        }
         auto* registry = AZ::SettingsRegistry::Get();
         bool enabled = true;
         if (registry)
@@ -448,6 +480,7 @@ namespace NoclipProtocol
                         else if (damage > 0.0)
                         {
                             Sound(MonsterSounds::Hurt, true);
+                            m_flinch = 0.28f;
                         }
                         m_heardAt = shooterAt;   // it knows where that came from
                         m_sinceHeard = 0.0f;
@@ -537,15 +570,43 @@ namespace NoclipProtocol
         AZ::Transform self = AZ::Transform::CreateIdentity();
         AZ::TransformBus::EventResult(self, GetEntityId(), &AZ::TransformBus::Events::GetWorldTM);
         const bool sees = player.IsValid() && distance <= m_sight && distance > 0.01f &&
-            self.GetBasisY().GetNormalized().Dot(flat / distance) >= 0.5f && LineOfSight(at, playerAt);
+            Ahead(self).Dot(flat / distance) >= 0.5f && LineOfSight(at, playerAt);
 
         if (m_health <= 0.0f)
         {
-            // Dead: it sinks back into the dark (the spawner removes it shortly after).
+            // Dead: it falls back, hard, lies there a moment, then sinks into the dark (the spawner removes it after).
+            if (m_sinceDeath == 0.0f)
+            {
+                // Where it faces (models that aren't built facing +Y carry m_turn on top).
+                m_deathTurn = m_hasYaw ? AZ::Quaternion::CreateRotationZ(m_yaw)
+                                       : self.GetRotation() * AZ::Quaternion::CreateRotationZ(-m_turn);
+                m_deathAt = at;
+                m_deathScale = self.GetUniformScale();
+            }
+            if (m_sinceDeath == 0.0f)
+            {
+                // Freeze the pose it was in when it died (switching to a stopped idle showed the bare rest pose, a
+                // T-pose, while it fell: owner, Nov 28).
+                if (m_playing.empty())
+                {
+                    Play("idle", true, 0.0f);
+                }
+                EMotionFX::Integration::SimpleMotionComponentRequestBus::Event(
+                    GetEntityId(), &EMotionFX::Integration::SimpleMotionComponentRequestBus::Events::SetPlaySpeed, 0.0f);
+            }
             m_sinceDeath += deltaTime;
-            Play("idle", false, 0.0f);
-            at.SetZ(at.GetZ() - deltaTime * 1.6f);
-            AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldTranslation, at);
+            const float fall = AZStd::min(1.0f, m_sinceDeath / 0.55f);
+            const float eased = fall * fall;                                   // gravity: slow, then fast
+            const float bounce = fall >= 1.0f ? std::exp(-9.0f * (m_sinceDeath - 0.55f)) * std::sin((m_sinceDeath - 0.55f) * 30.0f) * 0.06f : 0.0f;
+            const float tilt = AZ::DegToRad(84.0f) * eased - bounce;
+            const bool fourLegs = m_kind == "Hound" || m_kind == "Scp939" || m_kind == "Crawler"; // these drop onto their side
+            AZ::Vector3 lie = m_deathAt;
+            lie.SetZ(m_deathAt.GetZ() - 0.12f * eased - (m_sinceDeath > 2.2f ? (m_sinceDeath - 2.2f) * 0.9f : 0.0f));
+            AZ::Transform tm = AZ::Transform::CreateFromQuaternionAndTranslation(
+                m_deathTurn * (fourLegs ? AZ::Quaternion::CreateRotationY(tilt * 0.95f) : AZ::Quaternion::CreateRotationX(tilt)) *
+                AZ::Quaternion::CreateRotationZ(m_turn), lie);
+            tm.SetUniformScale(m_deathScale);
+            AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldTM, tm);
             Report(at, "Dead");
             return;
         }
@@ -659,7 +720,7 @@ namespace NoclipProtocol
             // Harmless while it cries, facing away. See its face and it screams, shakes for six seconds (your head
             // start), then runs you down through the doorways; one hit kills. Break its line of sight long enough and it
             // loses you: it wanders a while, then sits down and cries again. Bullets only slow it a moment.
-            const bool faceShown = distance > 0.01f && self.GetBasisY().GetNormalized().Dot(flat / distance) > 0.2f;
+            const bool faceShown = distance > 0.01f && Ahead(self).Dot(flat / distance) > 0.2f;
             const bool seesYou = player.IsValid() && distance < 40.0f && LineOfSight(at, playerAt);
             const float rageSpeed = 6.5f * (m_slowed > 0.0f ? 0.3f : 1.0f);
             switch (m_mood)
@@ -735,7 +796,7 @@ namespace NoclipProtocol
                 return;
             }
             default:
-                if (seesYou && distance < m_sight && self.GetBasisY().GetNormalized().Dot(flat / AZStd::max(distance, 0.01f)) >= 0.5f)
+                if (seesYou && distance < m_sight && Ahead(self).Dot(flat / AZStd::max(distance, 0.01f)) >= 0.5f)
                 {
                     m_mood = 2;
                     Sound(MonsterSounds::Alert, true);
@@ -1010,6 +1071,15 @@ namespace NoclipProtocol
             drainSanity(0.012 * deltaTime);
         }
         // Up close it strikes: the blow lands partway into the attack, if you're still in reach.
+        if (m_attack < 0.0f && m_fleeing <= 0.0f && sees && distance < 1.7f && m_attackCooldown <= 0.0f &&
+            Ahead(self).Dot(flat / AZStd::max(distance, 0.01f)) < 0.9f)
+        {
+            // Too close to swing sideways at you: it squares up first (a quick turn on the spot, no sliding).
+            Face(flat, 9.0f);
+            Play("idle", true, 1.0f);
+            Report(at, "Squaring up to " + playerName);
+            return;
+        }
         if (m_attack < 0.0f && m_fleeing <= 0.0f && sees && distance < 1.7f && m_attackCooldown <= 0.0f)
         {
             m_attack = 0.0f;
@@ -1079,7 +1149,17 @@ namespace NoclipProtocol
     {
         auto* registry = AZ::SettingsRegistry::Get();
         m_attack += deltaTime;
-        Play("slash", false, 1.6f);
+        Play("slash", true, 1.6f); // looped: a strike that ran out left the bare rest pose (a T-pose) until the next move
+        // It steps into the blow: a short lunge during the wind-up, never closer than arm's length.
+        if (m_attack > 0.12f && m_attack < 0.45f && distance > 1.05f)
+        {
+            AZ::Vector3 here = at;
+            here += flat / distance * AZStd::min(distance - 1.05f, 2.4f * deltaTime);
+            if (!InSafe(Cell(here)))
+            {
+                AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldTranslation, here);
+            }
+        }
         if (!m_struck && m_attack >= 0.45f)
         {
             m_struck = true;
@@ -1100,7 +1180,7 @@ namespace NoclipProtocol
         if (distance > 0.01f)
         {
             const AZ::Vector3 face = flat / distance;
-            Face(face, 8.0f);
+            Face(face, 12.0f); // squared up the whole swing
         }
         if (m_attack >= 1.1f)
         {
@@ -1244,8 +1324,10 @@ namespace NoclipProtocol
         // Eases into the turn and out of it, no faster than a person turns.
         const float step = AZStd::clamp(diff * AZStd::min(1.0f, m_dt * 7.0f), -rate * m_dt, rate * m_dt);
         m_yaw = std::remainder(m_yaw + step, AZ::Constants::TwoPi);
+        m_flinch = AZStd::max(0.0f, m_flinch - m_dt);
+        const float lean = m_flinch > 0.0f ? -0.22f * std::sin(m_flinch / 0.28f * AZ::Constants::Pi) : 0.0f; // rocked back
         AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion,
-            AZ::Quaternion::CreateRotationZ(m_yaw + m_turn + m_sway));
+            AZ::Quaternion::CreateRotationZ(m_yaw) * AZ::Quaternion::CreateRotationX(lean) * AZ::Quaternion::CreateRotationZ(m_turn + m_sway));
     }
 
     void HearthMonsterComponent::Face(const AZ::Vector3& direction, float rate)
@@ -1273,7 +1355,8 @@ namespace NoclipProtocol
             m_leaveFor = 25.0f + static_cast<float>(std::rand() % 1500) / 100.0f;
             m_leave = LeaveGoal(at);
             m_repath = 0.0f;
-            AZ_Printf("Noclip", "monster: %s turns away from the reality anchor's field", m_name.c_str());
+            AZ_Printf("Noclip", "monster: %s turns away from the reality anchor's field (goal cell %d %d, field %d %d +-%d, cell %.1f m)",
+                      m_name.c_str(), goal.x, goal.y, m_safeCentre.x, m_safeCentre.y, m_safeHalf, m_cell);
         }
         if (closeIn && !m_wasChasing && m_alertCooldown <= 0.0f && m_kind != "Scp096")
         {
@@ -1340,13 +1423,24 @@ namespace NoclipProtocol
             heading = flat / distance;
         }
 
+        // Close in on you, it faces you, not the next cell of its path.
+        if (closeIn && distance < 4.0f && distance > 0.01f && !m_path.empty() && m_path.size() <= 2 && LineOfSight(at, target))
+        {
+            heading = flat / distance;
+        }
+        // Shot, it reels: a moment's stop, rocked back.
+        if (m_flinch > 0.0f)
+        {
+            pace = 0.0f;
+            m_curSpeed *= 0.5f;
+        }
         // Turns into the way it's going first: it slows for a sharp turn rather than sliding sideways or backwards.
         float turnSlow = 1.0f;
         if (!heading.IsZero())
         {
             const float want = std::atan2(-heading.GetX(), heading.GetY());
             const float off = std::abs(std::remainder(want - m_yaw, AZ::Constants::TwoPi));
-            turnSlow = AZStd::clamp(std::cos(off), 0.15f, 1.0f);
+            turnSlow = off > 1.2f ? 0.05f : AZStd::clamp(std::cos(off) * 1.15f - 0.15f, 0.15f, 1.0f);
         }
         else
         {

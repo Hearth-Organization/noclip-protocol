@@ -176,6 +176,13 @@ namespace NoclipProtocol
             live.m_test = test;
             live.m_ticket = AZStd::make_shared<AzFramework::EntitySpawnTicket>(m_assets[kind]);
             const AZStd::string name = AZStd::string::format("%s %d", k.m_name, ++m_serial);
+            if (test)
+            {
+                if (auto* registry = AZ::SettingsRegistry::Get())
+                {
+                    registry->Set("/NoclipProtocol/Monsters/LastSpawned", name); // noclip_aim follows it
+                }
+            }
             const AZStd::string kindName = k.m_name, motions = k.m_motions;
             AZStd::shared_ptr<AZ::EntityId> entityOut = live.m_id;
             AzFramework::SpawnAllEntitiesOptionalArgs args;
@@ -262,7 +269,7 @@ namespace NoclipProtocol
                 AZ::TransformBus::EventResult(at, (*m_live[i].m_id), &AZ::TransformBus::Events::GetWorldTranslation);
                 int kindCount = 0;
                 const bool home = settings && LivesOn(Kinds(kindCount)[m_live[i].m_kind], number);
-                const bool gone = (!home && !m_live[i].m_test) || (monster && monster->IsDead() && monster->SinceDeath() > 1.5f) ||
+                const bool gone = (!home && !m_live[i].m_test) || (monster && monster->IsDead() && monster->SinceDeath() > 4.0f) ||
                                   (monster && at.GetDistance(playerAt) > 90.0f);
                 if (gone && (*m_live[i].m_id).IsValid())
                 {

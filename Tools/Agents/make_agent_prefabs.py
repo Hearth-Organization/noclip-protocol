@@ -20,15 +20,19 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "Tools" / "Monsters"))
 from make_monster_prefab import _guid  # noqa: E402
 
-AGENT = "assets/models/agents/agent"
 WEAPONS = ("Pistol", "Shotgun", "Carbine", "FlareGun", "Knife", "Shield")
 
 
-def body(ids, name, motion="walk"):
+def body(ids, name, motion="walk", folder="Agent"):
+    """folder: Agent (the temporary Soldier body), AgentMale or AgentFemale (Hearth Forge's, Tools/Agents/make_forge_agent.py)."""
     rnd = random.Random(name + "-agent")
     nid = lambda: rnd.getrandbits(63)
-    actor = ids[f"{AGENT}/agent.actor"]
-    walk = ids[f"{AGENT}/agent_{motion}.motion"]
+    base = f"assets/models/agents/{folder.lower()}/{folder.lower()}"
+    if f"{base}.actor" not in ids:
+        print("not processed yet:", f"{base}.actor")
+        return
+    actor = ids[f"{base}.actor"]
+    walk = ids[f"{base}_{motion}.motion"]
     plain = ["EditorEntitySortComponent", "EditorInspectorComponent", "EditorLockComponent", "EditorOnlyEntityComponent",
              "EditorPendingCompositionComponent", "EditorPrefabComponent", "EditorVisibilityComponent",
              "EditorDisabledCompositionComponent", "EditorEntityIconComponent"]
@@ -37,14 +41,14 @@ def body(ids, name, motion="walk"):
                                    "Parent Entity": ""}
     comps["EditorActorComponent"] = {"$type": "EditorActorComponent", "Id": nid(),
                                      "ActorAsset": {"assetId": {"guid": actor["guid"], "subId": actor["subId"]},
-                                                    "assetHint": f"{AGENT}/agent.actor"},
+                                                    "assetHint": f"{base}.actor"},
                                      "UpdateJointTransformsWhenOutOfView": False}
     comps["EditorSimpleMotionComponent"] = {"$type": "EditorSimpleMotionComponent", "Id": nid(), "Configuration": {
-        "MotionAsset": {"assetId": {"guid": walk["guid"], "subId": walk["subId"]}, "assetHint": f"{AGENT}/agent_{motion}.motion"},
-        "Loop": True, "PlayOnActivation": True, "InPlace": True, "BlendIn": 0.25, "BlendOut": 0.25}}
+        "MotionAsset": {"assetId": {"guid": walk["guid"], "subId": walk["subId"]}, "assetHint": f"{base}_{motion}.motion"},
+        "Loop": motion != "death", "PlayOnActivation": True, "InPlace": True, "BlendIn": 0.25, "BlendOut": 0.25}}
     comps["EditorMaterialComponent"] = {"$type": "EditorMaterialComponent", "Id": nid(), "Controller": {"Configuration": {
-        "materials": {"{}": {"MaterialAsset": {"assetId": {"guid": _guid("Assets/Models/Agents/Agent/Agent.material")},
-                                               "assetHint": f"{AGENT}/agent.azmaterial"}}}}}}
+        "materials": {"{}": {"MaterialAsset": {"assetId": {"guid": _guid(f"Assets/Models/Agents/{folder}/{folder}.material")},
+                                               "assetHint": f"{base}.azmaterial"}}}}}}
     prefab = {"ContainerEntity": {"Id": "ContainerEntity", "Name": name, "Components": comps}, "Entities": {}}
     out = ROOT / "Prefabs" / "Agents" / f"{name}.prefab"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -72,8 +76,10 @@ def arms(ids, weapon):
     e["Components"]["AZ::Render::EditorMeshComponent"]["Controller"]["Configuration"]["ModelAsset"] = {
         "assetId": {"guid": ids[key]["guid"], "subId": ids[key]["subId"]}, "assetHint": key}
     e["Components"]["EditorMaterialComponent"]["Controller"]["Configuration"]["materials"] = {
-        "{}": {"MaterialAsset": {"assetId": {"guid": _guid("Assets/Models/Agents/Agent/Agent.material")},
-                                 "assetHint": f"{AGENT}/agent.azmaterial"}}}
+        # the arms dressed like the new agent (black sleeves and gloves, owner Nov 28: "doesn't look like it's using
+        # the newest model for the hands carrying the guns"); Assets/Models/Agents/Arms, made from the arms' own texture
+        "{}": {"MaterialAsset": {"assetId": {"guid": _guid("Assets/Models/Agents/Arms/Arms.material")},
+                                 "assetHint": "assets/models/agents/arms/arms.azmaterial"}}}
     e["Components"]["TransformComponent"]["Transform Data"] = {"Translate": [0.0, 0.0, 0.0]}
     data["Entities"][eid] = e
     order[:] = [o for o in order if o in data["Entities"]] + ([eid] if eid not in order else [])
@@ -83,9 +89,13 @@ def arms(ids, weapon):
 
 def main():
     ids = json.loads(Path(sys.argv[1]).read_text())
-    body(ids, "Agent_Male")
-    body(ids, "Agent_Female")
-    body(ids, "Agent_Run", "run")   # the trailer's agent
+    # the agents' own bodies from Hearth Forge (owner, Nov 28), with idle, walk, run and death
+    body(ids, "Agent_Male", folder="AgentMale")
+    body(ids, "Agent_Female", folder="AgentFemale")
+    body(ids, "Agent_Run", "run", folder="AgentMale")   # the trailer's agent
+    for folder in ("AgentMale", "AgentFemale"):
+        for motion in ("idle", "death"):
+            body(ids, f"{folder}_{motion.capitalize()}", motion, folder=folder)
     for weapon in WEAPONS:
         arms(ids, weapon)
 

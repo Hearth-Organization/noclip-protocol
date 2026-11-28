@@ -62,12 +62,21 @@ namespace NoclipProtocol
                 { "Doll", 5.0f, 30.0f, 0.0f, 1.0e9f },       { "Mannequin", 6.0f, 30.0f, 0.0f, 1.0e9f },
                 { "Plush", 3.0f, 30.0f, 0.0f, 1.0e9f },      { "Watcher", 0.0f, 25.0f, 0.0f, 1.0e9f },
             };
-            // Models whose front isn't +Y walked sideways (owner, Nov 27). Found by lining every kind up facing the camera
-            // (monster_spawn all<N>): these showed a side; the turn (degrees) puts their face where they go.
+            // Models whose front isn't +Y walked sideways or backwards (owner, Nov 27 and Nov 28: "the SCPs and monsters are still
+            // facing away from the player"). Measured from the actors themselves (Tools/Monsters/front_views.py renders each
+            // one from four sides): the people-shaped ones were built facing -X, the animals checked in game.
+            // The turn (degrees about Z) puts each face along +Y, the way it walks and attacks.
             struct Turn { const char* kind; float degrees; };
             static const Turn turns[] = {
-                { "Smiler", -90.0f }, { "Scp096", 90.0f }, { "Wretch", -90.0f }, { "Hound", 90.0f }, { "Diver", -90.0f },
-                { "Farmthing", -90.0f },
+                { "Smiler", -90.0f },    { "Faceling", -90.0f },  { "Scp096", -90.0f },    { "Scp173", -90.0f },
+                { "Wretch", -90.0f },    { "Skinstealer", -90.0f }, { "Scp106", -90.0f },  { "Staff3008", -90.0f },
+                { "Partygoer", -90.0f }, { "Dancer", -90.0f },    { "Scp049", -90.0f },    { "Scarecrow", -90.0f },
+                { "Diver", -90.0f },     { "Burnt", -90.0f },     { "Patient", -90.0f },   { "Nurse", -90.0f },
+                { "Clown", -90.0f },     { "Miner", -90.0f },     { "Frostwraith", -90.0f }, { "Doll", -90.0f },
+                { "Mannequin", -90.0f }, { "Plush", -90.0f },     { "Watcher", -90.0f },   { "Mtf", -90.0f },
+                { "Crawler", -90.0f },   { "Hound", 90.0f },      { "Farmthing", -90.0f },
+                // Deathmoth, Clump, Scp939: built facing +Y already. The four-legged ones were set from the game itself
+                // (monster_spawn all<N> with everything frozen: each must show its face), not from the renders.
             };
             for (const Turn& turn : turns)
             {
@@ -156,6 +165,7 @@ namespace NoclipProtocol
         const Level0::Settings* Settings() const;
         void EnsureChunk(int chunkX, int chunkY);
         bool Open(const CellPos& from, int dx, int dy);
+        AZ::Vector3 Ahead(const AZ::Transform& self) const;
         bool LineOfSight(const AZ::Vector3& a, const AZ::Vector3& b);
         AZStd::vector<CellPos> FindPath(const CellPos& from, const CellPos& to);
         CellPos Cell(const AZ::Vector3& at) const;
@@ -166,8 +176,17 @@ namespace NoclipProtocol
         AZStd::string m_kind;
         AZStd::string m_motions;
         AZStd::string m_playing;
+        // Its motions, loaded as soon as it spawns: a motion loaded on first use left the bare rest pose (a T-pose) on screen
+        // until it arrived (owner, Nov 28).
+        AZStd::vector<AZ::Data::Asset<AZ::Data::AssetData>> m_preloaded;
+        bool m_preloadDone = false;
         float m_health = 160.0f;
         float m_sinceDeath = 0.0f;
+        AZStd::string m_lastState;
+        float m_flinch = 0.0f;   // seconds left reeling from a hit
+        AZ::Quaternion m_deathTurn = AZ::Quaternion::CreateIdentity();
+        AZ::Vector3 m_deathAt = AZ::Vector3::CreateZero();
+        float m_deathScale = 1.0f;
         float m_attack = -1.0f;      // seconds into an attack, or < 0
         bool m_struck = false;       // this attack's blow has landed (or missed)
         float m_attackCooldown = 0.0f;

@@ -43,6 +43,8 @@
 #include <MiniAudio/MiniAudioPlaybackBus.h>
 #include "../Hud/GameSettings.h"
 #include <AzCore/std/containers/unordered_map.h>
+#include <AzCore/Component/ComponentApplicationBus.h>
+#include "../Monsters/HearthMonsterComponent.h"
 #include <cmath>
 
 namespace NoclipProtocol
@@ -555,6 +557,18 @@ namespace NoclipProtocol
             {
                 AZ::s64 serial = 0;
                 registry->Get(serial, "/NoclipProtocol/Weapons/Hit/Serial");
+                // A shotgun's pellets land in the same moment: on the same body they add up into one hit (a monster
+                // reads one hit a frame, so each pellet after the first was lost and a point-blank blast did 14).
+                const bool samePellets = m_lastHitEntity == hit.m_entityId && m_lastHitClock == w.m_clock;
+                if (samePellets)
+                {
+                    double before = 0.0;
+                    registry->Get(before, "/NoclipProtocol/Weapons/Hit/Damage");
+                    damage += static_cast<float>(before);
+                    serial -= 1; // still the one hit
+                }
+                m_lastHitEntity = hit.m_entityId;
+                m_lastHitClock = w.m_clock;
                 registry->Set("/NoclipProtocol/Weapons/Hit/Entity", static_cast<AZ::u64>(hit.m_entityId));
                 registry->Set("/NoclipProtocol/Weapons/Hit/Damage", static_cast<double>(damage));
                 registry->Set("/NoclipProtocol/Weapons/Hit/X", static_cast<double>(hit.m_position.GetX()));
@@ -616,7 +630,69 @@ namespace NoclipProtocol
             AZ_Printf("NoclipProtocol", "Weapons ray: player %s, eye %.2f %.2f %.2f", m_player.ToString().c_str(), eye.GetX(), eye.GetY(), eye.GetZ());
         }
 
-        static bool IsMoving(AZ::EntityId) { return false; } // (monsters will say so; walls and props get sparks)
+        // A monster: it bleeds (no bullet hole, no spark). Walls and props get holes and sparks.
+        static bool IsMoving(AZ::EntityId id)
+        {
+            AZ::Entity* e = nullptr;
+            AZ::ComponentApplicationBus::BroadcastResult(e, &AZ::ComponentApplicationRequests::FindEntity, id);
+            return e && e->FindComponent<HearthMonsterComponent>() != nullptr;
+        }
+
+        // Damped springs for the held gun's kick: stiff and a little under-damped, so a shot snaps it back in ~40 ms and it
+        // returns in about a quarter second with a small overshoot.
+        void Recoil(float dt)
+        {
+            dt = AZStd::min(dt, 0.05f);
+            auto step = [dt](Spring& s, float stiffness, float damping)
+            {
+                // a few small steps: stable at low frame rates
+                const int n = 4;
+                const float h = dt / n;
+                for (int i = 0; i < n; ++i)
+                {
+                    s.m_v += (-stiffness * s.m_x - damping * s.m_v) * h;
+                    s.m_x += s.m_v * h;
+                }
+            };
+            step(m_springBack, 900.0f, 34.0f);
+            step(m_springClimb, 520.0f, 26.0f);
+            step(m_springSide, 400.0f, 24.0f);
+            // spent brass: thrown out to the right, falls, bounces once off the floor
+            for (size_t i = 0; i < m_casings.size();)
+            {
+                Casing& c = m_casings[i];
+                c.m_v += AZ::Vector3(0.0f, 0.0f, -9.8f) * dt;
+                c.m_at += c.m_v * dt;
+                c.m_spin += dt * 25.0f;
+                if (Weapons::Get().m_clock - c.m_born > 0.9f)
+                {
+                    m_casings.erase(m_casings.begin() + i);
+                    continue;
+                }
+                ++i;
+            }
+        }
+
+        void Eject()
+        {
+            AZ::Vector3 eye, ahead;
+            if (!Eye(eye, ahead) || m_muzzle.IsZero())
+            {
+                return;
+            }
+            const AZ::Vector3 right = ahead.Cross(AZ::Vector3::CreateAxisZ()).GetNormalizedSafe();
+            Casing c;
+            c.m_at = m_muzzle - ahead * 0.22f + AZ::Vector3(0.0f, 0.0f, 0.02f);
+            c.m_v = right * (1.6f + m_random.GetRandomFloat()) + AZ::Vector3(0.0f, 0.0f, 1.6f + m_random.GetRandomFloat() * 0.6f) - ahead * 0.4f;
+            c.m_axis = ahead;
+            c.m_born = Weapons::Get().m_clock;
+            c.m_spin = m_random.GetRandomFloat() * 6.0f;
+            m_casings.push_back(c);
+            if (m_casings.size() > 24)
+            {
+                m_casings.erase(m_casings.begin());
+            }
+        }
 
         void Fire()
         {
@@ -633,6 +709,28 @@ namespace NoclipProtocol
             w.m_cooldown = d.m_interval;
             w.m_lastShot = w.m_clock;
             w.m_kick = id == Weapons::Shotgun ? 1.0f : (id == Weapons::Carbine ? 0.35f : 0.6f);
+            {
+                // The gun's own kick (springs, see Recoil()): it slams back into the hand and the muzzle climbs, a little
+                // off to one side each shot, then settles with a small overshoot. Per gun: back (m/s), climb, side (rad/s).
+                struct Kick { float back, climb, side; };
+                static const Kick kicks[Weapons::Count] = {
+                    { 2.6f, 9.0f, 2.2f },  // pistol: a sharp snap up
+                    { 3.6f, 12.0f, 2.6f }, // shotgun: a shove into the shoulder
+                    { 1.1f, 2.4f, 1.4f },  // carbine: small, fast, it walks
+                    { 1.6f, 6.0f, 1.0f },  // flare gun
+                    { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f },
+                };
+                const Kick& k = kicks[id];
+                const float jitter = 0.85f + m_random.GetRandomFloat() * 0.3f;
+                m_springBack.m_v -= k.back * jitter;
+                m_springClimb.m_v += k.climb * jitter;
+                m_springSide.m_v += k.side * (m_random.GetRandomFloat() * 2.0f - 1.0f);
+                m_flashSpin = m_random.GetRandomFloat() * AZ::Constants::TwoPi;
+                if (id == Weapons::Pistol || id == Weapons::Carbine)
+                {
+                    Eject();
+                }
+            }
             if (d.m_pump)
             {
                 w.m_pumpNeeded = true;
@@ -903,6 +1001,7 @@ namespace NoclipProtocol
             w.m_drawLeft = AZStd::max(0.0f, w.m_drawLeft - dt);
             w.m_meleeLeft = AZStd::max(0.0f, w.m_meleeLeft - dt);
             w.m_kick = AZStd::max(0.0f, w.m_kick - dt * 6.0f);
+            Recoil(dt);
             if (w.m_pumpLeft > 0.0f)
             {
                 w.m_pumpLeft -= dt;
@@ -966,6 +1065,7 @@ namespace NoclipProtocol
                         {
                             w.m_pumpLeft = 0.45f;
                             Play("pump");
+                            Eject(); // the spent shell flies out as it racks
                         }
                         else if (Weapons::State::Mag(id) > 0)
                         {
@@ -1091,8 +1191,11 @@ namespace NoclipProtocol
                     AZ::Vector3 at = hold[i];
                     float pitch = 0.0f, yaw = 0.0f, roll = 0.0f;
                     at += AZ::Vector3(std::sin(m_bobPhase) * 0.008f * bob, 0.0f, -std::fabs(std::cos(m_bobPhase)) * 0.010f * bob);
-                    at += AZ::Vector3(0.0f, -0.05f * w.m_kick, 0.012f * w.m_kick);
-                    pitch += 0.18f * w.m_kick;
+                    // The kick: springs, so autofire stacks up and settles naturally (see Recoil()).
+                    at += AZ::Vector3(m_springSide.m_x * 0.06f, m_springBack.m_x, m_springClimb.m_x * 0.05f);
+                    pitch += m_springClimb.m_x;
+                    yaw += m_springSide.m_x;
+                    roll -= m_springSide.m_x * 1.6f;
                     if (w.m_drawLeft > 0.0f)
                     {
                         const float t = w.m_drawLeft / 0.35f;
@@ -1108,7 +1211,11 @@ namespace NoclipProtocol
                     }
                     if (w.m_pumpLeft > 0.0f)
                     {
-                        at += AZ::Vector3(0.0f, -0.04f * std::sin(w.m_pumpLeft / 0.45f * AZ::Constants::Pi), 0.0f);
+                        // racking it: pulled back and canted in toward you, then shoved home
+                        const float t = std::sin(w.m_pumpLeft / 0.45f * AZ::Constants::Pi);
+                        at += AZ::Vector3(-0.015f * t, -0.06f * t, -0.012f * t);
+                        roll += 0.22f * t;
+                        pitch += 0.06f * t;
                     }
                     if (w.m_meleeLeft > 0.0f)
                     {
@@ -1214,22 +1321,100 @@ namespace NoclipProtocol
                         holeColours.insert(holeColours.end(), 3, AZ::Color(0.015f, 0.012f, 0.01f, 0.9f * fade));
                     }
                 }
-                if (age < 0.12f)
+                // a few numbers from the hit itself, so each one sprays its own way
+                auto rnd = [&impact](int i) { const float x = std::sin(impact.m_born * 91.7f + i * 12.9898f) * 43758.5453f; return x - std::floor(x); };
+                if (impact.m_soft && age < 0.35f)
                 {
-                    const float k = 1.0f - age / 0.12f;
-                    quad(flashes, flashColours, impact.m_at + n * 0.02f, t1 * 0.05f * k, t2 * 0.05f * k, AZ::Color(1.0f, 0.85f, 0.45f, 0.9f * k));
-                    quad(flashes, flashColours, impact.m_at + n * 0.02f, (t1 + t2) * 0.035f * k, (t1 - t2) * 0.02f * k, AZ::Color(1.0f, 0.7f, 0.3f, 0.8f * k));
+                    // Blood: droplets thrown out of the wound and falling, and a dark mist that spreads and thins.
+                    const float k = 1.0f - age / 0.35f;
+                    const AZ::Vector3 out = (n + (eye - impact.m_at).GetNormalizedSafe() * 0.4f).GetNormalizedSafe();
+                    for (int d = 0; d < 9; ++d)
+                    {
+                        const AZ::Vector3 dir = (out + t1 * (rnd(d) * 2.0f - 1.0f) * 0.9f + t2 * (rnd(d + 20) * 2.0f - 1.0f) * 0.9f).GetNormalizedSafe();
+                        const float speed = 1.2f + rnd(d + 40) * 2.2f;
+                        const AZ::Vector3 at = impact.m_at + dir * speed * age + AZ::Vector3(0.0f, 0.0f, -4.9f * age * age);
+                        const float size = 0.006f + rnd(d + 60) * 0.01f;
+                        const AZ::Vector3 side = dir.Cross(AZ::Vector3::CreateAxisZ()).GetNormalizedSafe() * size;
+                        flashes.insert(flashes.end(), { at + side, at - side, at - dir * size * 3.0f });
+                        flashColours.insert(flashColours.end(), 3, AZ::Color(0.32f, 0.02f, 0.02f, 0.95f * k));
+                    }
+                    const float mist = 0.04f + age * 0.35f;
+                    quad(holes, holeColours, impact.m_at + out * (0.02f + age * 0.3f), t1 * mist, t2 * mist, AZ::Color(0.25f, 0.015f, 0.015f, 0.45f * k * k));
+                }
+                else if (!impact.m_soft && age < 0.1f)
+                {
+                    // Sparks: a hot point and short streaks flying off the wall, gone in a few frames.
+                    const float k = 1.0f - age / 0.1f;
+                    const AZ::Vector3 c = impact.m_at + n * 0.01f;
+                    for (int d = 0; d < 7; ++d)
+                    {
+                        const AZ::Vector3 dir = (n * 0.8f + t1 * (rnd(d) * 2.0f - 1.0f) + t2 * (rnd(d + 30) * 2.0f - 1.0f)).GetNormalizedSafe();
+                        const float len = (0.04f + rnd(d + 50) * 0.08f) * (0.5f + age * 10.0f);
+                        const AZ::Vector3 head = c + dir * (len + age * 3.0f);
+                        const AZ::Vector3 side = dir.Cross(n).GetNormalizedSafe() * 0.0025f;
+                        flashes.insert(flashes.end(), { head - dir * len + side, head - dir * len - side, head });
+                        flashColours.push_back(AZ::Color(1.0f, 0.6f, 0.2f, 0.0f));
+                        flashColours.push_back(AZ::Color(1.0f, 0.6f, 0.2f, 0.0f));
+                        flashColours.push_back(AZ::Color(1.0f, 0.92f, 0.6f, k));
+                    }
+                    const float r = 0.018f * k;
+                    for (int q = 0; q < 6; ++q)
+                    {
+                        const float a0 = AZ::Constants::TwoPi * q / 6.0f, a1 = AZ::Constants::TwoPi * (q + 1) / 6.0f;
+                        flashes.insert(flashes.end(), { c, c + (t1 * std::cos(a0) + t2 * std::sin(a0)) * r, c + (t1 * std::cos(a1) + t2 * std::sin(a1)) * r });
+                        flashColours.push_back(AZ::Color(1.0f, 0.97f, 0.85f, k));
+                        flashColours.push_back(AZ::Color(1.0f, 0.75f, 0.35f, 0.0f));
+                        flashColours.push_back(AZ::Color(1.0f, 0.75f, 0.35f, 0.0f));
+                    }
                 }
             }
             // The muzzle flash, for a moment after the shot (two crossed quads facing you).
             const float since = w.m_clock - w.m_lastShot;
-            if (since < 0.05f && w.m_equipped >= 0 && w.m_equipped != Weapons::FlareGun)
+            if (since < 0.06f && w.m_equipped >= 0 && w.m_equipped != Weapons::FlareGun)
             {
-                const float size = w.m_equipped == Weapons::Shotgun ? 0.09f : 0.06f;
+                // A star of flame spikes round a white-hot core, turned differently every shot, plus a short cone of fire
+                // thrown forward; it blooms and is gone in a couple of frames.
+                const float life = since / 0.06f;
+                const float bloom = life < 0.25f ? 0.6f + 1.6f * life : 1.0f - (life - 0.25f) * 0.9f;
+                const float size = (w.m_equipped == Weapons::Shotgun ? 0.11f : w.m_equipped == Weapons::Carbine ? 0.06f : 0.075f) * bloom;
+                const float fade = 1.0f - life;
                 const AZ::Vector3 right = ahead.Cross(AZ::Vector3::CreateAxisZ()).GetNormalizedSafe();
                 const AZ::Vector3 up = right.Cross(ahead).GetNormalizedSafe();
-                quad(flashes, flashColours, m_muzzle + ahead * 0.03f, right * size, up * size * 0.6f, AZ::Color(1.0f, 0.86f, 0.5f, 0.85f));
-                quad(flashes, flashColours, m_muzzle + ahead * 0.03f, (right + up) * size * 0.5f, (right - up) * size * 0.3f, AZ::Color(1.0f, 0.95f, 0.75f, 0.9f));
+                const AZ::Vector3 centre = m_muzzle + ahead * 0.02f;
+                const int spikes = w.m_equipped == Weapons::Shotgun ? 7 : 5;
+                for (int k = 0; k < spikes; ++k)
+                {
+                    const float a = m_flashSpin + AZ::Constants::TwoPi * k / spikes;
+                    const AZ::Vector3 dir = right * std::cos(a) + up * std::sin(a);
+                    const AZ::Vector3 side = right * -std::sin(a) + up * std::cos(a);
+                    const float len = size * (0.9f + 0.5f * std::sin(m_flashSpin * 3.0f + k * 1.7f));
+                    flashes.insert(flashes.end(), { centre + side * size * 0.16f, centre - side * size * 0.16f, centre + dir * len });
+                    flashColours.push_back(AZ::Color(1.0f, 0.78f, 0.32f, 0.9f * fade));
+                    flashColours.push_back(AZ::Color(1.0f, 0.78f, 0.32f, 0.9f * fade));
+                    flashColours.push_back(AZ::Color(1.0f, 0.35f, 0.05f, 0.0f));
+                }
+                // the forward tongue of fire (seen a little from the side, as the gun sits right of centre)
+                const float tongue = size * (w.m_equipped == Weapons::Shotgun ? 3.2f : 2.4f);
+                flashes.insert(flashes.end(), { centre + up * size * 0.22f, centre - up * size * 0.22f, centre + ahead * tongue });
+                flashes.insert(flashes.end(), { centre + right * size * 0.22f, centre - right * size * 0.22f, centre + ahead * tongue });
+                for (int k = 0; k < 2; ++k)
+                {
+                    flashColours.push_back(AZ::Color(1.0f, 0.85f, 0.45f, 0.85f * fade));
+                    flashColours.push_back(AZ::Color(1.0f, 0.85f, 0.45f, 0.85f * fade));
+                    flashColours.push_back(AZ::Color(1.0f, 0.4f, 0.1f, 0.0f));
+                }
+                quad(flashes, flashColours, centre, right * size * 0.32f, up * size * 0.32f, AZ::Color(1.0f, 0.97f, 0.85f, fade));
+            }
+            // spent brass
+            AZStd::vector<AZ::Vector3> brass;
+            AZStd::vector<AZ::Color> brassColours;
+            for (const Casing& c : m_casings)
+            {
+                const AZ::Vector3 axis = AZ::Quaternion::CreateRotationZ(c.m_spin).TransformVector(c.m_axis) * 0.012f;
+                const AZ::Vector3 width = axis.Cross(AZ::Vector3::CreateAxisZ()).GetNormalizedSafe() * 0.0045f +
+                                          AZ::Vector3(0.0f, 0.0f, 0.0045f);
+                const float shine = 0.75f + 0.25f * std::sin(c.m_spin * 2.0f);
+                quad(brass, brassColours, c.m_at, axis, width, AZ::Color(0.80f * shine, 0.62f * shine, 0.28f * shine, 1.0f));
             }
             auto submit = [&](const AZStd::vector<AZ::Vector3>& verts, const AZStd::vector<AZ::Color>& colours, bool depth)
             {
@@ -1248,6 +1433,7 @@ namespace NoclipProtocol
                 draw->DrawTriangles(args);
             };
             submit(holes, holeColours, true);
+            submit(brass, brassColours, true);
             submit(flashes, flashColours, false);
         }
 
@@ -1312,6 +1498,13 @@ namespace NoclipProtocol
         int m_ownedBefore = -1;
         AZ::Vector3 m_lastEye = AZ::Vector3::CreateZero();
         AZ::Vector3 m_muzzle = AZ::Vector3::CreateZero();
+        struct Spring { float m_x = 0.0f, m_v = 0.0f; };
+        Spring m_springBack, m_springClimb, m_springSide;
+        float m_flashSpin = 0.0f;
+        AZ::EntityId m_lastHitEntity;
+        float m_lastHitClock = -1.0f;
+        struct Casing { AZ::Vector3 m_at, m_v, m_axis; float m_born; float m_spin; };
+        AZStd::vector<Casing> m_casings;
         float m_bobSpeed = 0.0f;
         AZStd::unordered_map<AZStd::string, float> m_baseVolume;
         float m_recoilBack = 0.0f;

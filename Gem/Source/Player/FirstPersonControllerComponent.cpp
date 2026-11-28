@@ -6,6 +6,7 @@
 #include "WeaponsComponent.h"
 #include "../Monsters/MonsterSpawnerComponent.h"
 #include "DeathSequence.h"
+#include <cstdlib>
 
 #include <AzCore/Settings/SettingsRegistry.h>
 #include <AzCore/std/parallel/thread.h>
@@ -108,6 +109,27 @@ namespace NoclipProtocol
         }
         AZ_CONSOLEFREEFUNC("noclip_walk", NoclipWalk, AZ::ConsoleFunctorFlags::Null,
             "Walk the player forward: noclip_walk <seconds> [sprint 0/1]");
+
+        // noclip_aim <seconds> [monster name]: keep the sights on a monster (default: the last one monster_spawn brought in),
+        // turning the way a person does, for filming fights.
+        void NoclipAim(const AZ::ConsoleCommandContainer& arguments)
+        {
+            if (!s_activePlayer || arguments.empty())
+            {
+                AZ_Printf("Noclip", "noclip_aim <seconds> [monster name]%s", s_activePlayer ? "" : " (no player)");
+                return;
+            }
+            const float seconds = AZStd::stof(AZStd::string(arguments[0]));
+            AZStd::string name;
+            for (size_t i = 1; i < arguments.size(); ++i)
+            {
+                name += (i > 1 ? " " : "") + AZStd::string(arguments[i]);
+            }
+            s_activePlayer->AimFor(seconds, name);
+            AZ_Printf("Noclip", "noclip_aim: %.1f s at %s", seconds, name.empty() ? "the last spawned monster" : name.c_str());
+        }
+        AZ_CONSOLEFREEFUNC("noclip_aim", NoclipAim, AZ::ConsoleFunctorFlags::Null,
+            "Keep the sights on a monster: noclip_aim <seconds> [name, default the last monster_spawn]");
 
         // noclip_run <seconds> [sprint 0/1] [first turn: l/r]: run through the maze on its own, turning at walls (trailer).
         void NoclipRun(const AZ::ConsoleCommandContainer& arguments)
@@ -688,12 +710,69 @@ namespace NoclipProtocol
         {
             Steer(deltaTime);
         }
+        if (m_aimFor > 0.0f)
+        {
+            m_aimFor -= deltaTime;
+            auto* registry = AZ::SettingsRegistry::Get();
+            AZStd::string name = m_aimName;
+            if (name.empty() && registry)
+            {
+                registry->Get(name, "/NoclipProtocol/Monsters/LastSpawned");
+            }
+            double mx = 0.0, my = 0.0;
+            AZStd::string state;
+            if (registry && !name.empty() && registry->Get(mx, "/NoclipProtocol/Monsters/" + name + "/X") &&
+                registry->Get(my, "/NoclipProtocol/Monsters/" + name + "/Y") &&
+                !(registry->Get(state, "/NoclipProtocol/Monsters/" + name + "/State") && state == "Dead"))
+            {
+                AZ::Vector3 eye = AZ::Vector3::CreateZero();
+                AZ::TransformBus::EventResult(eye, m_cameraEntity.IsValid() ? m_cameraEntity : GetEntityId(),
+                                              &AZ::TransformBus::Events::GetWorldTranslation);
+                AZ::Vector3 feet = AZ::Vector3::CreateZero();
+                AZ::TransformBus::EventResult(feet, GetEntityId(), &AZ::TransformBus::Events::GetWorldTranslation);
+                const float dx = static_cast<float>(mx) - eye.GetX(), dy = static_cast<float>(my) - eye.GetY();
+                const float flat = std::sqrt(dx * dx + dy * dy);
+                if (flat > 0.3f)
+                {
+                    // Chest height on whatever it is; a person turns fast but not instantly, and overshoots a little less up close.
+                    const float wantYaw = std::atan2(-dx, dy);
+                    const float wantPitch = std::atan2(feet.GetZ() + 1.15f - eye.GetZ(), flat);
+                    const float yawDiff = std::remainder(wantYaw - m_yaw, AZ::Constants::TwoPi);
+                    const float rate = AZ::DegToRad(260.0f) * deltaTime;
+                    m_yaw += AZStd::clamp(yawDiff * AZStd::min(1.0f, deltaTime * 9.0f), -rate, rate);
+                    m_pitch += AZStd::clamp((wantPitch - m_pitch) * AZStd::min(1.0f, deltaTime * 8.0f), -rate, rate);
+                }
+            }
+        }
         m_lastWrittenRotation = AZ::Quaternion::CreateRotationZ(m_yaw);
         AZ::TransformBus::Event(GetEntityId(), &AZ::TransformBus::Events::SetWorldRotationQuaternion, m_lastWrittenRotation);
+        // A blow from a monster snaps the head: a jolt back and to one side that settles in about half a second.
+        {
+            double health = 1.0;
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Get(health, "/NoclipProtocol/Hud/player.health");
+            }
+            if (static_cast<float>(health) < m_lastHealth - 0.02f)
+            {
+                m_hitKick = 1.0f;
+                m_hitSide = (std::rand() & 1) ? 1.0f : -1.0f;
+            }
+            m_lastHealth = static_cast<float>(health);
+            m_hitKick *= std::exp(-7.0f * deltaTime);
+            if (m_hitKick < 0.01f)
+            {
+                m_hitKick = 0.0f;
+            }
+        }
         if (m_cameraEntity.IsValid())
         {
+            const float k = m_hitKick * m_hitKick * (3.0f - 2.0f * m_hitKick); // sharp start, soft settle
+            const float shake = m_hitKick > 0.0f ? std::sin(m_hitKick * 38.0f) * 0.25f : 0.0f;
             AZ::TransformBus::Event(m_cameraEntity, &AZ::TransformBus::Events::SetLocalRotationQuaternion,
-                AZ::Quaternion::CreateRotationX(m_pitch));
+                AZ::Quaternion::CreateRotationZ(AZ::DegToRad(6.0f) * m_hitSide * k) *
+                AZ::Quaternion::CreateRotationX(m_pitch + AZ::DegToRad(7.0f) * k) *
+                AZ::Quaternion::CreateRotationY(AZ::DegToRad(14.0f) * m_hitSide * (k + shake * m_hitKick)));
         }
 
         // --- Fly (noclip), from the debug overlay (F4): through walls, where you look, no gravity ---

@@ -31,6 +31,7 @@ namespace NoclipProtocol
         //! Walk forward for a while as if W were held (the noclip_walk dev command).
         void WalkFor(float seconds, bool sprint) { m_autoWalkSeconds = seconds; m_autoWalkSprint = sprint; m_autoSteer = false; }
         //! The same, steering round walls by itself like someone running through the maze (noclip_run; the trailer).
+        void AimFor(float seconds, const AZStd::string& name) { m_aimFor = seconds; m_aimName = name; }
         void RunFor(float seconds, bool sprint, float firstTurn) { WalkFor(seconds, sprint); m_autoSteer = true; m_steerSide = firstTurn; m_steerTime = 0.0f; }
 
     protected:
@@ -93,6 +94,11 @@ namespace NoclipProtocol
         void KeepOutOfWalls(AZ::Vector3& move, float deltaTime);
         int m_wallPushes = 0;
         AZ::Vector3 m_safeAt = AZ::Vector3::CreateZero(); // where the body was last frame, outside every wall
+        float m_aimFor = 0.0f;    // noclip_aim: seconds left tracking a monster
+        AZStd::string m_aimName;
+        float m_hitKick = 0.0f;   // 1 just hit, settles to 0
+        float m_hitSide = 1.0f;
+        float m_lastHealth = 1.0f;
         bool m_safeKnown = false;
     };
 } // namespace NoclipProtocol

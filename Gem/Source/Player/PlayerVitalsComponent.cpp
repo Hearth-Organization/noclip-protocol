@@ -12,6 +12,8 @@
 
 AZ_CVAR(float, player_sanity_set, -1.0f, nullptr, AZ::ConsoleFunctorFlags::Null,
     "Set the player's sanity once (0..1, for testing; goes back to -1 after)");
+AZ_CVAR(bool, player_god, false, nullptr, AZ::ConsoleFunctorFlags::Null,
+    "Testing and filming: hits still land (flinch, blood, sounds) but health never drops below 15%");
 
 namespace NoclipProtocol
 {
@@ -124,6 +126,10 @@ namespace NoclipProtocol
         if (registry->Get(damage, "/NoclipProtocol/Player/Damage") && damage != 0.0)
         {
             m_health = AZStd::clamp(m_health - static_cast<float>(damage), 0.0f, 1.0f);
+            if (player_god)
+            {
+                m_health = AZStd::max(m_health, 0.15f);
+            }
             registry->Set("/NoclipProtocol/Player/Damage", 0.0);
         }
 

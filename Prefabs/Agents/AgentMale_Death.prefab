@@ -1,0 +1,98 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "AgentMale_Death",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 896622703076147326
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 7448324152838535597
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 7929594136633779592
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 183312168524748926
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 281974831051144213
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 2434396325403673865
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 981022218073539911
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 2625375731811784517
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 1737621447552271160
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 7199385792285139249,
+                "Parent Entity": ""
+            },
+            "EditorActorComponent": {
+                "$type": "EditorActorComponent",
+                "Id": 4205311085955585822,
+                "ActorAsset": {
+                    "assetId": {
+                        "guid": "{6DACF6CE-2422-5FBD-9207-B5136CBA509B}",
+                        "subId": 1728893255
+                    },
+                    "assetHint": "assets/models/agents/agentmale/agentmale.actor"
+                },
+                "UpdateJointTransformsWhenOutOfView": false
+            },
+            "EditorSimpleMotionComponent": {
+                "$type": "EditorSimpleMotionComponent",
+                "Id": 4234968272775898060,
+                "Configuration": {
+                    "MotionAsset": {
+                        "assetId": {
+                            "guid": "{B2D6B8E9-A591-5F2A-B7D5-CFC47DF6BA52}",
+                            "subId": 1872549924
+                        },
+                        "assetHint": "assets/models/agents/agentmale/agentmale_death.motion"
+                    },
+                    "Loop": false,
+                    "PlayOnActivation": true,
+                    "InPlace": true,
+                    "BlendIn": 0.25,
+                    "BlendOut": 0.25
+                }
+            },
+            "EditorMaterialComponent": {
+                "$type": "EditorMaterialComponent",
+                "Id": 5796639704097602294,
+                "Controller": {
+                    "Configuration": {
+                        "materials": {
+                            "{}": {
+                                "MaterialAsset": {
+                                    "assetId": {
+                                        "guid": "{C9C4C7CB-15C1-5865-9B3F-24D4F2563DEA}"
+                                    },
+                                    "assetHint": "assets/models/agents/agentmale/agentmale.azmaterial"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "Entities": {}
+}
