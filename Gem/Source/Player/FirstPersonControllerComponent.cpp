@@ -786,6 +786,125 @@ namespace NoclipProtocol
         move *= speed;
         move.SetZ(m_verticalSpeed);
 
+        KeepOutOfWalls(move, deltaTime);
         Physics::CharacterRequestBus::Event(GetEntityId(), &Physics::CharacterRequests::AddVelocityForTick, move);
+    }
+
+    void FirstPersonControllerComponent::KeepOutOfWalls(AZ::Vector3& move, float deltaTime)
+    {
+        // The owner, Nov 28: "see how we ran thru a wall that cant happen". The character controller let the body slip
+        // into a wall in a corner (once its capsule overlaps a wall, the controller stops seeing that wall) and then out
+        // the other side. So, on top of the controller: sweep the body's capsule (above the step height, so floors and
+        // stairs don't count) along this frame's move against the level's static walls; if it's already in one, push it
+        // back out the way it came in (the cast's MTD); and take the part of the move that goes into a wall away.
+        auto* scenes = AZ::Interface<AzPhysics::SceneInterface>::Get();
+        const AzPhysics::SceneHandle scene = scenes ? scenes->GetSceneHandle(AzPhysics::DefaultPhysicsSceneName) : AzPhysics::InvalidSceneHandle;
+        if (scene == AzPhysics::InvalidSceneHandle)
+        {
+            return;
+        }
+        AZ::Vector3 base = AZ::Vector3::CreateZero();
+        Physics::CharacterRequestBus::EventResult(base, GetEntityId(), &Physics::CharacterRequests::GetBasePosition);
+        // What counts as a wall: anything solid but the player and the monsters (they're handled by combat).
+        const AZ::EntityId self = GetEntityId();
+        auto wallsOnly = [self](const AzPhysics::SimulatedBody* body, [[maybe_unused]] const Physics::Shape* shape)
+        {
+            if (!body || body->GetEntityId() == self)
+            {
+                return AzPhysics::SceneQuery::QueryHitType::None;
+            }
+            AZ::Entity* entity = nullptr;
+            AZ::ComponentApplicationBus::BroadcastResult(entity, &AZ::ComponentApplicationRequests::FindEntity, body->GetEntityId());
+            if (entity && entity->FindComponent<HearthMonsterComponent>())
+            {
+                return AzPhysics::SceneQuery::QueryHitType::None;
+            }
+            return AzPhysics::SceneQuery::QueryHitType::Block;
+        };
+        // The last line of defence: the body's path since last frame may not cross a wall. Rays at knee and chest
+        // height from where it was to where it is; if one hits a wall on the way, it goes back to where it was.
+        // (A jump of more than 3 m is a teleport, a level change or a respawn, and is let through.)
+        if (m_safeKnown)
+        {
+            const AZ::Vector3 step = base - m_safeAt;
+            const float length = AZ::Vector3(step.GetX(), step.GetY(), 0.0f).GetLength();
+            if (length > 0.0005f && length < 3.0f)
+            {
+                bool crossed = false;
+                for (float h : { 0.6f, 1.3f })
+                {
+                    AzPhysics::RayCastRequest ray;
+                    ray.m_start = m_safeAt + AZ::Vector3(0.0f, 0.0f, h);
+                    ray.m_direction = AZ::Vector3(step.GetX(), step.GetY(), 0.0f) / length;
+                    ray.m_distance = length + 0.05f;
+                    ray.m_filterCallback = wallsOnly;
+                    AzPhysics::SceneQueryHits hits = scenes->QueryScene(scene, &ray);
+                    if (hits && hits.m_hits.front().m_distance < length + 0.05f)
+                    {
+                        crossed = true;
+                    }
+                }
+                if (crossed)
+                {
+                    Physics::CharacterRequestBus::Event(GetEntityId(), &Physics::CharacterRequests::SetBasePosition, m_safeAt);
+                    base = m_safeAt;
+                    if (++m_wallPushes % 30 == 1)
+                    {
+                        AZ_Printf("Noclip", "walls: stopped the player going through a wall at %.1f %.1f", base.GetX(), base.GetY());
+                    }
+                }
+            }
+        }
+        m_safeAt = base;
+        m_safeKnown = true;
+        constexpr float radius = 0.29f, height = 1.25f, lift = 0.38f; // capsule from 0.38 m to 1.63 m above the feet
+        AZ::Vector3 flat(move.GetX(), move.GetY(), 0.0f);
+        const float speed = flat.GetLength();
+        const AZ::Vector3 dir = speed > 0.001f ? flat / speed : AZ::Quaternion::CreateRotationZ(m_yaw).TransformVector(AZ::Vector3::CreateAxisY());
+        AzPhysics::ShapeCastRequest cast = AzPhysics::ShapeCastRequestHelpers::CreateCapsuleCastRequest(radius, height,
+            AZ::Transform::CreateTranslation(base + AZ::Vector3(0.0f, 0.0f, lift + height * 0.5f)), dir,
+            speed * AZ::GetMax(deltaTime, 1.0f / 30.0f) + 0.04f);
+        cast.m_reportMultipleHits = true;
+        cast.m_filterCallback = [wallsOnly](const AzPhysics::SimulatedBody* body, const Physics::Shape* shape)
+        {
+            return wallsOnly(body, shape) == AzPhysics::SceneQuery::QueryHitType::None ? AzPhysics::SceneQuery::QueryHitType::None
+                                                                                       : AzPhysics::SceneQuery::QueryHitType::Touch;
+        };
+        AzPhysics::SceneQueryHits hits = scenes->QueryScene(scene, &cast);
+        AZ::Vector3 push = AZ::Vector3::CreateZero();
+        for (const AzPhysics::SceneQueryHit& hit : hits.m_hits)
+        {
+            AZ::Vector3 n(hit.m_normal.GetX(), hit.m_normal.GetY(), 0.0f);
+            if (n.GetLengthSq() < 0.01f)
+            {
+                continue; // a floor or ceiling face: the controller handles those
+            }
+            n.Normalize();
+            if (hit.m_distance <= 0.0001f)
+            {
+                // Already inside it: out along the wall's normal by how deep we are.
+                push += n * (AZ::GetMax(0.0f, -hit.m_distance) + 0.02f);
+            }
+            const float into = flat.Dot(n);
+            if (into < 0.0f)
+            {
+                flat -= n * into;
+            }
+        }
+        if (!push.IsZero())
+        {
+            if (push.GetLength() > 0.6f)
+            {
+                push = push.GetNormalized() * 0.6f;
+            }
+            Physics::CharacterRequestBus::Event(GetEntityId(), &Physics::CharacterRequests::SetBasePosition, base + push);
+            m_safeAt = base + push;
+            if (++m_wallPushes % 30 == 1)
+            {
+                AZ_Printf("Noclip", "walls: pushed the player out of a wall by %.2f m at %.1f %.1f", push.GetLength(), base.GetX(), base.GetY());
+            }
+        }
+        move.SetX(flat.GetX());
+        move.SetY(flat.GetY());
     }
 } // namespace NoclipProtocol

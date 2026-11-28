@@ -89,5 +89,10 @@ namespace NoclipProtocol
         float m_steerRate = 0.0f;  // the yaw's speed, eased
         float m_steerTime = 0.0f;
         void Steer(float deltaTime);
+        //! Never through a wall (on top of the character controller): see the .cpp.
+        void KeepOutOfWalls(AZ::Vector3& move, float deltaTime);
+        int m_wallPushes = 0;
+        AZ::Vector3 m_safeAt = AZ::Vector3::CreateZero(); // where the body was last frame, outside every wall
+        bool m_safeKnown = false;
     };
 } // namespace NoclipProtocol
