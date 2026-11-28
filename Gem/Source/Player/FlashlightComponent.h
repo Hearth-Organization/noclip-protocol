@@ -44,8 +44,6 @@ namespace NoclipProtocol
         // Settings
         AZ::EntityId m_lightEntity;
         void PlaceBeam();
-        AZ::Quaternion m_baseRotation = AZ::Quaternion::CreateIdentity(); // the beam's own turn under the camera
-        bool m_baseKept = false;
         bool m_onWeapon = false;
         float m_batteryCapacitySeconds = 180.0f; // 3 minutes of light on a full battery
         float m_lowBatteryFraction = 0.15f;      // starts flickering below this

@@ -123,11 +123,6 @@ namespace NoclipProtocol
             lightEntity->Activate();
             // Without a weapon in hand the beam comes from just ahead of the eyes, like a chest light; with one it comes
             // from the weapon's own light (PlaceBeam).
-            if (!m_baseKept)
-            {
-                AZ::TransformBus::EventResult(m_baseRotation, m_lightEntity, &AZ::TransformBus::Events::GetLocalRotationQuaternion);
-                m_baseKept = true;
-            }
             AZ::TransformBus::Event(m_lightEntity, &AZ::TransformBus::Events::SetLocalTranslation, AZ::Vector3(0.16f, 0.95f, -0.10f));
             AZ::Render::AreaLightRequestBus::Event(m_lightEntity, [](AZ::Render::AreaLightRequests* light)
             {
@@ -151,17 +146,19 @@ namespace NoclipProtocol
     {
         // The owner, Nov 27: the light is on the weapon (mounted on the side of the long guns, held beside the pistol,
         // flare gun and knife), so the beam starts at that light's lens and turns with the weapon, kick and sway included.
+        // The spot shines along its +Z; turned -90° about X it shines ahead (+Y), as the beam sits in the levels.
+        static const AZ::Quaternion ahead = AZ::Quaternion::CreateRotationX(-AZ::Constants::HalfPi);
         const Weapons::Lens& lens = Weapons::HeldLens();
         if (lens.m_valid)
         {
             AZ::TransformBus::Event(m_lightEntity, &AZ::TransformBus::Events::SetLocalTM,
-                AZ::Transform::CreateFromQuaternionAndTranslation(lens.m_turn * m_baseRotation, lens.m_at));
+                AZ::Transform::CreateFromQuaternionAndTranslation(lens.m_turn * ahead, lens.m_at));
             m_onWeapon = true;
         }
         else if (m_onWeapon)
         {
             AZ::TransformBus::Event(m_lightEntity, &AZ::TransformBus::Events::SetLocalTM,
-                AZ::Transform::CreateFromQuaternionAndTranslation(m_baseRotation, AZ::Vector3(0.16f, 0.95f, -0.10f)));
+                AZ::Transform::CreateFromQuaternionAndTranslation(ahead, AZ::Vector3(0.16f, 0.95f, -0.10f)));
             m_onWeapon = false;
         }
     }
