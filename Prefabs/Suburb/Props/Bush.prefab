@@ -1,0 +1,204 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "Bush",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 3934635166545639209
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 1717633806652225717
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 4678119861580857001
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 3745474875250701602
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 1695433831310646075
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 7982564926103073845
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 3381573021378319014
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 5855504073245031174
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 9138403606636785393
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 8324823455765693929,
+                "Parent Entity": ""
+            }
+        }
+    },
+    "Entities": {
+        "Entity_[12941076125041]": {
+            "Id": "Entity_[12941076125041]",
+            "Name": "leaves",
+            "Components": {
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 1516485374362711443
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 3349301572448475167
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 8412941502877508728
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 6557463030924695144
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 8260314637902293048
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 2333738977040621747
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 624680695678551283
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 6684875331692403094
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 7045434636472408101,
+                    "Parent Entity": "ContainerEntity"
+                },
+                "AZ::Render::EditorMeshComponent": {
+                    "$type": "AZ::Render::EditorMeshComponent",
+                    "Id": 3910099448992976183,
+                    "Controller": {
+                        "Configuration": {
+                            "ModelAsset": {
+                                "assetId": {
+                                    "guid": "{73352007-FE35-56D0-B7EF-4D954B1BD3F3}",
+                                    "subId": 275120501
+                                },
+                                "assetHint": "assets/models/suburb/props/bush/bush_leaves.fbx.azmodel"
+                            },
+                            "IsRayTracingEnabled": false
+                        }
+                    }
+                },
+                "EditorMaterialComponent": {
+                    "$type": "EditorMaterialComponent",
+                    "Id": 5637457853840390403,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": {
+                                "{}": {
+                                    "MaterialAsset": {
+                                        "assetId": {
+                                            "guid": "{BF295B80-8CEF-5240-9C8B-53C97F47D9FE}"
+                                        },
+                                        "assetHint": "assets/materials/suburb/prop_leaves.azmaterial"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[16852499117615]": {
+            "Id": "Entity_[16852499117615]",
+            "Name": "plastic_green",
+            "Components": {
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 1333194192868415595
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 7828215547448712364
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 8430547470806669731
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 5640766892751869456
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 6670153496237166213
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 6305483926959174002
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 2441202130186664241
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 1315733161990826938
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 8960239091182409038,
+                    "Parent Entity": "ContainerEntity"
+                },
+                "AZ::Render::EditorMeshComponent": {
+                    "$type": "AZ::Render::EditorMeshComponent",
+                    "Id": 3917439591458998076,
+                    "Controller": {
+                        "Configuration": {
+                            "ModelAsset": {
+                                "assetId": {
+                                    "guid": "{2D3D4A8B-8ECC-5502-9C14-E8E81407AC38}",
+                                    "subId": 281364932
+                                },
+                                "assetHint": "assets/models/suburb/props/bush/bush_plastic_green.fbx.azmodel"
+                            }
+                        }
+                    }
+                },
+                "EditorMaterialComponent": {
+                    "$type": "EditorMaterialComponent",
+                    "Id": 190612301650628841,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": {
+                                "{}": {
+                                    "MaterialAsset": {
+                                        "assetId": {
+                                            "guid": "{C2B60B7C-34CE-5601-8226-9BD302A456D2}"
+                                        },
+                                        "assetHint": "assets/materials/suburb/prop_plastic_green.azmaterial"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -6,6 +6,7 @@
 #include "../Base/BaseBuilding.h"
 #include "ClutterCatalog.h"
 #include "SuburbHouses.h"
+#include "SuburbProps.h"
 #include "LevelCatalog.h"
 #include "LevelCatalogMaterials.h"
 #include <AtomLyIntegration/CommonFeatures/CoreLights/AreaLightBus.h>
@@ -869,6 +870,8 @@ namespace NoclipProtocol
                     home = Suburb::Houses[i].m_furniture[f].m_kind == k;
                 }
             }
+            // And the cars parked in its drives and at its kerbs.
+            home = home || (m_settings.m_scene == 1 && AZStd::string_view(Clutter::Kinds[k].m_name).starts_with("Car"));
             if (Clutter::Kinds[k].m_weight[m_settings.m_style] <= 0 && !home)
             {
                 continue; // never in this level
@@ -1455,6 +1458,27 @@ namespace NoclipProtocol
                 SpawnBox(chunk.m_tickets[houseTicket[v]], Level0::Box{ house.m_at.m_x, house.m_at.m_y, 0.0f, 1.0f, 1.0f, 1.0f }, false, house.m_yaw);
             }
         }
+        // Level 9's props: one ticket per kind; wires stretched between their poles.
+        if (!layout.m_suburbProps.empty() && static_cast<int>(m_suburbPropAssets.size()) == Suburb::PropCount)
+        {
+            AZStd::vector<int> propTicket(Suburb::PropCount, -1);
+            for (const Level0::ChunkLayout::PropPlaced& prop : layout.m_suburbProps)
+            {
+                const int k = prop.m_kind;
+                if (k < 0 || k >= Suburb::PropCount || !m_suburbPropAssets[k].IsReady())
+                {
+                    continue;
+                }
+                if (propTicket[k] < 0)
+                {
+                    propTicket[k] = static_cast<int>(chunk.m_tickets.size());
+                    chunk.m_tickets.emplace_back(m_suburbPropAssets[k]);
+                }
+                const bool stretch = prop.m_size.m_x != 1.0f || prop.m_size.m_y != 1.0f || prop.m_size.m_z != 1.0f;
+                SpawnBox(chunk.m_tickets[propTicket[k]], Level0::Box{ prop.m_at.m_x, prop.m_at.m_y, prop.m_at.m_z, prop.m_size.m_x,
+                    prop.m_size.m_y, prop.m_size.m_z }, stretch, prop.m_yaw);
+            }
+        }
         if (layout.m_hasSlabs)
         {
             // A hole only when its stairs or pool can go in it (their prefabs loaded), else the floor whole.
@@ -1813,6 +1837,20 @@ namespace NoclipProtocol
                 AZ::Data::AssetCatalogRequestBus::BroadcastResult(m_sceneMaterials[i], &AZ::Data::AssetCatalogRequests::GetAssetIdByPath,
                     scene[i], AZ::Data::s_invalidAssetType, false);
                 AZ_Warning("NoclipProtocol", m_sceneMaterials[i].IsValid(), "Suburb: '%s' not found", scene[i]);
+            }
+        }
+        // Level 9's street and yard props (Tools/Levels/make_suburb_props.py).
+        m_suburbPropAssets.clear();
+        m_suburbPropAssets.resize(Suburb::PropCount);
+        for (int i = 0; m_settings.m_scene == 1 && i < Suburb::PropCount; ++i)
+        {
+            AZ::Data::AssetId id;
+            AZ::Data::AssetCatalogRequestBus::BroadcastResult(id, &AZ::Data::AssetCatalogRequests::GetAssetIdByPath, Suburb::Props[i].m_prefab,
+                azrtti_typeid<AzFramework::Spawnable>(), false);
+            AZ_Warning("NoclipProtocol", id.IsValid(), "Suburb: '%s' not found", Suburb::Props[i].m_prefab);
+            if (id.IsValid())
+            {
+                m_suburbPropAssets[i] = AZ::Data::AssetManager::Instance().GetAsset<AzFramework::Spawnable>(id, AZ::Data::AssetLoadBehavior::PreLoad);
             }
         }
         // Level 9's houses (Tools/Levels/make_houses.py, make_house_prefabs.py).

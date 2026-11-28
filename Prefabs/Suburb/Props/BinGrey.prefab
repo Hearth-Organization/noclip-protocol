@@ -1,0 +1,203 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "BinGrey",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 7921188043412168091
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 6074289997706504617
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 7199421604068048436
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 7433120490768415771
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 4833491463679460580
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 8622160061164366068
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 7037803918752721266
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 201555683602489796
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 8841076428888489112
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 1351669901486304579,
+                "Parent Entity": ""
+            }
+        }
+    },
+    "Entities": {
+        "Entity_[16778144467429]": {
+            "Id": "Entity_[16778144467429]",
+            "Name": "plastic_grey",
+            "Components": {
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 1078044077872223025
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 7705908259090869853
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 1094019022467185644
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 1845284154277236177
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 5396268742771031070
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 4801192949923857638
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 8356245492390162955
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 7672791509019423929
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 4884723169924401965,
+                    "Parent Entity": "ContainerEntity"
+                },
+                "AZ::Render::EditorMeshComponent": {
+                    "$type": "AZ::Render::EditorMeshComponent",
+                    "Id": 5564550026584062143,
+                    "Controller": {
+                        "Configuration": {
+                            "ModelAsset": {
+                                "assetId": {
+                                    "guid": "{9736B213-1903-548F-BD6E-52CC1F25AA77}",
+                                    "subId": 280144683
+                                },
+                                "assetHint": "assets/models/suburb/props/bingrey/bingrey_plastic_grey.fbx.azmodel"
+                            }
+                        }
+                    }
+                },
+                "EditorMaterialComponent": {
+                    "$type": "EditorMaterialComponent",
+                    "Id": 1688424574522046633,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": {
+                                "{}": {
+                                    "MaterialAsset": {
+                                        "assetId": {
+                                            "guid": "{88C148C6-D1E7-52FB-A07C-D41AE42B4933}"
+                                        },
+                                        "assetHint": "assets/materials/suburb/prop_plastic_grey.azmaterial"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "Entity_[10428400162724]": {
+            "Id": "Entity_[10428400162724]",
+            "Name": "rubber",
+            "Components": {
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 6330248002708081318
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 2849374870143519768
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 4612524046582735483
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 119355337078457531
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 8936910565065130874
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 3587663219237619212
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 2762752317405672686
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 1203716566048865533
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 8997275156574550651,
+                    "Parent Entity": "ContainerEntity"
+                },
+                "AZ::Render::EditorMeshComponent": {
+                    "$type": "AZ::Render::EditorMeshComponent",
+                    "Id": 1918728682896889446,
+                    "Controller": {
+                        "Configuration": {
+                            "ModelAsset": {
+                                "assetId": {
+                                    "guid": "{80B9E055-BB8F-52E7-954F-306465A8ABD9}",
+                                    "subId": 269299890
+                                },
+                                "assetHint": "assets/models/suburb/props/bingrey/bingrey_rubber.fbx.azmodel"
+                            }
+                        }
+                    }
+                },
+                "EditorMaterialComponent": {
+                    "$type": "EditorMaterialComponent",
+                    "Id": 7039059526933592059,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": {
+                                "{}": {
+                                    "MaterialAsset": {
+                                        "assetId": {
+                                            "guid": "{138EF58C-2082-529C-B5B2-EC9829D12739}"
+                                        },
+                                        "assetHint": "assets/materials/suburb/prop_rubber.azmaterial"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

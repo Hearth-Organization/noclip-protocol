@@ -56,7 +56,7 @@ class House:
         """An axis-aligned box. UVs: metres / TILE, projected per face (fit: 0..1 across each face, for doors)."""
         if x1 - x0 < 1e-4 or y1 - y0 < 1e-4 or z1 - z0 < 1e-4:
             return
-        t = TILE[part]
+        t = TILE.get(part, 1.0)
         v = [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0), (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
         faces = [((0, 3, 2, 1), "z"), ((4, 5, 6, 7), "z"), ((0, 1, 5, 4), "y"), ((2, 3, 7, 6), "y"),
                  ((1, 2, 6, 5), "x"), ((3, 0, 4, 7), "x")]
@@ -78,7 +78,7 @@ class House:
 
     def poly(self, part, pts, uv_axes):
         """A flat polygon (roof planes, gables), UVs from two of its axes in metres."""
-        t = TILE[part]
+        t = TILE.get(part, 1.0)
         a, b = uv_axes
         uv = [(p[a] / t, p[b] / t) for p in pts]
         self.parts.setdefault(part, []).append((pts, [(tuple(range(len(pts))), uv)]))
@@ -362,4 +362,5 @@ def main():
     print("wrote", HEADER.relative_to(ROOT))
 
 
-main()
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,128 @@
+{
+    "ContainerEntity": {
+        "Id": "ContainerEntity",
+        "Name": "LeafLitter",
+        "Components": {
+            "EditorEntitySortComponent": {
+                "$type": "EditorEntitySortComponent",
+                "Id": 2784982704695648009
+            },
+            "EditorInspectorComponent": {
+                "$type": "EditorInspectorComponent",
+                "Id": 379763902309263645
+            },
+            "EditorLockComponent": {
+                "$type": "EditorLockComponent",
+                "Id": 5283811974858207828
+            },
+            "EditorOnlyEntityComponent": {
+                "$type": "EditorOnlyEntityComponent",
+                "Id": 8141737019352139243
+            },
+            "EditorPendingCompositionComponent": {
+                "$type": "EditorPendingCompositionComponent",
+                "Id": 7390582681560262801
+            },
+            "EditorVisibilityComponent": {
+                "$type": "EditorVisibilityComponent",
+                "Id": 6435812597391061163
+            },
+            "EditorDisabledCompositionComponent": {
+                "$type": "EditorDisabledCompositionComponent",
+                "Id": 6478312625410577656
+            },
+            "EditorEntityIconComponent": {
+                "$type": "EditorEntityIconComponent",
+                "Id": 6736944554274603537
+            },
+            "EditorPrefabComponent": {
+                "$type": "EditorPrefabComponent",
+                "Id": 1970111548532288890
+            },
+            "TransformComponent": {
+                "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                "Id": 1260860175474871299,
+                "Parent Entity": ""
+            }
+        }
+    },
+    "Entities": {
+        "Entity_[6487669434433]": {
+            "Id": "Entity_[6487669434433]",
+            "Name": "leaf_litter",
+            "Components": {
+                "EditorEntitySortComponent": {
+                    "$type": "EditorEntitySortComponent",
+                    "Id": 145949373204243486
+                },
+                "EditorInspectorComponent": {
+                    "$type": "EditorInspectorComponent",
+                    "Id": 1619279399568624770
+                },
+                "EditorLockComponent": {
+                    "$type": "EditorLockComponent",
+                    "Id": 225694454738265919
+                },
+                "EditorOnlyEntityComponent": {
+                    "$type": "EditorOnlyEntityComponent",
+                    "Id": 5347462641960834755
+                },
+                "EditorPendingCompositionComponent": {
+                    "$type": "EditorPendingCompositionComponent",
+                    "Id": 5352102304009990386
+                },
+                "EditorVisibilityComponent": {
+                    "$type": "EditorVisibilityComponent",
+                    "Id": 4186219282427438119
+                },
+                "EditorDisabledCompositionComponent": {
+                    "$type": "EditorDisabledCompositionComponent",
+                    "Id": 4836290789680719117
+                },
+                "EditorEntityIconComponent": {
+                    "$type": "EditorEntityIconComponent",
+                    "Id": 1329994310963261225
+                },
+                "TransformComponent": {
+                    "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
+                    "Id": 5923743231023205632,
+                    "Parent Entity": "ContainerEntity"
+                },
+                "AZ::Render::EditorMeshComponent": {
+                    "$type": "AZ::Render::EditorMeshComponent",
+                    "Id": 581753271171766755,
+                    "Controller": {
+                        "Configuration": {
+                            "ModelAsset": {
+                                "assetId": {
+                                    "guid": "{AC6B6C9B-20E2-5D73-9E6F-EBDB7B86797F}",
+                                    "subId": 272434004
+                                },
+                                "assetHint": "assets/models/suburb/props/leaflitter/leaflitter_leaf_litter.fbx.azmodel"
+                            },
+                            "IsRayTracingEnabled": false
+                        }
+                    }
+                },
+                "EditorMaterialComponent": {
+                    "$type": "EditorMaterialComponent",
+                    "Id": 2630674753348503740,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": {
+                                "{}": {
+                                    "MaterialAsset": {
+                                        "assetId": {
+                                            "guid": "{196C1EBC-65F7-5B27-B969-22253F3E3A44}"
+                                        },
+                                        "assetHint": "assets/materials/suburb/prop_leaf_litter.azmaterial"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,6 +1,8 @@
 #include "Level0Layout.h"
 #include "ClutterCatalog.h"
 #include "SuburbHouses.h"
+#include "SuburbProps.h"
+#include <cstring>
 
 #include <algorithm>
 #include <cmath>
@@ -348,6 +350,56 @@ namespace NoclipProtocol::Level0
             return west ? Point{ cx - ly, cy + lx, 0.0f } : Point{ cx + ly, cy - lx, 0.0f };
         }
 
+        int ClutterKind(const char* name)
+        {
+            for (int k = 0; k < Clutter::KindCount; ++k)
+            {
+                if (std::strcmp(Clutter::Kinds[k].m_name, name) == 0)
+                {
+                    return k;
+                }
+            }
+            return -1;
+        }
+
+        //! A prop on the street or in a yard, turned by a quarter turn q (0..3, counter-clockwise), its solid boxes with it.
+        void AddProp(ChunkLayout& layout, int kind, float x, float y, int q, float z = 0.0f)
+        {
+            q &= 3;
+            layout.m_suburbProps.push_back(ChunkLayout::PropPlaced{ Point{ x, y, z }, static_cast<float>(q) * 1.5707963f, kind,
+                Point{ 1.0f, 1.0f, 1.0f } });
+            const Suburb::PropInfo& info = Suburb::Props[kind];
+            for (int i = 0; i < info.m_solidCount; ++i)
+            {
+                const Suburb::LocalBox& b = info.m_solids[i];
+                float cx = b.m_cx, cy = b.m_cy, sx = b.m_sx, sy = b.m_sy;
+                for (int t = 0; t < q; ++t)
+                {
+                    const float nx = -cy, ny = cx;
+                    cx = nx; cy = ny;
+                    std::swap(sx, sy);
+                }
+                layout.m_blockers.push_back(Box{ x + cx, y + cy, z + b.m_cz, sx, sy, b.m_sz });
+            }
+        }
+
+        //! A run of fence or hedge (2.5 m pieces) from (x0, y0) to (x1, y1), along x or y; gap: which piece to leave out (-1 none).
+        void AddRun(ChunkLayout& layout, int kind, float x0, float y0, float x1, float y1, int gap)
+        {
+            const bool alongX = std::fabs(x1 - x0) >= std::fabs(y1 - y0);
+            const float length = alongX ? std::fabs(x1 - x0) : std::fabs(y1 - y0);
+            const int pieces = static_cast<int>(length / 2.5f);
+            for (int i = 0; i < pieces; ++i)
+            {
+                if (i == gap)
+                {
+                    continue;
+                }
+                const float t = (static_cast<float>(i) + 0.5f) * 2.5f / length;
+                AddProp(layout, kind, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, alongX ? 0 : 1);
+            }
+        }
+
         void BuildBlock(const Settings& settings, ChunkLayout& layout, int bx, int by, float cell)
         {
             const float X0 = (static_cast<float>(bx * SuburbPeriod) + 1.0f) * cell;   // the block's inside, past its streets
@@ -407,6 +459,90 @@ namespace NoclipProtocol::Level0
                     {
                         path(house.m_garageX, 3.4f);
                     }
+                    // What makes it a street of homes: a mailbox at the end of the walk, bins by the drive, a hedge along
+                    // the front, bushes at the corners, a fenced back yard, things left out in it, a car in the drive.
+                    const int q = west ? 1 : 3;                   // props face the street, like the house
+                    const float out = west ? -1.0f : 1.0f;        // towards the street, in x
+                    const float backX = west ? cx + house.m_maxY : cx - house.m_maxY;  // the house's back wall
+                    const float walkY = HouseToWorld(house.m_doorX, 0.0f, cx, cy, west).m_y;
+                    const float driveY = house.m_garage ? HouseToWorld(house.m_garageX, 0.0f, cx, cy, west).m_y : 1e9f;
+                    if (Unit(Mix(h ^ 40)) < 0.9f)
+                    {
+                        AddProp(layout, Suburb::PropMailbox, streetX - out * 0.6f, walkY + 1.0f, q);
+                    }
+                    if (Unit(Mix(h ^ 41)) < 0.65f)
+                    {
+                        const float by = house.m_garage ? driveY + 2.3f : walkY - 2.2f;
+                        AddProp(layout, Unit(Mix(h ^ 42)) < 0.5f ? Suburb::PropBinGreen : Suburb::PropBinGrey, frontX + out * 0.7f, by, q);
+                        if (Unit(Mix(h ^ 43)) < 0.5f)
+                        {
+                            AddProp(layout, Suburb::PropBinGrey, frontX + out * 0.7f, by + 0.7f, q);
+                        }
+                    }
+                    const float hedgeRoll = Unit(Mix(h ^ 44));
+                    if (hedgeRoll < 0.7f)
+                    {
+                        const int hedgeKind = hedgeRoll < 0.5f ? Suburb::PropHedge : Suburb::PropHedgeDry;
+                        const float hx = frontX + out * 0.8f;
+                        const float y0h = std::min(c0.m_y, c1.m_y) + 0.4f, y1h = std::max(c0.m_y, c1.m_y) - 0.4f;
+                        for (float yy = y0h; yy + 2.5f <= y1h; yy += 2.5f)
+                        {
+                            const float mid = yy + 1.25f;
+                            if (std::fabs(mid - walkY) < 2.0f || std::fabs(mid - driveY) < 3.2f)
+                            {
+                                continue;
+                            }
+                            AddProp(layout, hedgeKind, hx, mid, 1);
+                        }
+                    }
+                    if (Unit(Mix(h ^ 45)) < 0.6f)
+                    {
+                        const int bushKind = Unit(Mix(h ^ 46)) < 0.7f ? Suburb::PropBush : Suburb::PropBushDry;
+                        AddProp(layout, bushKind, frontX + out * 0.9f, std::min(c0.m_y, c1.m_y) - 0.8f, 0);
+                        if (!house.m_garage)
+                        {
+                            AddProp(layout, bushKind, frontX + out * 0.9f, std::max(c0.m_y, c1.m_y) + 0.8f, 0);
+                        }
+                    }
+                    // The back yard: fenced on three sides (a gap for a gate), half the time.
+                    const float fenceRoll = Unit(Mix(h ^ 47));
+                    if (fenceRoll < 0.55f)
+                    {
+                        const int fenceKind = fenceRoll < 0.3f ? Suburb::PropPicketFence : Suburb::PropChainFence;
+                        const float farX = west ? lx0 + lot - 0.15f : lx0 + 0.15f;
+                        const int gap = static_cast<int>(Mix(h ^ 48) % 10ull);
+                        AddRun(layout, fenceKind, farX, ly0 + 0.15f, farX, ly0 + lot - 0.15f, gap);
+                        const float fx0 = std::min(backX, farX), fx1 = std::max(backX, farX);
+                        AddRun(layout, fenceKind, fx0, ly0 + 0.15f, fx1, ly0 + 0.15f, -1);
+                        AddRun(layout, fenceKind, fx0, ly0 + lot - 0.15f, fx1, ly0 + lot - 0.15f, -1);
+                    }
+                    // Things left out in it (the wiki: some have fully furnished back yards).
+                    const float yardX = (backX + (west ? lx0 + lot : lx0)) * 0.5f;
+                    if (Unit(Mix(h ^ 49)) < 0.45f)
+                    {
+                        AddProp(layout, Suburb::PropPatioSet, yardX, walkY - 1.0f, 0);
+                        AddProp(layout, Suburb::PropGrill, yardX - out * 1.6f, walkY + 1.6f, 0);
+                    }
+                    if (Unit(Mix(h ^ 50)) < 0.3f)
+                    {
+                        AddProp(layout, Suburb::PropSwingSet, yardX + out * 1.5f, ly0 + lot * 0.5f + (walkY > ly0 + lot * 0.5f ? -6.0f : 6.0f), 1);
+                    }
+                    else if (Unit(Mix(h ^ 51)) < 0.2f)
+                    {
+                        AddProp(layout, Suburb::PropPaddlingPool, yardX, ly0 + lot * 0.5f + (walkY > ly0 + lot * 0.5f ? -6.0f : 6.0f), 0);
+                    }
+                    // A car in the drive, nose to the garage.
+                    if (house.m_garage && Unit(Mix(h ^ 52)) < 0.45f)
+                    {
+                        static const char* const cars[3] = { "CarGrey", "CarBlue", "CarRed" };
+                        const int kind = ClutterKind(cars[Mix(h ^ 53) % 3ull]);
+                        if (kind >= 0)
+                        {
+                            layout.m_clutter.push_back(ChunkLayout::Clutter{ Point{ (streetX + frontX) * 0.5f, driveY, 0.0f },
+                                west ? 1.5707963f : -1.5707963f, kind });
+                            layout.m_blockers.push_back(Box{ (streetX + frontX) * 0.5f, driveY, 0.7f, 4.4f, 1.9f, 1.4f });
+                        }
+                    }
                     // A dead tree in the front yard, often one out back.
                     const float side = Unit(Mix(h ^ 3)) < 0.5f ? -1.0f : 1.0f;
                     const float ty = ly0 + lot * 0.5f + side * lot * 0.33f;
@@ -422,6 +558,11 @@ namespace NoclipProtocol::Level0
                         layout.m_placed.push_back({ tree, Unit(Mix(h ^ 7)) * 6.2831853f, 0 });
                         layout.m_blockers.push_back(Box{ tree.m_x, tree.m_y, 2.0f, 0.7f, 0.7f, 4.0f });
                     }
+                }
+                if (empty && Unit(Mix(h ^ 60)) < 0.5f)
+                {
+                    // The wiki's playground: tube structures with glowing round windows, in the middle of an empty lot.
+                    AddProp(layout, Suburb::PropPlayground, lx0 + lot * 0.5f, ly0 + lot * 0.5f, static_cast<int>(Mix(h ^ 61) & 1ull));
                 }
                 // Grass over the lot in 5 m patches (Assets/Models/Foliage): mown short, long at the edges, dry spots;
                 // none under the house or on the paths. An empty lot is left to grow long.
@@ -530,6 +671,66 @@ namespace NoclipProtocol::Level0
                         const int kind = roll < 0.10f ? 3 : (roll < 0.30f ? 4 : 2);
                         layout.m_placed.push_back({ at, yaw, kind });
                         layout.m_blockers.push_back(Box{ at.m_x, at.m_y, 2.5f, 0.35f, 0.35f, 5.0f });
+                    }
+                    // Power poles down one side of every street, a pole every 30 m, three lines from each to the next (the wiki:
+                    // electric powerlines to follow). Arrow signs to Level 11 and stop signs at the crossings, hydrants,
+                    // cars left at the kerb, wet leaves on the road.
+                    if (rx != ry)
+                    {
+                        const int along = rx ? gy : gx;
+                        if (Mod(along, 3) == 1)
+                        {
+                            const float px = rx ? x0 + cell - 0.3f : cx - cell * 0.5f + 0.0f;
+                            const Point pole = rx ? Point{ x0 + cell - 0.3f, cy + 3.0f, 0.0f } : Point{ cx + 3.0f, y0 + cell - 0.3f, 0.0f }; // clear of the lamps
+                            (void)px;
+                            AddProp(layout, Unit(Mix(h ^ 20)) < 0.2f ? Suburb::PropPowerPoleTransformer : Suburb::PropPowerPole,
+                                pole.m_x, pole.m_y, rx ? 0 : 1);
+                            for (int w = -1; w <= 1; ++w)
+                            {
+                                const float off = static_cast<float>(w) * 1.05f;
+                                ChunkLayout::PropPlaced wire{ rx ? Point{ pole.m_x + off, pole.m_y + cell * 1.5f, 9.42f }
+                                                                 : Point{ pole.m_x + cell * 1.5f, pole.m_y + off, 9.42f },
+                                    rx ? 0.0f : -1.5707963f, Suburb::PropPowerWire, Point{ 1.0f, cell * 3.0f, 1.0f } };
+                                layout.m_suburbProps.push_back(wire);
+                            }
+                        }
+                        if (Mod(along, SuburbPeriod) == 3 && Unit(Mix(h ^ 21)) < 0.5f)
+                        {
+                            AddProp(layout, Suburb::PropHydrant, rx ? x0 + 1.45f : cx + 2.0f, rx ? cy + 2.0f : y0 + 1.45f, 0);
+                        }
+                        if (Unit(Mix(h ^ 22)) < 0.12f)
+                        {
+                            static const char* const cars[3] = { "CarGrey", "CarBlue", "CarRed" };
+                            const int kind = ClutterKind(cars[Mix(h ^ 23) % 3ull]);
+                            const float lane = (Unit(Mix(h ^ 24)) < 0.5f ? -1.0f : 1.0f) * (cell * 0.5f - walk - 1.1f);
+                            if (kind >= 0)
+                            {
+                                const Point at = rx ? Point{ cx + lane, cy, 0.0f } : Point{ cx, cy + lane, 0.0f };
+                                layout.m_clutter.push_back(ChunkLayout::Clutter{ at, rx ? (lane < 0.0f ? 0.0f : 3.1415927f)
+                                                                                      : (lane < 0.0f ? -1.5707963f : 1.5707963f), kind });
+                                layout.m_blockers.push_back(rx ? Box{ at.m_x, at.m_y, 0.7f, 1.9f, 4.4f, 1.4f } : Box{ at.m_x, at.m_y, 0.7f, 4.4f, 1.9f, 1.4f });
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // A crossing: stop signs on two corners; now and then an arrow sign pointing on to Level 11.
+                        const float c = (cell - walk) * 0.5f + 0.4f;
+                        AddProp(layout, Suburb::PropStopSign, cx - c, cy - c, 2);
+                        AddProp(layout, Suburb::PropStopSign, cx + c, cy + c, 0);
+                        if (Unit(Mix(h ^ 25)) < 0.35f)
+                        {
+                            AddProp(layout, Suburb::PropArrowSign, cx + c, cy - c, static_cast<int>(Mix(h ^ 26) & 3ull));
+                        }
+                    }
+                    for (int l = 0; l < 2; ++l)
+                    {
+                        if (Unit(Mix(h ^ (27 + l))) < 0.55f)
+                        {
+                            const Point at{ cx + (Unit(Mix(h ^ (30 + l))) - 0.5f) * cell * 0.8f, cy + (Unit(Mix(h ^ (32 + l))) - 0.5f) * cell * 0.8f, 0.0f };
+                            layout.m_suburbProps.push_back(ChunkLayout::PropPlaced{ at, Unit(Mix(h ^ (34 + l))) * 6.2831853f,
+                                l ? Suburb::PropLeafLitterB : Suburb::PropLeafLitter, Point{ 1.0f, 1.0f, 1.0f } });
+                        }
                     }
                     // Leaves and puddles lie about on the asphalt (recent rain).
                     if (Unit(Mix(h ^ 9)) < 0.45f)

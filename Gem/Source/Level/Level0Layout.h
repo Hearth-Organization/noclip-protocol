@@ -139,6 +139,15 @@ namespace NoclipProtocol::Level0
             int m_variant;
         };
         std::vector<HousePlaced> m_houses;
+        //! Level 9's street and yard props (SuburbProps.h): poles, wires (stretched by m_size), signs, fences, hedges...
+        struct PropPlaced
+        {
+            Point m_at;
+            float m_yaw;
+            int m_kind;
+            Point m_size; // the stretch (wires); 1, 1, 1 for the rest
+        };
+        std::vector<PropPlaced> m_suburbProps;
         std::vector<Box> m_blockers;  // solid but drawn by their models (houses, trunks, lamp posts)
         std::vector<Point> m_noclipSpots; // on the floor, in the middle of a cell
         //! Ways into other levels besides the tears (owner, Nov 27: "doorways or stairs or a drop off into water").
