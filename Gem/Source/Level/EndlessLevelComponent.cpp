@@ -618,6 +618,14 @@ namespace NoclipProtocol
         m_settings.m_darkZoneShare = m_darkZoneShareField;
         const bool rayTraced = RayTracing::IsOn();
         m_settings.m_workingLights = rayTraced ? m_workingLightsRayTracedField : m_workingLightsField;
+        {
+            double share = 0.6; // /NoclipProtocol/Graphics/LightShare: the share of lights left on, every level
+            if (auto* registry = AZ::SettingsRegistry::Get())
+            {
+                registry->Get(share, "/NoclipProtocol/Graphics/LightShare");
+            }
+            m_settings.m_lightShare = static_cast<float>(share);
+        }
         AZ_Printf("NoclipProtocol", "Level 0 lights: ray tracing %s, %.0f%% of lit-area lights work", rayTraced ? "on" : "off",
             m_settings.m_workingLights * 100.0f);
         m_settings.m_decalChance = m_decalChanceField;

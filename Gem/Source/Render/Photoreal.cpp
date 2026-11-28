@@ -9,6 +9,7 @@
 #include <Atom/Feature/SpecularReflections/SpecularReflectionsFeatureProcessorInterface.h>
 #include <Atom/RPI.Public/Scene.h>
 #include <AzCore/Console/IConsole.h>
+#include <AzCore/std/containers/unordered_map.h>
 #include <AzCore/Settings/SettingsRegistry.h>
 
 namespace NoclipProtocol::Photoreal
@@ -113,13 +114,23 @@ namespace NoclipProtocol::Photoreal
             ao->OnConfigChanged();
         }
 
-        // An eye, not a fixed camera: a narrow range round the level's own exposure, so the dark stays dark.
+        // An eye, not a fixed camera: it stops down in a bright room and never opens up past the level's own exposure,
+        // so the dark stays dark and lit rooms don't blow out (owner, Nov 28).
         if (auto* exposure = settings->GetOrCreateExposureControlSettingsInterface())
         {
             exposure->SetExposureControlType(look && Flag("EyeAdaptation", true) ? AZ::Render::ExposureControl::ExposureControlType::EyeAdaptation
                                                   : AZ::Render::ExposureControl::ExposureControlType::ManualOnly);
-            exposure->SetEyeAdaptationExposureMin(-1.5f);
-            exposure->SetEyeAdaptationExposureMax(1.5f);
+            exposure->SetEyeAdaptationExposureMin(-2.0f);
+            // Half a stop darker than each level was set up for (the owner, Nov 28: "not all blown out").
+            // The level's own value is kept once, so applying again never darkens twice.
+            static AZStd::unordered_map<AZ::EntityId, float> original;
+            auto it = original.find(environment);
+            if (it == original.end())
+            {
+                it = original.emplace(environment, exposure->GetManualCompensation()).first;
+            }
+            exposure->SetManualCompensation(it->second - (look ? 0.5f : 0.0f));
+            exposure->SetEyeAdaptationExposureMax(0.0f);
             exposure->SetEyeAdaptationSpeedUp(2.0f);
             exposure->SetEyeAdaptationSpeedDown(0.8f);
             exposure->OnConfigChanged();

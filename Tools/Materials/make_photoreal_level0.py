@@ -102,8 +102,8 @@ def carpet(ph):
         'occlusion.diffuseFactor': 1.0,
         'parallax.textureMap': '../../Textures/Level0/level0_carpet_height.png',
         'parallax.factor': 0.008,
-        'uv.tileU': 16.0,
-        'uv.tileV': 16.0,
+        'uv.tileU': 12.0,
+        'uv.tileV': 12.0,
     })
 
 

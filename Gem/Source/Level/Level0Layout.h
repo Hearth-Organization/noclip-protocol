@@ -35,6 +35,7 @@ namespace NoclipProtocol::Level0
         float m_darkZoneShare = 0.4f;  // share of the world inside dark zones (dead / missing lights)
         float m_darkZoneScale = 3.5f;  // dark zones are about this many cells across
         float m_decalChance = 0.3f;    // chance a cell gets a floor stain
+        float m_lightShare = 1.0f;     // share of the lights that would work which really do, every level (owner, Nov 28: "turn off some lights on every level ... so it's not all blown out")
         float m_workingLights = 0.66f; // share of lights in lit areas that work; lower = more dead and flickering (ray tracing uses 0.33)
 
         // Which level this is: 0 = Level 0 (yellow rooms), 1 = Level 1 (concrete warehouse / garage),

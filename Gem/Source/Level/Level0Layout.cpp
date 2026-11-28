@@ -581,10 +581,11 @@ namespace NoclipProtocol::Level0
         //    The spawn room is mostly lit: the cells around spawn always work, elsewhere some lights are out.
         //    Working lights: 0.66 is the original balance. Fewer working lights (ray tracing) turns the difference
         //    mostly into dead fixtures and a bit more flicker; the spawn room loses some too. Dark zones don't change.
-        const float working = std::clamp(settings.m_workingLights, 0.05f, 0.9f);
+        const float share = std::clamp(settings.m_lightShare, 0.1f, 1.0f);
+        const float working = std::clamp(settings.m_workingLights, 0.05f, 0.9f) * share;
         const float fewer = std::max(0.0f, 0.66f - working);
         const float litFlicker = std::min(0.94f, working + 0.16f + fewer * 0.25f);
-        const float spawnDead = 0.20f + fewer * 0.5f;
+        const float spawnDead = 1.0f - (1.0f - std::min(0.9f, 0.20f + fewer * 0.5f)) * share;
         const float spawnFlicker = spawnDead + 0.06f + fewer * 0.1f;
         for (int x = 0; x < n; ++x)
         {
