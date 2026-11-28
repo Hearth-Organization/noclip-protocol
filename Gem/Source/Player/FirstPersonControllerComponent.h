@@ -79,6 +79,9 @@ namespace NoclipProtocol
         // The grid can't rotate, so it's taken off the player and follows its position only; after a teleport it
         // is switched off for a few frames and starts fresh where the player landed.
         AZ::EntityId m_rayTracedLight;
+        bool m_photorealDone = false;   // the photoreal look set for this level (Render/Photoreal.h)
+        float m_photorealWait = 0.0f;
+        void UpdatePhotoreal(float deltaTime);
         bool m_rayTracedLightSearched = false;
         int m_rayTracedLightPause = 0;
 

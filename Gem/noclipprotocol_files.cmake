@@ -24,6 +24,8 @@ set(FILES
     Source/Level/FlickerLightComponent.h
     Source/Render/RayTracing.cpp
     Source/Render/RayTracing.h
+    Source/Render/Photoreal.cpp
+    Source/Render/Photoreal.h
     Source/Cinematics/CinematicCommands.cpp
     Source/Scripting/HearthBlocksComponent.cpp
     Source/Scripting/HearthBlocksComponent.h

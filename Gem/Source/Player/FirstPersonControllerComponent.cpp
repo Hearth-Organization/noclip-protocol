@@ -7,6 +7,7 @@
 #include "../Monsters/MonsterSpawnerComponent.h"
 #include "DeathSequence.h"
 #include "../Level/EndlessLevelComponent.h"
+#include "../Render/Photoreal.h"
 #include <cstdlib>
 
 #include <AzCore/Settings/SettingsRegistry.h>
@@ -476,6 +477,39 @@ namespace NoclipProtocol
         return false; // never swallow input; other components may want it too
     }
 
+    void FirstPersonControllerComponent::UpdatePhotoreal(float deltaTime)
+    {
+        // Every level gets the same look (ray-traced reflections, GTAO, eye adaptation...), once its environment is up.
+        if (Photoreal::TakeReapply())
+        {
+            m_photorealDone = false;
+            m_photorealWait = 0.0f;
+        }
+        if (m_photorealDone)
+        {
+            return;
+        }
+        m_photorealWait -= deltaTime;
+        if (m_photorealWait > 0.0f)
+        {
+            return;
+        }
+        m_photorealWait = 0.5f;
+        AZ::EntityId environment;
+        AZ::ComponentApplicationBus::Broadcast(&AZ::ComponentApplicationRequests::EnumerateEntities, [&environment](AZ::Entity* entity)
+        {
+            if (!environment.IsValid() && entity->GetState() == AZ::Entity::State::Active && entity->GetName() == "Atom Default Environment")
+            {
+                environment = entity->GetId();
+            }
+        });
+        if (Photoreal::Apply(environment, RayTracing::IsOn()))
+        {
+            m_photorealDone = true;
+            AZ_Printf("NoclipProtocol", "Photoreal look applied (gfx_set changes one effect)");
+        }
+    }
+
     void FirstPersonControllerComponent::UpdateRayTracedLight()
     {
         if (!m_rayTracedLightSearched)
@@ -607,6 +641,7 @@ namespace NoclipProtocol
             return;
         }
         UpdateRayTracedLight();
+        UpdatePhotoreal(deltaTime);
         bool paused = false;
         double sensitivity = 1.0;
         if (auto* registry = AZ::SettingsRegistry::Get())
